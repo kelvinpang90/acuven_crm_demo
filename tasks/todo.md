@@ -1028,6 +1028,9 @@ Q3：**选 1**（`E,F,W,I`，忽略 E501、E712）。
       不发请求（缺 token、缺 id、都缺三种）；另补凭据齐全时成功入库、非 200 与网络出错仍 502 不入库的用例。
       新增 `backend/tests/test_email_send.py`：未配置（三种缺法）、发送出错（连接 / 认证 / 发送三步，含错误日志断言）、
       发送成功、没有邮箱。每条 docstring 写明守住哪条验收标准。
+- [x] 评审第 1 轮：经接口的 WhatsApp 用例原来 patch 的是 `httpx.AsyncClient.post`，连测试客户端自己的请求也被替换，
+      根本没到应用。改为只替换 `whatsapp_service` 模块里的 `httpx` 名字（`AsyncClient` 换成 mock，`HTTPError`
+      保留真实类），测试客户端不受影响；未配置用例断言 `AsyncClient` 没有被实例化。业务代码未改。
 
 ## 偏离
 

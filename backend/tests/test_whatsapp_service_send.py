@@ -1,3 +1,4 @@
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
@@ -66,6 +67,23 @@ async def test_send_message_demo_contact_uses_gateway(async_session_maker, monke
     assert called_kwargs["json"] == {"to": "60199999999", "text": "hello"}
 
 
+def _stub_service_httpx(monkeypatch, post_mock: AsyncMock) -> MagicMock:
+    """Replace the httpx client the service creates, leaving the test client alone.
+
+    Only the `httpx` name inside whatsapp_service is swapped, so the `client`
+    fixture (itself an httpx.AsyncClient) still reaches the app, and
+    `except httpx.HTTPError` in the service still catches real httpx errors.
+    """
+    mock_cls = MagicMock()
+    mock_cls.return_value.__aenter__.return_value.post = post_mock
+    monkeypatch.setattr(
+        whatsapp_service,
+        "httpx",
+        SimpleNamespace(AsyncClient=mock_cls, HTTPError=httpx.HTTPError),
+    )
+    return mock_cls
+
+
 @pytest.mark.parametrize(
     "token, phone_number_id",
     [("", ""), ("", "123456"), ("token", "")],
@@ -80,12 +98,14 @@ async def test_send_without_credentials_is_503_and_not_saved(
 
     contact_id = await _make_contact(async_session_maker, is_gateway=False)
 
-    with patch("httpx.AsyncClient.post", new=AsyncMock()) as mock_post:
-        resp = await _post_send(client, contact_id)
+    post_mock = AsyncMock()
+    mock_cls = _stub_service_httpx(monkeypatch, post_mock)
+    resp = await _post_send(client, contact_id)
 
     assert resp.status_code == 503
     assert resp.json()["error"]["code"] == "NOT_CONFIGURED"
-    mock_post.assert_not_awaited()
+    mock_cls.assert_not_called()
+    post_mock.assert_not_awaited()
     assert await _outbound_count(async_session_maker) == 0
 
 
@@ -102,8 +122,9 @@ async def test_send_with_credentials_succeeds_and_is_saved(
     graph_response = MagicMock(status_code=200)
     graph_response.json.return_value = {"messages": [{"id": "wamid.1"}]}
 
-    with patch("httpx.AsyncClient.post", new=AsyncMock(return_value=graph_response)) as mock_post:
-        resp = await _post_send(client, contact_id)
+    mock_post = AsyncMock(return_value=graph_response)
+    _stub_service_httpx(monkeypatch, mock_post)
+    resp = await _post_send(client, contact_id)
 
     assert resp.status_code == 200
     assert resp.json()["data"]["external_id"] == "wamid.1"
@@ -113,15 +134,11 @@ async def test_send_with_credentials_succeeds_and_is_saved(
 
 
 @pytest.mark.parametrize(
-    "post_mock",
-    [
-        AsyncMock(return_value=MagicMock(status_code=400, text="bad request")),
-        AsyncMock(side_effect=httpx.ConnectError("unreachable")),
-    ],
-    ids=["non_200", "network_error"],
+    "failure",
+    ["non_200", "network_error"],
 )
 async def test_send_graph_failure_is_502_and_not_saved(
-    client, async_session_maker, monkeypatch, post_mock
+    client, async_session_maker, monkeypatch, failure
 ):
     """Guards AC2: a non-200 from the Graph API or a network error is still
     502 API_ERROR with nothing persisted."""
@@ -130,9 +147,14 @@ async def test_send_graph_failure_is_502_and_not_saved(
 
     contact_id = await _make_contact(async_session_maker, is_gateway=False)
 
-    with patch("httpx.AsyncClient.post", new=post_mock):
-        resp = await _post_send(client, contact_id)
+    if failure == "non_200":
+        post_mock = AsyncMock(return_value=MagicMock(status_code=400, text="bad request"))
+    else:
+        post_mock = AsyncMock(side_effect=httpx.ConnectError("unreachable"))
+    _stub_service_httpx(monkeypatch, post_mock)
+    resp = await _post_send(client, contact_id)
 
+    post_mock.assert_awaited_once()
     assert resp.status_code == 502
     assert resp.json()["error"]["code"] == "API_ERROR"
     assert await _outbound_count(async_session_maker) == 0
