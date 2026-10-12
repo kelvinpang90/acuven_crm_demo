@@ -237,7 +237,7 @@ tasks:
       实现 docs/chatbot-events.md 第五节与第九节第 1、4 条对五种事件的处理：找联系人（必要时新建并指派、建 lead 商机）、
       消息按 wa_message_id 去重入库、接管状态按事件时间更新、送达状态只升不降。只做业务规则层，入口只收已校验的普通参数，
       由 CRM-TASK-008 的接口调用。不加接口与验签、不改表结构、不改号码规范化与各保存入口（CRM-TASK-007）、不改前端。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-006
       - CRM-TASK-007
