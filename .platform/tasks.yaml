@@ -197,7 +197,7 @@ tasks:
     purpose: >-
       按 docs/chatbot-events.md 第三、五节实现业务规则：号码规范化函数，并在联系人新建、编辑、表格导入与 AutoCount 客户同步时使用；号码冲突的实时查询；
       会话事件（顾客消息、AI 回复、控制台回复、接管变化、送达状态）的处理服务，入参是接口层校验过的事件字典。
-      只做工具函数与服务层；不加路由、不验签、不加配置（接口是 CRM-TASK-008）；不改 whatsapp_service 现有的入站与发送逻辑；
+      只做工具函数与服务层；不加路由、不验签、不加配置（接口是 CRM-TASK-008）；whatsapp_service 只改旧入站按号码找联系人的取法（多于一个取最早），其余入站与发送逻辑不动；
       不改表结构、不改存量数据、不改前端。
     status: ready
     depends_on:
@@ -205,10 +205,10 @@ tasks:
     acceptance_criteria:
       - 号码规范化按设计第三节五步，每步作用在上一步的数字串上：去掉非数字；以 00 开头去掉这两个 0；以 0 开头把它换成 60；以 600 开头去掉 60 后紧跟的所有 0；8 到 15 位才有效，否则判为无效。结果与第三节例子表逐行一致，且对有效结果再规范化一次不变。联系人新建、编辑、表格导入以及 AutoCount 客户同步写入号码时，有效则存规范化结果，无效原样存
       - 联系人列表与详情返回 phone_conflict、whatsapp_bsuid、wa_handover_active、wa_handover_expires_at（带 Z 的 UTC）。phone_conflict 只在调用方是管理员时实时查询，只查号码已是有效规范化形式的联系人（未删除、号码相同、多于一个），其他角色与无效号码恒为 false；get_contact 为此加一个默认不查询的参数。wa_handover_active 返回生效值：已存为接管中且到期时间晚于当前时间才为 true
-      - 消息类事件按设计第五节找联系人：先按号码找未删除联系人，多于一个取 created_at 最早、再按 id 最小的；按条件补 bsuid；按号码没找到而带 bsuid 时按 bsuid 找未删除联系人，没有号码则补上；都没有则新建，名字依次取 profile_name、号码、bsuid 并一律截断到 100，is_gateway 为 false，调 assign_contact 指派并建 lead 商机；要写入的 bsuid 被已删除联系人占用时先清空它（BSUID 让位），与第五节的例子一致
-      - 消息类事件先按 wa_message_id 去重，重复直接返回 duplicate，不找联系人、不新建、不让位 bsuid；customer_message 存为入站、author_kind 为 customer、未读；ai_reply 存为出站、author_kind 为 ai、带 bot_id、已读；console_reply 存为出站、author_kind 为 console、已读；created_at 取 occurred_at 换算的 UTC（保留微秒）；正文超过 16000 字符截断入库；访客一侧填号码（没有号码填 bsuid），chatbot 一侧填 ai_chatbot_demo；assigned_to 取联系人当前负责人；返回 stored
+      - 消息类事件按设计第五节找联系人：先按号码找未删除联系人，多于一个取 created_at 最早、再按 id 最小的；按条件补 bsuid；按号码没找到而带 bsuid 时按 bsuid 找未删除联系人，没有号码则补上；都没有则新建，名字依次取 profile_name、号码、bsuid 并一律截断到 100，is_gateway 为 false，调 assign_contact 指派并建 lead 商机；要写入的 bsuid 被已删除联系人占用时先清空它（BSUID 让位），与第五节的例子一致；旧入站路径按号码找联系人时同样取 created_at 最早、再按 id 最小的，不再因同号码多个而报错
+      - 消息类事件先按 wa_message_id 去重，重复直接返回 duplicate，不找联系人、不新建、不让位 bsuid；customer_message 存为入站、author_kind 为 customer、未读；ai_reply 存为出站、author_kind 为 ai、带 bot_id、已读；console_reply 存为出站、author_kind 为 console、已读；created_at 取 occurred_at 换算的 UTC（保留微秒）；正文超过 16000 字符截断入库；访客一侧填事件里的 phone（没有则填事件里的 bsuid），chatbot 一侧填 ai_chatbot_demo；assigned_to 取联系人当前负责人；返回 stored
       - handover_changed 按同样的号码再 bsuid 方式找联系人但不补字段，找不到返回 ignored 且不新建；occurred_at 早于或等于已存的更新时间返回 ignored 且不改；否则写入接管中、到期时间（active 为 false 时存空）与微秒精度的更新时间。delivery_status 只更新出站消息，找不到或是入站消息返回 ignored；状态按 空、sent、delivered、failed、read 排序，新状态更高才写入，否则 ignored；写入 failed 时原因按第五节拼法截断到 300，写入 read 时清空原因。三组行为与第五节的例子逐条一致
-      - 新增测试逐条覆盖上面五条，包括第三节例子表与幂等、AutoCount 同步写入规范化号码且再同步一次不改动该行、平局按 id、重复消息不新建联系人、BSUID 让位、去重、三类消息字段与 created_at、接管的三个例子、送达的例子、非管理员与无效号码 phone_conflict 恒为 false；每条测试写明守住哪一条验收标准；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
+      - 新增测试逐条覆盖上面五条，包括第三节例子表与幂等、AutoCount 同步写入规范化号码且再同步一次不改动该行、平局按 id、重复消息不新建联系人、旧入站在同号码多个联系人时挂到最早那个、BSUID 让位、去重、三类消息字段与 created_at、接管的三个例子、送达的例子、非管理员与无效号码 phone_conflict 恒为 false；每条测试写明守住哪一条验收标准；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
       - tasks/todo.md 新增 CRM-TASK-007 记录段（做了什么、偏离了什么、验证到什么程度），不改 planning-v1 块，复选框只允许 [ ] / [x]；改动只落在 allowed_change_paths，不改 .platform/、CI、部署配置，不装依赖，不加路由、不改表结构、不改前端
       - allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#17 与登记 PR 里的修订一），不合并、不直推
     allowed_change_paths:
@@ -216,6 +216,7 @@ tasks:
       - backend/app/services/chatbot_event_service.py
       - backend/app/services/contact_service.py
       - backend/app/services/autocount_service.py
+      - backend/app/services/whatsapp_service.py
       - backend/tests/test_phone_normalize.py
       - backend/tests/test_chatbot_event_service.py
       - backend/tests/test_contact_phone.py
