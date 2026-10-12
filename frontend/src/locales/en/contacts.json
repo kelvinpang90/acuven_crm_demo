@@ -38,6 +38,8 @@
   "unarchive": "Unarchive",
   "viewArchived": "View Archived",
   "viewActive": "View Active",
+  "unassignedOnly": "Unassigned only",
+  "unassignedCount": "{{number}} unassigned contacts",
   "autocountCustomer": "AutoCount Customer Code",
   "autocountDocuments": "AutoCount Documents",
   "autocountDocType": {

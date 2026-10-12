@@ -10,6 +10,7 @@ export interface ContactListParams {
   sort_by?: string;
   order?: string;
   is_archived?: number;
+  unassigned?: number;
 }
 
 export const contactsApi = {
