@@ -406,7 +406,7 @@ tasks:
       - CRM-TASK-008
     acceptance_criteria:
       - 配置类新增 CHATBOT_SEND_URL（chatbot 后端的内部基地址，只到端口、不含路径，发送与交还分别接 /internal/crm/send 与 /internal/crm/handback）与 CHATBOT_SEND_SECRET，默认空，任一为空按未配置处理；注释写明密钥与 chatbot 一侧 CRM_SEND_SECRET 同值、必须与 CHATBOT_EVENTS_SECRET 不同值；请求按设计第五节签名（请求头 X-Acuven-Timestamp 为 Unix 秒、X-Acuven-Signature 为 sha256= 接十六进制，HMAC-SHA256，密钥是字符串的 UTF-8 字节，被签内容是时间戳与一个点的字节再接原始请求体字节），请求体为 request_id、visitor 的 phone 与 bsuid、text、agent 的 id 与 name，总时限 30 秒
-      - 发送前按第六节校验，任一不过就返回对应结果、不存消息、不调用 chatbot：联系人号码不能被 normalize_phone 规范化为 NO_PHONE；当前时间不早于该联系人最后一条渠道为 whatsapp 的入站消息时间加 24 小时（恰好 24 小时算关闭），或没有入站消息，为 WINDOW_CLOSED 并带窗口关闭时间（没有入站消息时为空）；未配置为 NOT_CONFIGURED
+      - 发送前按第六节校验，任一不过就返回对应结果、不存消息、不调用 chatbot：联系人不存在或已软删除为 NOT_FOUND；联系人号码不能被 normalize_phone 规范化为 NO_PHONE；当前时间不早于该联系人最后一条渠道为 whatsapp 的入站消息时间加 24 小时（恰好 24 小时算关闭），或没有入站消息，为 WINDOW_CLOSED 并带窗口关闭时间（没有入站消息时为空）；未配置为 NOT_CONFIGURED
       - 通过后先存并提交一条消息再调用 chatbot：新 UUID 作 id 与 request_id，渠道 whatsapp、出站、author_kind 为 agent、sent_by 为当前用户、负责人取联系人当前负责人、发件人 ai_chatbot_demo、收件人为规范化号码、已读、external_id 与 delivery_status 为空；agent 的 name 取用户名字
       - 按第六节第 8 条分三类：200 且 result 为 sent 或 duplicate、带 wa_message_id 为已发出；502 且 result 为 rejected、401、422、503、请求没送出去（连接失败、连接超时、连接池超时）为明确没发出，删掉这条消息并带回 Meta 的错误码与标题（有则带）；其余一切（409、504、其他状态码、200 但 result 或 wa_message_id 不对、写超时、读超时、连接中途断开、30 秒总时限到）为结果不明，消息留着；服务向调用方返回结果类别、这条消息与错误信息
       - 已发出时用条件更新补写，不按内存里的旧值判断：external_id 为空时写入 wa_message_id，delivery_status 为空时写 sent；响应的 handover 非空时，经 chatbot_event_service 新增的写入函数写入接管三项，条件是 occurred_at 严格晚于已存的更新时间，否则不改；CRM-TASK-011 已有的五种事件规则行为不变
@@ -463,7 +463,7 @@ tasks:
     depends_on:
       - CRM-TASK-014
     acceptance_criteria:
-      - POST /api/messages/whatsapp/send 改用 CRM-TASK-013 的服务，路由不再引用 whatsapp_service；正文校验写在请求模型里（去掉首尾空白后须为 1 至 4096 字符，否则 422，先于处理函数）；归属校验不变（403 NOT_ASSIGNED）；之后依次是 NO_PHONE、WINDOW_CLOSED、NOT_CONFIGURED；结果映射为已发出 200 返回消息、NO_PHONE 400、WINDOW_CLOSED 409、NOT_CONFIGURED 503、明确没发出 502 SEND_FAILED、结果不明 202（用 ok 外壳，data 是这条消息，message 为 UNCONFIRMED）；错误照现有 fail 外壳返回，窗口关闭时间放在 error 的 fields 的 window_closed_at，Meta 的错误码与标题放在 fields 的 error_code 与 error_title
+      - POST /api/messages/whatsapp/send 改用 CRM-TASK-013 的服务，路由不再引用 whatsapp_service；正文校验写在请求模型里（去掉首尾空白后须为 1 至 4096 字符，否则 422，先于处理函数）；归属校验不变（403 NOT_ASSIGNED），联系人不存在或已删除（含管理员请求时）返回同一个 403；之后依次是 NO_PHONE、WINDOW_CLOSED、NOT_CONFIGURED；结果映射为已发出 200 返回消息、NO_PHONE 400、WINDOW_CLOSED 409、NOT_CONFIGURED 503、明确没发出 502 SEND_FAILED、结果不明 202（用 ok 外壳，data 是这条消息，message 为 UNCONFIRMED）；错误照现有 fail 外壳返回，窗口关闭时间放在 error 的 fields 的 window_closed_at，Meta 的错误码与标题放在 fields 的 error_code 与 error_title
       - 新增 POST /api/messages/{message_id}/whatsapp/retry，交给 CRM-TASK-014 的重试；消息不存在、不是客服消息、或无权访问其联系人一律返回同一个 403 NOT_ASSIGNED 响应，不泄露是否存在；其间已确认的返回 200 与这条消息；其余结果映射同上，另加 IN_PROGRESS 409 与 RETRY_EXPIRED 409，联系人已不存在或已删除（含管理员请求时）同样返回 403 NOT_ASSIGNED；发送与重试返回的消息与下一条一样带 sent_by 与 sent_by_name
       - 新增 POST /api/contacts/{contact_id}/whatsapp/handback，归属校验同发送，联系人不存在或已删除（含管理员请求时）返回同一个 403 NOT_ASSIGNED；成功 200 返回联系人当前接管三项（输出约定同 CRM-TASK-008）；NO_IDENTITY 400、NOT_CONFIGURED 503、chatbot 失败 502 CHATBOT_FAILED
       - 会话事件接口接受 agent_reply：除公共字段外必须带 message 的 wa_message_id 与 body 和非空的 crm_message_id，否则 422；合法的交给 CRM-TASK-014 的规则，响应体顶层只有 result；其他五种事件的校验与处理不变
