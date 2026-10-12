@@ -1295,3 +1295,37 @@ PRECHECK_RESULT: READY
 
 - 前端类型检查与构建由 PR 的必需检查 `frontend` 执行；检查结果由 Worker 和 CI 记录，不写在这里。
 - 没有在浏览器里实际点过三种角色的页面。
+
+---
+
+# CRM-TASK-006：会话事件第1阶段的表结构迁移与模型
+
+来源：`docs/chatbot-events.md` 第六节。设计闸门：kelvinpang90/acuven_crm_demo#17。
+
+## 做了什么
+
+- [x] 新增迁移 `backend/alembic/versions/012_add_chatbot_event_fields.py`（`down_revision = "011"`）：
+      `contacts` 加 `whatsapp_bsuid`（`String(128)`，可空）、`wa_handover_active`（`Boolean`，非空，`server_default=false`，
+      存量行取 false）、`wa_handover_expires_at` 与 `wa_handover_updated_at`（`DateTime`，可空，与其他时间列一样存无时区的 UTC）；
+      加唯一索引 `idx_contacts_whatsapp_bsuid` 与普通索引 `idx_contacts_phone`。`messages` 加 `author_kind`
+      （枚举 `message_author_kind`：customer / ai / console / agent）、`bot_id`（`String(50)`）、`delivery_status`
+      （枚举 `message_delivery_status`：sent / delivered / read / failed）、`delivery_error`（`String(300)`），都可空。
+      upgrade 只加列加索引，不改存量数据；downgrade 按相反顺序先删 `messages` 的列，再删两个索引和 `contacts` 的列。
+- [x] `backend/app/models/contact.py`、`backend/app/models/message.py`：同名同类型同可空性的字段与同名索引，
+      `wa_handover_active` 同时带 Python 默认值 `False` 与数据库默认值 `false()`。只加字段，不加行为。
+- [x] 新增测试 `backend/tests/test_migration_012.py`，每条 docstring 写明守住哪条验收标准：
+      revision 链；在只含 id、phone 的 `contacts` 与只含 id 的 `messages` 上用 `Operations` 跑 upgrade 后新列、
+      可空性与两个索引（唯一与否）出现，downgrade 后回到原样；upgrade 不改存量行、存量行的 `wa_handover_active` 为 false；
+      迁移建出的列与按模型建出的列逐列一致（类型、可空性、默认值、索引）；按模型建表后同一 `whatsapp_bsuid`
+      的两个联系人插入失败、两个空值插入成功。
+
+## 偏离
+
+- 测试额外比较了迁移与模型反射出的列形状（验收标准 3「逐列一致」原来没有测试守住）；SQLite 把枚举存成 VARCHAR，
+  枚举取值只在模型上断言。
+- 没有改服务、路由、schema、前端，没有改存量数据（号码规范化是 CRM-TASK-009）。
+
+## 验证到什么程度
+
+- 验证依据是上面的新测试加已有后端测试，由 PR 的必需检查 `backend` 执行；检查结果由 Worker 和 CI 记录，不写在这里。
+- 迁移没有在 MySQL 上实际跑过；测试只在 SQLite 上跑 012 本身。

@@ -10,6 +10,7 @@ from sqlalchemy import (
     SmallInteger,
     String,
     Text,
+    false,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -38,6 +39,16 @@ class Contact(Base):
     # True for contacts that came in through the shared WhatsApp demo gateway
     # (whatsapp_gateway) rather than this project's own WhatsApp number.
     is_gateway: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # WhatsApp business-scoped user id from ai_chatbot_demo events: the channel
+    # identity of visitors who don't share their number (docs/chatbot-events.md).
+    whatsapp_bsuid: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    # Human takeover of the AI conversation. Times are naive UTC; updated_at is
+    # the occurred_at of the event the current state is based on.
+    wa_handover_active: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+    wa_handover_expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    wa_handover_updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
@@ -51,4 +62,6 @@ class Contact(Base):
         Index("idx_is_archived", "is_archived"),
         Index("idx_autocount_customer_code", "autocount_customer_code"),
         Index("idx_contacts_is_gateway", "is_gateway"),
+        Index("idx_contacts_whatsapp_bsuid", "whatsapp_bsuid", unique=True),
+        Index("idx_contacts_phone", "phone"),
     )

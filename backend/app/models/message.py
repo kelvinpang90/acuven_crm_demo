@@ -25,6 +25,17 @@ class Message(Base):
     external_id: Mapped[str | None] = mapped_column(String(200), unique=True, nullable=True)
     is_read: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     assigned_to: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    # Who wrote it; NULL for messages from before ai_chatbot_demo events.
+    author_kind: Mapped[str | None] = mapped_column(
+        Enum("customer", "ai", "console", "agent", name="message_author_kind"), nullable=True
+    )
+    # Industry bot that wrote an `ai` message.
+    bot_id: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    # Meta delivery status of messages sent through ai_chatbot_demo.
+    delivery_status: Mapped[str | None] = mapped_column(
+        Enum("sent", "delivered", "read", "failed", name="message_delivery_status"), nullable=True
+    )
+    delivery_error: Mapped[str | None] = mapped_column(String(300), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
 
     __table_args__ = (
