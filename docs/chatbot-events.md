@@ -1,0 +1,176 @@
+# ai_chatbot_demo → CRM 会话事件：第 1 阶段设计
+
+> 状态：**待 Kelvin 批准**。批准后 CRM-TASK-006 至 010 的设计闸门引用本文件所在的 PR；设计一变，批准作废。
+> 上位设计：`acuven_hub` 的 `CHATBOT_DEMO_CRM_MULTIAGENT_2026-10-12.md`（D1–D11，2026-10-12 批准），现行索引 `DECISIONS.md` 的 J-04、A-18。
+> 本文件只管第 1 阶段「入站进 CRM」；CRM 经 chatbot 发送、交还 AI、作废沙盒号凭据在第 2 阶段另行设计。
+> 这里是两个仓库共用的接口契约：`ai_chatbot_demo` 那边的推送按本文件实现。
+
+## 一、第 1 阶段做到什么
+
+- demo 号上所有 WhatsApp 访客的对话（D9）都进 CRM：顾客消息、行业 bot 的 AI 回复、Director 控制台的人工回复。
+- 新访客在 CRM 自动建联系人、按现有路由引擎指派客服、建 lead 商机（沿用现有入站逻辑）。
+- 接管状态（AI 是否静默、静默到什么时候）与 chatbot 所发消息的送达状态，第 1 阶段就存进 CRM 并显示（Kelvin 2026-10-12）。
+- **不做**：CRM 回复经 chatbot 发出、「交还 AI」按钮、删除 CRM 自己的 Meta 凭据与网关代码（都在第 2 阶段）。
+  第 1、2 阶段之间，客服在 CRM 里回复这些访客仍走 CRM 自己的沙盒号，必然发不出去；CRM-TASK-004 合并后如实报 502。
+
+## 二、已定的取舍（Kelvin 2026-10-12）
+
+| # | 问题 | 结论 |
+|---|---|---|
+| P1 | 本地写法号码缺国家码 | 按马来西亚 `60` 补齐 |
+| P2 | 规范化后多个联系人撞同一个号码 | 不合并；入站消息挂最早创建的那个，联系人显示「号码冲突」交管理员处理（D5） |
+| P3 | 接管变化与送达状态 | 第 1 阶段就存 |
+| P4 | chatbot 来的新访客是否标 `is_gateway` | 不标：CRM 已定为 demo，这些访客就是主数据，要出现在客户列表与统计里。原有 2 个 `is_gateway` 联系人不动，第 2 阶段删网关代码时一并处理 |
+| P5 | chatbot 那边怎么做 | `ai_chatbot_demo` 里人工会话做，不登记进 OpenClaw |
+
+## 三、号码规范化
+
+一个函数、一处定义，入站匹配、联系人新建 / 编辑 / 表格导入、存量迁移都用它：
+
+1. 去掉数字以外的所有字符。原文以 `+` 开头的照常去掉。
+2. 原文以 `00` 开头（国际拨号前缀）：去掉这两个 0。
+3. 剩下的以单个 `0` 开头（马来西亚本地写法）：把这个 `0` 换成 `60`。
+4. 结果 8–15 位才算有效号码；否则视为无法规范化：入站不会出现（Meta 给的就是 E.164 数字），
+   手工录入的原样保存、不参与匹配，存量迁移里原样保留。
+
+存储形状：纯数字、不带 `+`（例如 `60123456789`）。页面上显示的就是这个形状，接受。
+
+**号码冲突不存字段**：规范化之后同号码的联系人可以直接查出来（未删除、号码非空、按号码分组计数大于 1），
+联系人接口按查询结果返回 `phone_conflict`，管理员改掉号码或删除重复联系人后自然消失，不存在「标记忘了清」。
+
+## 四、接口
+
+`POST /internal/chatbot/events`，只在共享 Docker 网络内可达，不经 nginx 暴露。一次请求一个事件。
+
+### 鉴权
+
+- 请求头 `X-Acuven-Timestamp`（Unix 秒）与 `X-Acuven-Signature: sha256=<hex>`，
+  签名 = HMAC-SHA256(密钥, `<timestamp>.<原始请求体字节>`)。
+- 时间戳与 CRM 当前时间相差超过 300 秒拒绝。
+- CRM 配置 `CHATBOT_EVENTS_SECRET` 与可选的 `CHATBOT_EVENTS_SECRET_PREVIOUS`，任一把验过即可（轮换用）；常数时间比较。
+- 只用于这一个方向；第 2 阶段 CRM → chatbot 用另一把。不复用现有明文比对的 `X-Internal-Secret`。
+
+### 请求体（公共部分）
+
+```json
+{
+  "event_id": "chatbot 生成的 UUID，只用于日志与排查，CRM 不存",
+  "type": "customer_message | ai_reply | console_reply | handover_changed | delivery_status",
+  "occurred_at": "2026-10-12T08:00:00Z",
+  "visitor": {
+    "phone": "60123456789 或 null",
+    "bsuid": "MY.xxxx 或 null",
+    "profile_name": "WhatsApp 资料名，或 null"
+  }
+}
+```
+
+`phone` 与 `bsuid` 至少一个非空。`profile_name` 只在新建联系人时用作名字，不覆盖已有联系人的名字。
+
+### 各类型的附加字段
+
+| type | 附加字段 | CRM 怎么处理 |
+|---|---|---|
+| `customer_message` | `message: {wa_message_id, body}` | 入站消息，`author_kind=customer`，未读 |
+| `ai_reply` | `message: {wa_message_id, body}`、`bot_id` | 出站消息，`author_kind=ai`，记 `bot_id`，已读 |
+| `console_reply` | `message: {wa_message_id, body}` | 出站消息，`author_kind=console`，已读（控制台只有一个口令，没有坐席身份） |
+| `handover_changed` | `handover: {active, expires_at}` | 更新联系人的接管状态 |
+| `delivery_status` | `status: {wa_message_id, status, error_code, error_title}` | 更新那条消息的送达状态 |
+
+`body` 是文字正文；媒体由 chatbot 转成占位文字（如 `[image] 说明`），第 1 阶段不传媒体本身。
+
+### 返回
+
+| 情况 | 状态码 | chatbot 怎么办 |
+|---|---|---|
+| 已存、重复（同一 `wa_message_id`）、或按规则忽略（见下） | 200，`{"result": "stored" \| "duplicate" \| "ignored"}` | 出队 |
+| 请求体不合法 | 422 | 进死信，不重试 |
+| 签名或时间戳不对 | 401 | 退避重试并告警（多半是密钥或时钟配错，修好后事件不丢） |
+| CRM 未配置密钥 | 503 | 退避重试 |
+| 其他服务端错误 | 5xx | 退避重试 |
+
+chatbot 按顺序投递：队首没成功之前不发后面的，保证同一访客的事件先后不乱。
+
+## 五、CRM 的处理规则
+
+### 找联系人
+
+1. 有 `phone`：按规范化号码找未删除的联系人；多于一个取最早创建的（P2）。
+   找到且事件带 `bsuid`、该联系人还没有、也没有别的联系人占用这个 `bsuid`：补上。
+2. 按号码没找到、但带 `bsuid`：按 `bsuid` 找；找到且它还没有号码，补上号码（访客后来公开了号码）。
+3. 都没找到：新建联系人。名字取 `profile_name`，没有就取号码，再没有取 `bsuid`；`is_gateway=false`（P4）；
+   调 `assign_contact()` 指派；建 lead 商机。与现有入站逻辑一致。
+
+消息类事件都会走这一步（AI 回复或控制台回复先于顾客消息到达时也一样建联系人，正常顺序下不会发生）。
+`handover_changed` 与 `delivery_status` 找不到联系人或消息时返回 `ignored`，不新建。
+
+### 消息
+
+- 按 `wa_message_id` 去重（沿用 `messages.external_id` 唯一键），重复返回 `duplicate`。
+- 消息的 `assigned_to` 取联系人当前负责人，与现有入站一致；转派时随联系人一起转（任务二 2.1 已做）。
+- 收件人 / 发件人字段：访客一侧填号码（没有号码填 `bsuid`），chatbot 一侧填固定值 `ai_chatbot_demo`。
+
+### 接管状态
+
+- 联系人存三项：是否接管中、到期时间、最后一次更新所依据的事件时间。
+- 事件的 `occurred_at` 早于已存的更新时间就忽略（死信补投的旧事件不能把新状态盖掉）。
+- chatbot 在开始接管、每次续期、结束接管（顾客发 menu、控制台交还、空闲到期）时都推一次。
+  CRM 显示时以到期时间为准：标着接管中但已过期，按「AI 在回」显示，不依赖 chatbot 补推到期事件。
+
+### 送达状态
+
+- 只更新 `external_id` 等于 `wa_message_id` 的那条消息；找不到返回 `ignored`。
+- 只升不降：`sent` < `delivered` < `read`；`failed` 只能覆盖 `sent`、`delivered` 或空值，不覆盖 `read`。
+- `failed` 时存 Meta 的错误码与标题（截断到 300 字符），收件箱显示「未送达」及原因。
+
+## 六、表结构改动（一次迁移）
+
+`contacts`：
+
+| 列 | 类型 | 说明 |
+|---|---|---|
+| `whatsapp_bsuid` | 字符串，可空，唯一 | D10：只有 BSUID 的访客以它作渠道身份 |
+| `wa_handover_active` | 布尔，默认 false | |
+| `wa_handover_expires_at` | 时间，可空 | UTC |
+| `wa_handover_updated_at` | 时间，可空 | 最后一次所依据事件的 `occurred_at` |
+| `phone` 加索引 | | 按规范化号码查找 |
+
+`messages`：
+
+| 列 | 类型 | 说明 |
+|---|---|---|
+| `author_kind` | 枚举 customer / ai / console / agent，可空 | 旧数据留空；`agent`（CRM 客服）第 2 阶段起写入 |
+| `bot_id` | 字符串，可空 | 行业 bot 标识，收件箱显示「AI · 行业」 |
+| `delivery_status` | 枚举 sent / delivered / read / failed，可空 | |
+| `delivery_error` | 字符串（300），可空 | |
+
+另一次数据迁移把存量联系人的号码按第三节规范化；无法规范化的原样保留。
+
+**个人数据**：新增存储的是 BSUID 与 WhatsApp 资料名（作联系人名字），以及经 chatbot 进来的对话正文（D1 已定存进 CRM）。
+都只存在 CRM 自己的库里，权限沿用现有的联系人与收件箱可见范围，不新增导出。
+
+## 七、任务拆分
+
+| 编号 | 层 | 内容 | 依赖 |
+|---|---|---|---|
+| CRM-TASK-006 | 数据库 | 第六节表结构迁移与模型 | — |
+| CRM-TASK-007 | 业务规则 | 号码规范化（含联系人新建 / 编辑 / 导入时规范化）、号码冲突查询、第五节的事件处理 | 006 |
+| CRM-TASK-008 | 接口 | 第四节的接收接口与验签；消息与联系人接口返回新字段和 `phone_conflict` | 007 |
+| CRM-TASK-009 | 数据库 | 存量号码规范化的数据迁移 | 007 |
+| CRM-TASK-010 | 前端 | 收件箱显示消息来源（AI · 行业、控制台）、送达状态与失败原因、接管状态；管理员看得到号码冲突；中英文文案 | 008 |
+
+`ai_chatbot_demo` 那边（人工会话，P5）：
+
+- C1：持久化事件 outbox（Redis 列表）、按顺序投递与退避重试、死信、签名；开关默认关闭。
+- C2：在顾客消息、AI 回复、控制台回复、接管变化处入队；开始转推 chatbot 所发消息的 statuses。
+
+上线顺序：006 → 007 → 008 → 009 合并部署（接口上线但密钥未配，一律 503）→ chatbot C1、C2 部署且开关关闭
+→ 两边配密钥 → 打开开关。010 在 008 之后任何时候。
+
+## 八、边缘情况
+
+- 访客先只有 BSUID、后来公开号码，而这个号码已经属于另一个联系人：按第五节第 1 步挂到号码那个联系人，
+  `bsuid` 已被占用就不补；两个联系人并存，由管理员处理。
+- 原有 2 个 `is_gateway` 联系人的号码若与 chatbot 访客相同：消息挂上去，但它们仍被排除在客户列表与统计之外，第 2 阶段处理。
+- chatbot 死信里的事件人工补投：消息类靠去重、接管靠事件时间、送达靠只升不降，补投不会把状态改坏。
+- 规范化改了存量号码的显示形状（去掉空格、横线、`+`）。

@@ -1007,3 +1007,12 @@ Q3：**选 1**（`E,F,W,I`，忽略 E501、E712）。
   chatbot 发出；客服回复后该对话 AI 静默 24 小时滑动，期满交还；完整对话存 CRM；CRM 自己的 Meta 沙盒号凭据在第 2 阶段作废。
 - 设计全文与 D1–D11 在 `acuven_hub/CHATBOT_DEMO_CRM_MULTIAGENT_2026-10-12.md`，现行索引 `acuven_hub/DECISIONS.md` 的 J-04、A-18。
 - 下一步：按两个仓库、按层拆第 1 阶段（入站进 CRM）的任务；每个任务过设计闸门与设计预审。
+
+## 第 1 阶段拆分（2026-10-12，设计待批准）
+
+设计与接口契约：[docs/chatbot-events.md](../docs/chatbot-events.md)。Kelvin 同日定：本地号码按 60 补国家码；号码冲突挂最早的联系人并显示冲突；
+接管变化与送达状态第 1 阶段就存；chatbot 来的新访客不标 `is_gateway`；chatbot 那边人工会话做，不登记进 OpenClaw。
+
+- [ ] 设计 PR 获 Kelvin 批准
+- [ ] 登记 CRM-TASK-006（表结构）、007（业务规则）、008（接口）、009（存量号码迁移）、010（前端），附设计预审输出
+- [ ] `ai_chatbot_demo`：C1 事件 outbox 与推送、C2 埋点与 statuses 转推
