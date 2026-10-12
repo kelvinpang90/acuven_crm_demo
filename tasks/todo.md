@@ -24,7 +24,7 @@
 
 ### 后续计划
 
-- 待登记：WhatsApp 经 acuven_aichat 收发、一个号码多客服分别回复（任务七，设计中）
+- 待登记：demo 号经 ai_chatbot_demo 收发、一个号码多客服分别回复（任务七，设计已批准，待拆任务）
 <!-- openclaw:planning-v1:end -->
 
 ---
@@ -998,7 +998,12 @@ Q3：**选 1**（`E,F,W,I`，忽略 E501、E712）。
 - 预审：不适用。没有设计闸门；文件最多 6 个、验收标准最多 8 条，改动预计各一两百行，远低于拆分线。
 - 004 的代价：本地开发没有凭据时不能再「假装发出」来调试收件箱，接受。
 
-## WhatsApp 接入方案（设计中）
+## WhatsApp 接入方案（Kelvin 2026-10-12 批准）
 
-Kelvin 2026-10-12：接 `acuven_aichat`（公司真实客服号），需求是**一个号码、多个客服在 CRM 里分别回复各自的顾客，
-每个新顾客自动指派给某个客服**。分工设计写在 `acuven_hub`，批准后再拆 crm_os 与 acuven_aichat 两边的任务。
+- 起初定接 `acuven_aichat`（公司真实客服号），同日改为 **`ai_chatbot_demo` 的 demo 号**：Kelvin 定 crm_os 是 demo 项目，
+  不承载 Acuven 真实客户，不应接公司真实客服号。
+- 需求：一个号码、多个客服在 CRM 里分别回复各自的顾客，每个新顾客自动指派给某个客服。
+- 分工：`ai_chatbot_demo` 是唯一对接 Meta 的一方，所有访客对话经内部签名接口推给 CRM；CRM 自动指派、多客服在收件箱回复并经
+  chatbot 发出；客服回复后该对话 AI 静默 24 小时滑动，期满交还；完整对话存 CRM；CRM 自己的 Meta 沙盒号凭据在第 2 阶段作废。
+- 设计全文与 D1–D11 在 `acuven_hub/CHATBOT_DEMO_CRM_MULTIAGENT_2026-10-12.md`，现行索引 `acuven_hub/DECISIONS.md` 的 J-04、A-18。
+- 下一步：按两个仓库、按层拆第 1 阶段（入站进 CRM）的任务；每个任务过设计闸门与设计预审。
