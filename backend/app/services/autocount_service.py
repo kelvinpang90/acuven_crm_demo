@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.autocount_document import AutocountDocument
 from app.models.contact import Contact
 from app.services import autocount_client
+from app.utils.phone import phone_for_storage
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +81,9 @@ async def _sync_customers(db: AsyncSession) -> int:
         contact.company = company_name or None
         contact.industry = d.get("NatureOfBusiness") or None
         contact.email = d.get("EmailAddress") or None
-        contact.phone = d.get("Phone1") or None
+        # Normalized like every other save path; otherwise each 60s run would
+        # write AutoCount's raw form back over the normalized number.
+        contact.phone = phone_for_storage(d.get("Phone1") or None)
         contact.address = d.get("Address") or None
         # `updated_at` is deliberately not assigned. The column carries
         # `onupdate`, so it moves by itself when one of the fields above actually
