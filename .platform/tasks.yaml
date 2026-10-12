@@ -435,9 +435,9 @@ tasks:
     depends_on:
       - CRM-TASK-013
     acceptance_criteria:
-      - 重试只对 author_kind 为 agent 的消息，其他返回不可重试；external_id 已非空（其间已确认）直接返回已发出与这条消息、不调用 chatbot；否则先查创建时间（当前时间不早于创建时间加 24 小时返回 RETRY_EXPIRED，先于其他检查），再按 CRM-TASK-013 查窗口与配置；用同一个 request_id（消息 id）、同样的正文、发给这条消息存的收件人（第一次发送时的规范化号码，不换成联系人现在的号码）、visitor 的 bsuid 取联系人现在的 BSUID（可为空）、agent 为原发送人 sent_by（用户已不存在时 name 用这个 id）调用 chatbot；已发出按 CRM-TASK-013 的条件更新与接管写入处理；其他任何结果都保留这条消息，只返回结果类别与错误信息
+      - 重试只对 author_kind 为 agent 的消息，其他返回不可重试；external_id 已非空（其间已确认）直接返回已发出与这条消息、不调用 chatbot；否则先查创建时间：创建不足 45 秒返回 IN_PROGRESS（第一次发送可能还在途中，30 秒总时限加余量），当前时间不早于创建时间加 24 小时返回 RETRY_EXPIRED，两者先于其他检查；再按 CRM-TASK-013 查窗口与配置；用同一个 request_id（消息 id）、同样的正文、发给这条消息存的收件人（第一次发送时的规范化号码，不换成联系人现在的号码）、visitor 的 bsuid 取联系人现在的 BSUID（可为空）、agent 为原发送人 sent_by（用户已不存在时 name 用这个 id）调用 chatbot；已发出按 CRM-TASK-013 的条件更新与接管写入处理；其他任何结果都保留这条消息，只返回结果类别与错误信息
       - agent_reply 事件处理入口只接受已校验的普通参数（crm_message_id、wa_message_id、body）：按 crm_message_id 找消息，找不到或不是 agent 返回 ignored；external_id 已等于 wa_message_id 返回 duplicate；external_id 为空时若别的消息已占用这个 wa_message_id 返回 duplicate，否则写入 external_id，delivery_status 为空时写 sent，返回 stored；external_id 是另一个值返回 ignored 并打 WARNING；不新建联系人、不改接管、不改正文
-      - 交还 AI 按设计第五节签名调用 chatbot 交还接口（总时限 30 秒），visitor 带联系人的规范化号码与 BSUID；两个都没有返回 NO_IDENTITY、未配置返回 NOT_CONFIGURED，都不调用；ended 时经 CRM-TASK-013 的写入函数写入接管（严格晚于）；not_active 不改；chatbot 其他错误、超时、或 200 但 result 与 handover 不合契约（ended 却没有合法的 handover）都返回失败、不改，后者打 ERROR；返回联系人当前接管三项；不存消息、不记活动
+      - 交还 AI 按设计第五节签名调用 chatbot 交还接口（总时限 30 秒），visitor 带联系人的规范化号码（号码无法规范化时为空）与 BSUID；两个都为空返回 NO_IDENTITY；联系人不存在或已删除返回 NOT_FOUND、未配置返回 NOT_CONFIGURED，都不调用；ended 时经 CRM-TASK-013 的写入函数写入接管（严格晚于）；not_active 不改；chatbot 其他错误、超时、或 200 但 result 与 handover 不合契约（ended 却没有合法的 handover）都返回失败、不改，后者打 ERROR；返回联系人当前接管三项；不存消息、不记活动
       - 新增测试：打桩 chatbot 逐条覆盖上面三条规则；对应设计第十一节例 3 的事件部分、例 4（含重试得到 rejected 与 401 时消息仍留着）、例 8、例 9；每条测试写明守住的是哪一条验收标准；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
       - tasks/todo.md 新增 CRM-TASK-014 记录段（做了什么、偏离了什么、验证到什么程度）；不改 planning-v1 块；复选框只允许 [ ] / [x]
       - 改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不加表、不加迁移、不改接口与前端
@@ -464,8 +464,8 @@ tasks:
       - CRM-TASK-014
     acceptance_criteria:
       - POST /api/messages/whatsapp/send 改用 CRM-TASK-013 的服务，路由不再引用 whatsapp_service；正文校验写在请求模型里（去掉首尾空白后须为 1 至 4096 字符，否则 422，先于处理函数）；归属校验不变（403 NOT_ASSIGNED）；之后依次是 NO_PHONE、WINDOW_CLOSED、NOT_CONFIGURED；结果映射为已发出 200 返回消息、NO_PHONE 400、WINDOW_CLOSED 409、NOT_CONFIGURED 503、明确没发出 502 SEND_FAILED、结果不明 202（用 ok 外壳，data 是这条消息，message 为 UNCONFIRMED）；错误照现有 fail 外壳返回，窗口关闭时间放在 error 的 fields 的 window_closed_at，Meta 的错误码与标题放在 fields 的 error_code 与 error_title
-      - 新增 POST /api/messages/{message_id}/whatsapp/retry，交给 CRM-TASK-014 的重试；消息不存在、不是客服消息、或无权访问其联系人一律返回同一个 403 NOT_ASSIGNED 响应，不泄露是否存在；其间已确认的返回 200 与这条消息；其余结果映射同上，另加 RETRY_EXPIRED 409
-      - 新增 POST /api/contacts/{contact_id}/whatsapp/handback，归属校验同发送；成功 200 返回联系人当前接管三项（输出约定同 CRM-TASK-008）；NO_IDENTITY 400、NOT_CONFIGURED 503、chatbot 失败 502 CHATBOT_FAILED
+      - 新增 POST /api/messages/{message_id}/whatsapp/retry，交给 CRM-TASK-014 的重试；消息不存在、不是客服消息、或无权访问其联系人一律返回同一个 403 NOT_ASSIGNED 响应，不泄露是否存在；其间已确认的返回 200 与这条消息；其余结果映射同上，另加 IN_PROGRESS 409 与 RETRY_EXPIRED 409
+      - 新增 POST /api/contacts/{contact_id}/whatsapp/handback，归属校验同发送，联系人不存在或已删除（含管理员请求时）返回同一个 403 NOT_ASSIGNED；成功 200 返回联系人当前接管三项（输出约定同 CRM-TASK-008）；NO_IDENTITY 400、NOT_CONFIGURED 503、chatbot 失败 502 CHATBOT_FAILED
       - 会话事件接口接受 agent_reply：除公共字段外必须带 message 的 wa_message_id 与 body 和非空的 crm_message_id，否则 422；合法的交给 CRM-TASK-014 的规则，响应体顶层只有 result；其他五种事件的校验与处理不变
       - 消息列表、联系人消息与标记已读接口每条多 sent_by 与 sent_by_name（一次批量查用户，不逐条查库；用户不存在为空）；联系人列表与详情多 wa_reply_window_until（该联系人最后一条渠道为 whatsapp 的入站消息时间加 24 小时，带 UTC 标记输出，没有入站为空；列表一次批量查询）
       - 新增测试逐条覆盖上面的映射、重试与交还的权限、agent_reply 的校验与转交、新字段；test_message_permission 里打桩的旧发送函数改成新服务、原有断言不变；每条测试写明守住的是哪一条验收标准；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
@@ -500,9 +500,9 @@ tasks:
       - CRM-TASK-010
     acceptance_criteria:
       - WhatsApp 会话的回复框限制最多 4096 字符，并在 wa_reply_window_until 为空或已过时禁用，提示窗口已关闭、要等顾客先来消息；邮件会话不受影响
-      - 发送与重试请求单独把超时设为 45 秒（长于后端调用 chatbot 的 30 秒总时限），其他请求的超时不变；发送返回 200 时清空输入并刷新会话；返回 202 时清空输入、刷新并提示未确认送出；收不到响应（超时或网络错误）时保留输入、刷新会话，并提示先看会话里有没有出现未确认送出的消息，有就用它的重试、不要重发；其他错误保留输入，按错误码显示原因（窗口关闭带 fields 里的 window_closed_at、Meta 拒绝带 fields 里的 error_code 与 error_title、未配置、无权、无号码、重试过期；SEND_FAILED 没有 Meta 字段时显示通用的未发出，没有 code 的 422 显示通用的发送失败）
-      - 会话里 author_kind 为 agent 的消息显示客服加 sent_by_name（为空只显示客服）；agent 消息 external_id 为空时显示未确认送出与重试按钮，重试调用新接口，结果按上一条处理（重试返回 200 即刷新，已确认的消息不再显示重试）
-      - 会话头部在接管中（判断同 CRM-TASK-010）时显示交还 AI 按钮，确认后调用交还接口，用返回的接管状态刷新头部；失败时提示原因
+      - 发送与重试请求单独把超时设为 45 秒（长于后端调用 chatbot 的 30 秒总时限），其他请求的超时不变；发送返回 200 时清空输入并刷新会话；返回 202 时清空输入、刷新并提示未确认送出（以上是回复框的发送；重试的结果只刷新会话与提示，不碰回复框里的输入）；收不到响应（超时或网络错误）时保留输入、刷新会话，并提示先看会话里有没有出现未确认送出的消息，有就用它的重试、不要重发；其他错误保留输入，按错误码显示原因（窗口关闭带 fields 里的 window_closed_at、Meta 拒绝带 fields 里的 error_code 与 error_title、未配置、无权、无号码、重试过期；SEND_FAILED 没有 Meta 字段时显示通用的未发出，没有 code 的 422 显示通用的发送失败）
+      - 会话里 author_kind 为 agent 的消息显示客服加 sent_by_name（为空只显示客服）；agent 消息 external_id 为空时：创建不足 45 秒显示发送中、不给重试，之后显示未确认送出与重试按钮；重试调用新接口，只刷新会话并提示结果（IN_PROGRESS、RETRY_EXPIRED 等按错误码显示原因），已确认的消息不再显示重试
+      - 会话头部在接管中（判断同 CRM-TASK-010）时显示交还 AI 按钮，确认后调用交还接口，用返回的接管状态刷新头部；返回后若仍是接管中（chatbot 那边本来就没在接管，或同一秒的状态没写入），提示已请求交还、状态以 chatbot 推送为准并稍后刷新；失败时提示原因
       - 新文案同时加在 en 与 zh 的 inbox 命名空间，不写硬编码文字；类型定义与接口字段一致；前端类型检查与构建由 PR 的必需 CI 检查 frontend 执行并通过（Worker 沙箱不跑 npm）
       - tasks/todo.md 新增 CRM-TASK-016 记录段（做了什么、偏离了什么、验证到什么程度）；不改 planning-v1 块；复选框只允许 [ ] / [x]
       - 改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不改后端
