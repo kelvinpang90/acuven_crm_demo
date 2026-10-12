@@ -1007,3 +1007,38 @@ Q3：**选 1**（`E,F,W,I`，忽略 E501、E712）。
   chatbot 发出；客服回复后该对话 AI 静默 24 小时滑动，期满交还；完整对话存 CRM；CRM 自己的 Meta 沙盒号凭据在第 2 阶段作废。
 - 设计全文与 D1–D11 在 `acuven_hub/CHATBOT_DEMO_CRM_MULTIAGENT_2026-10-12.md`，现行索引 `acuven_hub/DECISIONS.md` 的 J-04、A-18。
 - 下一步：按两个仓库、按层拆第 1 阶段（入站进 CRM）的任务；每个任务过设计闸门与设计预审。
+
+---
+
+# CRM-TASK-004：发送失败或未配置时如实报错，不再把消息记为已发出
+
+来源：任务七「发现的问题」里的两条假发送。设计闸门：不适用（只让失败如实暴露）。
+
+## 做了什么
+
+- [x] `backend/app/services/whatsapp_service.py` 的 `send_message`：非演示联系人在 access token 或 phone number id
+      缺任一项时，抛 `WhatsAppSendError("not_configured")`，不发请求、不入库（原来记一条 warning 后照样存成已发出）。
+      凭据齐全时的 Graph API 调用、非 200 / 网络出错抛 `api_error`、演示联系人经网关的分支，逐行未改。
+- [x] `backend/app/services/email_service.py`：新增 `EmailSendError`（`not_configured` / `api_error`）。`send_email`
+      在 SMTP 主机或用户缺任一项时抛 `not_configured`；连接、STARTTLS、认证、发送任一步出错时记 `logger.exception`
+      后抛 `api_error`，两种情况都不入库。联系人不存在或没有邮箱仍返回 `None`，发送成功仍入库并返回原来的字典。
+- [x] `backend/app/routers/messages.py`：两个发送接口把 `not_configured` 映射为 `503 NOT_CONFIGURED`，邮件的
+      `api_error` 映射为 `502 API_ERROR`（与 WhatsApp 原有的一致）；其余分支未改。
+- [x] 测试：`backend/tests/test_whatsapp_service_send.py` 里原来断言未配置仍保存的用例改为经接口断言 503 且不入库、
+      不发请求（缺 token、缺 id、都缺三种）；另补凭据齐全时成功入库、非 200 与网络出错仍 502 不入库的用例。
+      新增 `backend/tests/test_email_send.py`：未配置（三种缺法）、发送出错（连接 / 认证 / 发送三步，含错误日志断言）、
+      发送成功、没有邮箱。每条 docstring 写明守住哪条验收标准。
+- [x] 评审第 1 轮：经接口的 WhatsApp 用例原来 patch 的是 `httpx.AsyncClient.post`，连测试客户端自己的请求也被替换，
+      根本没到应用。改为只替换 `whatsapp_service` 模块里的 `httpx` 名字（`AsyncClient` 换成 mock，`HTTPError`
+      保留真实类），测试客户端不受影响；未配置用例断言 `AsyncClient` 没有被实例化。业务代码未改。
+
+## 偏离
+
+- 没有改演示联系人经网关的分支、前端、表结构、收邮件。
+- WhatsApp 测试里额外补了凭据齐全时的成功与失败用例（验收标准 2 说行为不变，原来没有测试守住）。
+- 邮件的 STARTTLS 失败与连接、认证、发送同样走 `api_error`（原来的 `try` 本就包着它）。
+- 任务七「发现的问题」里对应的两条复选框保持 `[ ]`，等本 PR 合并后再勾。
+
+## 验证到什么程度
+
+- 验证依据是上面的测试加已有后端测试，由 PR 的必需检查 `backend` 执行；检查结果由 Worker 和 CI 记录，不写在这里。
