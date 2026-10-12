@@ -1,6 +1,7 @@
 # CRM 客服经 ai_chatbot_demo 回复：第 2 阶段设计
 
 > 状态：**已批准**（Kelvin 2026-10-13，原话「Q1–Q7 都按建议，批准，开 PR 登记 012 到 019」）。第 2 阶段任务的设计闸门引用本文件所在的 PR kelvinpang90/acuven_crm_demo#28；设计一变，批准作废。
+> 第一至十三节如上已批准；**第十四节**是登记 CRM-TASK-012 至 019 时按设计预审补的，待 Kelvin 在登记 PR 上批准。
 > 上位设计：`acuven_hub` 的 `CHATBOT_DEMO_CRM_MULTIAGENT_2026-10-12.md`（下称 MULTI，D1–D11），现行索引 `DECISIONS.md` 的 J-04、A-18。
 > 第 1 阶段契约：[chatbot-events.md](chatbot-events.md)（已批准）。本文件只在它上面**增补**，不改它已定的规则；增补处集中在第四节。
 > 这里是两个仓库共用的接口契约：`ai_chatbot_demo` 的发送与交还接口按本文件实现。
@@ -335,3 +336,26 @@ Kelvin 手工（不在仓库里）：
 - **访客发 `menu` 结束接管**：chatbot 现有行为，推 `handover_changed`；客服下一次回复重新开始接管。
 - **两把密钥配反或配成同一把**：配反时两个方向都 401，各自记 ERROR，修好即恢复；配成同一把代码不拦，靠上线步骤保证。
 - **超过 4096 字符**：CRM 拒收（422），不靠 chatbot 截断。
+
+## 十四、登记预审后的补充（2026-10-13，待 Kelvin 在登记 PR 上批准）
+
+登记 CRM-TASK-012 至 019 前跑了设计预审（输出在 `tasks/todo.md`「登记 CRM-TASK-012 至 019」），下面几条照原文没写死或走不通，按这里补；
+对应任务的验收标准已按这里写。
+
+1. **`CHATBOT_SEND_URL` 是基地址**：只到端口、不含路径，发送与交还分别接 `/internal/crm/send` 与 `/internal/crm/handback`。
+2. **窗口边界**：当前时间早于「最后一条 WhatsApp 入站消息时间 + 24 小时」才算开着，恰好 24 小时算关闭；没有入站消息时 `WINDOW_CLOSED` 的关闭时间为空。
+3. **结果分类写死**（第六节第 8 条）：已发出 = 200 且 `result` 为 `sent` / `duplicate`、带 `wa_message_id`；明确没发出 = 502 且 `result` 为 `rejected`、401、422、503、
+   请求没送出去（连接失败、连接超时、连接池超时）；**其余一切**都算结果不明（409、504、其他状态码、200 但字段不对、写超时、读超时、连接中途断开、30 秒总时限到）。
+   拿不准就留着消息，可以重试，不会丢。
+4. **校验顺序**（第六节）：正文校验在请求模型里，FastAPI 先于处理函数执行，所以顺序是 422 → 403 → `NO_PHONE` → `WINDOW_CLOSED` → `NOT_CONFIGURED`。
+5. **错误放哪**：沿用现有 `fail` 外壳 `{code, message, fields}`；窗口关闭时间放 `fields.window_closed_at`，Meta 的错误码与标题放 `fields.error_code` 与 `fields.error_title`。
+6. **重试发给谁**：发给这条消息存的收件人（第一次发送时的规范化号码），不换成联系人现在的号码，所以重试不再查号码，只查窗口与配置。
+7. **重试已确认的消息**：其间已被同步响应或 `agent_reply` 确认（`external_id` 非空）的，重试直接返回 200 与这条消息、不调用 chatbot，不再返回「无权」。
+8. **前端超时**（设计缺陷）：前端请求默认 15 秒超时，后端调用 chatbot 最长 30 秒，前端会先报错、客服重发就换了幂等键，访客收到两条。
+   补：发送与重试请求单独把超时设为 45 秒；收不到响应时保留输入、刷新会话，提示先看有没有「未确认送出」的消息、有就用它的重试。
+9. **删配置后的启动**：配置类从本地环境文件读取时默认拒绝多出来的键，而环境变量示例文件（Worker 改不了）仍带 WhatsApp 那几项，照它复制的本地环境文件会让启动失败。
+   补：CRM-TASK-017 删配置时让配置忽略环境文件里多出来的键。生产经 compose 以环境变量注入，本来不受影响。
+10. **`DEPLOY.md` 的变量清单**：第七节原写「只加 `CHATBOT_SEND_URL`、`CHATBOT_SEND_SECRET`，第 1 阶段两项另由人补」；改为 CRM-TASK-017 一次补齐
+    `CHATBOT_EVENTS_SECRET`、`CHATBOT_EVENTS_SECRET_PREVIOUS`、`CHATBOT_SEND_URL`、`CHATBOT_SEND_SECRET` 四项空值。
+11. **测试文件范围**：CRM-TASK-007 新增的 `test_contact_phone.py` 有经旧 Meta 回调与网关入站的用例，归 CRM-TASK-017 删；CRM-TASK-018 新增的
+    `test_gateway_contacts_visible.py` 用到 `is_gateway`，归 CRM-TASK-019 删（列不存在后它守的口径已无意义）；019「不再出现 `is_gateway`」不含迁移文件与 `test_migration_015`。
