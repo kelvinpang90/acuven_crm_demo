@@ -135,7 +135,7 @@ tasks:
     purpose: >-
       在 CRM-TASK-002 的 unassigned 参数之上，让管理员在客户页直接看到有多少未分派客户、一键只看它们，
       未分派的线索不再无声无息。只对管理员显示；不改后端、不改销售与经理看到的页面、不加新页面或路由。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-002
     acceptance_criteria:
