@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import Optional
+from typing import Iterable, Optional
 
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,6 +11,7 @@ from app.models.message import Message
 from app.models.user import User
 from app.services import access_service, routing_service
 from app.utils.demo_scope import contact_not_demo
+from app.utils.phone import normalize_phone, phone_for_storage
 
 VALID_STATUSES = {"lead", "following", "negotiating", "won", "lost"}
 VALID_PRIORITIES = {"high", "mid", "low"}
@@ -138,7 +139,7 @@ async def create_contact(db: AsyncSession, data: dict, current_user: User) -> di
         company=data.get("company"),
         industry=data.get("industry"),
         email=data.get("email"),
-        phone=data.get("phone"),
+        phone=phone_for_storage(data.get("phone")),
         address=data.get("address"),
         notes=data.get("notes"),
         assigned_to=data.get("assigned_to"),
@@ -210,6 +211,8 @@ async def update_contact(
     }
     for key, value in data.items():
         if key in allowed_fields and value is not None and hasattr(contact, key):
+            if key == "phone":
+                value = phone_for_storage(value)
             setattr(contact, key, value)
     contact.updated_at = datetime.utcnow()
 
@@ -256,6 +259,26 @@ async def soft_delete_contact(db: AsyncSession, contact_id: str) -> bool:
 
     await db.flush()
     return True
+
+
+async def find_phone_conflicts(db: AsyncSession, phones: Iterable[Optional[str]]) -> set[str]:
+    """The given numbers that two or more non-deleted contacts share.
+
+    Numbers are normalized first and compared with the stored value as is
+    (stored numbers are normalized by CRM-TASK-009). Ones that cannot be
+    normalized -- blank and None included -- never count as a conflict. Nothing
+    is stored: renaming or deleting the duplicate makes the conflict go away.
+    """
+    normalized = {n for n in (normalize_phone(p) for p in phones) if n is not None}
+    if not normalized:
+        return set()
+    result = await db.execute(
+        select(Contact.phone)
+        .where(Contact.phone.in_(normalized), Contact.deleted_at.is_(None))
+        .group_by(Contact.phone)
+        .having(func.count(Contact.id) > 1)
+    )
+    return set(result.scalars().all())
 
 
 async def import_contacts(
@@ -395,7 +418,7 @@ async def import_contacts(
                 company=row.get("company") or None,
                 industry=row.get("industry") or None,
                 email=email or None,
-                phone=row.get("phone") or None,
+                phone=phone_for_storage(row.get("phone") or None),
                 address=row.get("address") or None,
                 notes=row.get("notes") or None,
                 tags=tags,

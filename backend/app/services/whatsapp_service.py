@@ -155,14 +155,18 @@ async def _handle_message(
     if existing.scalar_one_or_none():
         return None
 
-    # Find or create contact
+    # Find or create contact. Several contacts may share a number; the message
+    # goes to the earliest created one (docs/chatbot-events.md P2).
     result = await db.execute(
-        select(Contact).where(
+        select(Contact)
+        .where(
             Contact.phone == phone,
             Contact.deleted_at.is_(None),
         )
+        .order_by(Contact.created_at.asc(), Contact.id.asc())
+        .limit(1)
     )
-    contact = result.scalar_one_or_none()
+    contact = result.scalars().first()
 
     if not contact:
         contact = Contact(

@@ -14,11 +14,10 @@
 <!-- openclaw:planning-v1:begin -->
 ### 当前计划
 
-1. `CRM-TASK-007` 号码规范化、各保存入口统一规范化与号码冲突查询
-2. `CRM-TASK-011` 会话事件的处理规则，找联系人、消息入库、接管与送达状态
-3. `CRM-TASK-008` 会话事件接收接口与验签，消息和联系人接口返回新字段
-4. `CRM-TASK-009` 存量联系人号码按统一规则规范化的数据迁移
-5. `CRM-TASK-010` 收件箱显示消息来源、送达与接管状态，管理员看得到号码冲突
+1. `CRM-TASK-011` 会话事件的处理规则，找联系人、消息入库、接管与送达状态
+2. `CRM-TASK-008` 会话事件接收接口与验签，消息和联系人接口返回新字段
+3. `CRM-TASK-009` 存量联系人号码按统一规则规范化的数据迁移
+4. `CRM-TASK-010` 收件箱显示消息来源、送达与接管状态，管理员看得到号码冲突
 
 ### 已阻塞
 
@@ -1338,3 +1337,43 @@ PRECHECK_RESULT: READY
 
 - 验证依据是上面的新测试加已有后端测试，由 PR 的必需检查 `backend` 执行；检查结果由 Worker 和 CI 记录，不写在这里。
 - 迁移没有在 MySQL 上实际跑过；测试只在 SQLite 上跑 012 本身。
+
+---
+
+# CRM-TASK-007：号码规范化、各保存入口统一规范化与号码冲突查询
+
+来源：`docs/chatbot-events.md` 第三节、第九节第 2、3 条与 P2。设计闸门：kelvinpang90/acuven_crm_demo#17。
+
+## 做了什么
+
+- [x] 新增 `backend/app/utils/phone.py`：`normalize_phone(raw)` 去掉非数字，对剩下的数字去掉开头的 `00`，恰好一个开头的 `0`
+      换成 `60`，仍以 `0` 开头或不在 8–15 位的返回 `None`（空值、空串、没有数字的同样返回 `None`）；结果不以 `0` 开头，
+      再规范化一次不变。`phone_for_storage(raw)` 给保存入口用：能规范化的返回规范化结果，否则原样返回输入。
+- [x] `backend/app/services/contact_service.py`：`create_contact`、`update_contact`（只在请求带 `phone` 时）与
+      `import_contacts` 新建联系人时，号码经 `phone_for_storage` 再存。不带号码时与原来一样（新建存 `None`，编辑不动原号码，
+      导入的空格子仍存 `None`）。
+- [x] 同文件新增 `find_phone_conflicts(db, phones)`：先规范化，丢掉无法规范化的；与库里存的号码按原值比较，
+      返回被两个及以上未删除联系人共用的号码（规范化形式的集合）。不存字段，改号或删除后自然不再算冲突。供 CRM-TASK-008 用，
+      本任务不接到接口上。
+- [x] `backend/app/services/autocount_service.py` 的 `_sync_customers`：`Phone1` 经 `phone_for_storage` 再存。
+      规范化幂等，所以拉回同一个号码时赋的值与已存的相等，不产生 UPDATE、`updated_at` 不动。
+- [x] `backend/app/services/whatsapp_service.py` 的 `_handle_message`（Meta webhook 与网关入站共用）：按号码找联系人改为
+      `ORDER BY created_at, id LIMIT 1` 取最早创建的一条，多个联系人同号码时不再因 `scalar_one_or_none` 报错。
+      入站号码本身没有规范化，其余逻辑未改。
+- [x] 新增测试 `backend/tests/test_phone.py`（规范化规则、设计里的每个例子、无法规范化的各种情况、8 与 15 位边界、幂等、
+      保存时的原样保留）与 `backend/tests/test_contact_phone.py`（四个保存入口各自的规范化、原样保留与不带号码；AutoCount
+      第二次拉回同号码时 `updated_at` 不动；冲突查询的规范化返回、按原值比较、空值与无法规范化的不算、改号与删除后消失；
+      Meta webhook 与网关入站在同号码时挂到最早创建的联系人、创建时间相同取 id 最小、已删除的不算、不新建联系人）。
+      每条 docstring 写明守住哪条验收标准。
+
+## 偏离
+
+- 导入的空号码格子原来经 `or None` 存成 `None`，现在仍然这样（规范化在 `or None` 之后）；新建与编辑传空串时原样存空串，与原来一致。
+- 冲突查询收到空列表或全都无法规范化时直接返回空集合，不查库。
+- 表格导入里 Excel 把号码存成数字时，路由层的 `str()` 可能带出 `.0` 等形状，这是原有行为，本任务没有改路由。
+- 没有加接口、没有改表结构、没有迁移存量号码（CRM-TASK-009）、没有改前端，没有处理会话事件（CRM-TASK-011）。
+
+## 验证到什么程度
+
+- 验证依据是上面的新测试加已有后端测试，由 PR 的必需检查 `backend` 执行；检查结果由 Worker 和 CI 记录，不写在这里。
+- 冲突查询与同号码取最早的查询只在 SQLite 上由测试覆盖，没有在 MySQL 上实际跑过。
