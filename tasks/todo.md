@@ -14,6 +14,11 @@
 <!-- openclaw:planning-v1:begin -->
 ### 当前计划
 
+1. `CRM-TASK-006` 会话事件第1阶段的表结构迁移与模型
+2. `CRM-TASK-007` 号码规范化、号码冲突查询与会话事件的处理规则
+3. `CRM-TASK-008` 会话事件接收接口与验签，消息和联系人接口返回新字段
+4. `CRM-TASK-009` 存量联系人号码按统一规则规范化的数据迁移
+5. `CRM-TASK-010` 收件箱显示消息来源、送达与接管状态，管理员看得到号码冲突
 
 ### 已阻塞
 
@@ -21,7 +26,7 @@
 
 ### 后续计划
 
-- 待登记：demo 号经 ai_chatbot_demo 收发、一个号码多客服分别回复（任务七，设计已批准，待拆任务）
+- 待登记：demo 号第 2 阶段，CRM 回复经 ai_chatbot_demo 发出、交还 AI、作废 CRM 自己的沙盒号凭据（任务七，待设计）
 <!-- openclaw:planning-v1:end -->
 
 ---
@@ -1005,14 +1010,168 @@ Q3：**选 1**（`E,F,W,I`，忽略 E501、E712）。
 - 设计全文与 D1–D11 在 `acuven_hub/CHATBOT_DEMO_CRM_MULTIAGENT_2026-10-12.md`，现行索引 `acuven_hub/DECISIONS.md` 的 J-04、A-18。
 - 下一步：按两个仓库、按层拆第 1 阶段（入站进 CRM）的任务；每个任务过设计闸门与设计预审。
 
-## 第 1 阶段拆分（2026-10-12，设计待批准）
+## 第 1 阶段拆分（2026-10-12，设计同日 Kelvin 批准）
 
 设计与接口契约：[docs/chatbot-events.md](../docs/chatbot-events.md)。Kelvin 同日定：本地号码按 60 补国家码；号码冲突挂最早的联系人并显示冲突；
 接管变化与送达状态第 1 阶段就存；chatbot 来的新访客不标 `is_gateway`；chatbot 那边人工会话做，不登记进 OpenClaw。
 
-- [ ] 设计 PR 获 Kelvin 批准
-- [ ] 登记 CRM-TASK-006（表结构）、007（业务规则）、008（接口）、009（存量号码迁移）、010（前端），附设计预审输出
+- [x] 设计 PR 获 Kelvin 批准（kelvinpang90/acuven_crm_demo#17，2026-10-12，原话「批准，开 PR 登记 006 到 010」）
+- [x] 登记 CRM-TASK-006（表结构）、007（业务规则）、008（接口）、009（存量号码迁移）、010（前端），附设计预审输出（见下「登记 CRM-TASK-006 至 010」）
 - [ ] `ai_chatbot_demo`：C1 事件 outbox 与推送、C2 埋点与 statuses 转推
+
+## 登记 CRM-TASK-006 至 010（2026-10-12）
+
+Kelvin 2026-10-12 批准设计（kelvinpang90/acuven_crm_demo#17），原话「批准，开 PR 登记 006 到 010」。本段是登记 PR 的记录。
+
+### 做了什么
+
+- `docs/chatbot-events.md`：文件头改为已批准；加第九节「登记预审后的补充」，**随登记 PR 待 Kelvin 批准**（不批准就不合并）。
+- `.platform/tasks.yaml`：登记 006–010，全部 `ready`，依赖照设计第七节（006 → 007 → 008 → 010，009 依赖 007）。
+- planning-v1：「当前计划」按 006、007、008、009、010 排；「后续计划」那条改写成第 2 阶段（CRM 回复经 chatbot 发出、交还 AI、
+  作废沙盒号凭据），第 1 阶段已登记，不再写「待拆任务」。
+
+### 设计闸门与预审
+
+- 设计闸门：五个都适用，都引用 #17（006/009 改表结构与存量数据；007 有接管、送达两个状态规则并存 BSUID 与资料名；
+  008 是接收个人数据的接口与验签；010 展示经 chatbot 进来的对话与号码冲突）。
+- 预审：按控制面 `docs/ONBOARD-PROJECT.md`「登记任务之前」，五个都跑了（`python -m worker.design_precheck`，对本分支的干净克隆，
+  设计文件 `docs/chatbot-events.md`）。第 1 轮全跑；修改契约与设计后第 2 轮复查 007–010；007 第 3 轮。最终：006、008、009、010 READY；
+  007 第 3 轮仍 NOT_READY，第 3 轮之后的处理见下表最后几行（**之后没有再跑第 4 轮**）。
+
+逐条处理（成立的已修，不成立的写明理由）：
+
+| 轮次 / 任务 | 发现 | 处理 |
+|---|---|---|
+| 1 / 007 | 同一秒的接管开始被补投会盖掉同一秒的结束 | 不成立：相同时间按到达顺序生效（开始、结束同秒时结束照常生效）；chatbot 顺序投递，重发只会是队首原样重发，同一事件重复写入结果不变；若改成「相同时间也忽略」，同秒的开始与结束反而会丢结束 |
+| 1 / 007、008 | `occurred_at` 落在未来会让之后的接管事件全被忽略 | 不成立：接管事件的 `occurred_at` 是 chatbot 入队时刻，签名时间戳是同一个时钟的发送时刻，且已限定与 CRM 相差 300 秒内；除非 chatbot 时钟在入队与发送之间倒退，否则不会出现。未加额外限制（加了就是改契约） |
+| 1 / 007 | BSUID 唯一索引含已软删除的联系人，补上或新建会撞索引、5xx、整条队列卡死 | 成立，设计缺陷 → 第九节第 1 条：只被已删除联系人占着时先清掉再用 |
+| 1 / 007 | 创建时间相同的同号码联系人取哪个 | 写进 007 验收：按 id 取最小 |
+| 1 / 007 | AutoCount 同步写号码不经规范化 | 成立 → 第九节第 2 条，007 加 `autocount_service.py` |
+| 1 / 007、1 / 009 | 第 2 步按「原文」判断 00，`+0060…` 规范化不幂等 | 成立，设计缺陷 → 第九节第 3 条 |
+| 1 / 007 | `delivery_error` 的拼法 | 第九节第 4 条 + 007 验收 |
+| 1 / 007、2 / 007、3 / 007 | 验收标准 10 条，建议拆成两个任务 | **未拆，留给 Kelvin 定**：拆分写在已批准设计第七节，改拆分等于改设计。可行拆法：号码规范化 + 各保存入口 + 冲突查询一个，事件处理规则一个。文件 9 个、预计约 900 行，都在线内 |
+| 1 / 008 | 联系人详情路由不传当前用户，管理员才算的 `phone_conflict` 要改 `routers/contacts.py` | 成立 → 008 加这个路径（共 12 个） |
+| 1 / 008 | `active` 为真而 `expires_at` 为空怎么办 | 第九节第 5 条：422；chatbot 现有实现正是这样推的 |
+| 1 / 008 | `failed` 之后能不能被覆盖 | 第九节第 4 条：不能 |
+| 1 / 010 | bot_id 的行业列表没写 | 写进 010 验收：food、hotel、realestate、retail、saas（读 `ai_chatbot_demo` 的 bot 数据目录得到，共 5 个，不是 6 个） |
+| 1 / 010 | 接管到期时间的时区 | 写进 008/010 验收：按现有响应约定带 UTC 标记输出，前端按本地时间显示 |
+| 2 / 007、3 / 007 | 现有 Meta webhook / 网关入站按号码找联系人用 `scalar_one_or_none`，规范化后同号码多联系人会抛异常 | 成立（设计 P2 本来就规定入站挂最早创建的那个）→ 007 加 `whatsapp_service.py`，只改这处查询。第 3 轮之后改的 |
+| 2 / 007 | 同一送达状态重复到达算什么 | 写进 007 验收：不算升级，返回 ignored。第 3 轮前改的 |
+| 2 / 007 | 事件里的号码要不要先规范化、无法规范化怎么办 | 写进 007 验收：一律先规范化；无法规范化的由 008 拒收（422），处理入口按无号码处理。第 3 轮前改的 |
+| 3 / 007 | 空串、无法规范化的原文算不算号码冲突 | 写进 007 验收：只看能规范化的号码。第 3 轮之后改的 |
+| 3 / 007 | 名字回退到 BSUID 时可能超过 100 字符 | 写进 007 验收：三种来源都截断到 100。第 3 轮之后改的 |
+
+### 与 ai_chatbot_demo 已实现推送的对齐（读其 `tasks/todo.md` 任务 40.1、40.2，未改那个仓库）
+
+- 一致：签名 = HMAC-SHA256(密钥, `<ts>.` + 原始请求体字节)，`sha256=<hex>`，时间戳是发送时刻；`occurred_at` 形如 `...Z`；
+  路径 `/internal/chatbot/events`（chatbot 默认推送地址的路径，不带 `/api`）；`console_reply` 不带 `bot_id`。
+- 契约没写、按 chatbot 的实现写进 008 验收：密钥取 `CHATBOT_EVENTS_SECRET` **字符串的 UTF-8 字节**（chatbot 一侧变量名是
+  `CRM_EVENTS_SECRET`，同值）；`ai_reply` 的 `bot_id` 可为空（还没选行业时的菜单回复）；`error_code` 可能是整数。
+- 要特别注意的不一致：契约写返回 `{"result": ...}`，而 CRM 所有接口都经 `ok()` 套 `{"success", "data", "message"}` 外壳；
+  chatbot 只读**顶层** `result`，套了外壳它会每条打 WARNING（仍出队，不丢事件）。008 验收明确要求不套外壳。
+- 008 不能改 `backend/.env.example`（凭据形状的文件名，Worker 的路径规则拒收），两项新配置的示例要人另补。
+- nginx：本仓库 `nginx/conf.d/crm.conf` 与 `vps_infra` 的配置里，CRM 域名只把 `/api/` 转给后端，其余转前端，`/internal/` 不会到后端。
+  只读了仓库里的配置，没上 VPS 核对线上。
+
+### 验证到什么程度
+
+- 契约自检：控制面 `python -m worker.contract_check --repo <本分支干净克隆> --project-id crm_os --task-id-pattern '^CRM-TASK-[0-9]{3}$' --planning tasks/todo.md`，
+  `result: ready to register`，退出码 0。WARN：Worker 主机要固定 python、ruff 要登记 `check_win32k`（已有项目级 WARN，与本次无关）、
+  007 验收标准 10 条建议拆分。planning-v1 评估 `ok, next: CRM-TASK-006`。
+- 预审：上面所述；第 3 轮之后对 007 的四处修改没有再跑预审。
+- 没验：Worker 主机上的真实就绪上报、Telegram 推荐行（合并后由 Worker 空闲刷新时上报）。
+
+### 预审完整输出
+
+```text
+第 1 轮 CRM-TASK-006:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 8.1 万 token（其中缓存读取 6.1 万），折合 API 价约 $0.21；周额度读数 13%。
+退出码 0
+
+第 1 轮 CRM-TASK-007:
+PRECHECK_FINDING: DESIGN_DEFECT §5 :: Handover ignores only events strictly earlier than the stored time; a re-sent same-second start event overwrites a same-second end, contradicting §8's promise that re-sends never corrupt state.
+PRECHECK_FINDING: DESIGN_DEFECT §5 :: occurred_at is never bounded, so one future-dated handover event makes every later real event "earlier" and silently ignored until that time passes.
+PRECHECK_FINDING: DESIGN_DEFECT §6 :: whatsapp_bsuid is unique across soft-deleted contacts, but lookups only cover non-deleted ones, so back-filling or creating with that BSUID fails with a 5xx and blocks the ordered event queue forever.
+PRECHECK_FINDING: UNDECIDED §5 :: "Take the earliest created" has no tie-break when contacts sharing a number have equal created_at (same-second import), so the matched contact is random.
+PRECHECK_FINDING: UNDECIDED §3 :: AutoCount sync writes contact.phone unnormalized (autocount_service.py:83) and §3 does not say whether that path must normalize.
+PRECHECK_FINDING: UNDECIDED §3 :: Step 2 checks whether the original text starts with 00, so "+0060..." keeps 00 and stays valid, while the acceptance criterion strips 00 from the digits.
+PRECHECK_FINDING: UNDECIDED §5 :: The delivery_error format for joining error code and title, and the value when both are null, are not specified.
+PRECHECK_FINDING: TOO_LARGE tasks/todo.md :: Ten acceptance criteria exceed eight; split into 007a (normalization, contact save paths, conflict query) and 007b (the five event-handling rules and their tests).
+session verdict: NOT_READY
+PRECHECK_RESULT: NOT_READY
+用量：Claude 会话 1 次，共 16.2 万 token（其中缓存读取 12.6 万），折合 API 价约 $0.40；周额度读数 13%。
+退出码 1
+
+第 1 轮 CRM-TASK-008:
+PRECHECK_FINDING: SCOPE_GAP backend/app/routers/contacts.py :: Contact detail calls contact_service.get_contact(db, contact_id) without the current user, so admin-only phone_conflict needs a router change outside allowed_change_paths.
+PRECHECK_FINDING: DESIGN_DEFECT §5 :: Handover events are ignored only if older than the stored time and occurred_at is unbounded, so one future-dated event (e.g. 2099) blocks every later handover update with no undo.
+PRECHECK_FINDING: UNDECIDED §4 :: Whether handover_changed with active=true and expires_at null is a 422 or is accepted and shown as false is not decided.
+PRECHECK_FINDING: UNDECIDED §5 :: The upgrade-only delivery order never ranks failed, so whether a later delivered or read may overwrite failed is undefined.
+session verdict: NOT_READY
+PRECHECK_RESULT: NOT_READY
+用量：Claude 会话 1 次，共 13.6 万 token（其中缓存读取 11 万），折合 API 价约 $0.28；周额度读数 13%。
+退出码 1
+
+第 1 轮 CRM-TASK-009:
+PRECHECK_FINDING: DESIGN_DEFECT §三 :: Step 2 tests the original text for a leading 00, so "+0060123456789" normalises to "0060123456789", and a second pass turns it into "60123456789": the rule is not idempotent, which breaks the second acceptance criterion and inbound matching.
+session verdict: NOT_READY
+PRECHECK_RESULT: NOT_READY
+用量：Claude 会话 1 次，共 11.3 万 token（其中缓存读取 9.1 万），折合 API 价约 $0.25；周额度读数 13%。
+退出码 1
+
+第 1 轮 CRM-TASK-010:
+PRECHECK_FINDING: UNDECIDED docs/chatbot-events.md#4 :: The six demo-industry bot_id identifiers that must map to industry labels are not listed in the design, the task, or anywhere in the repo, so the required mapping cannot be written.
+PRECHECK_FINDING: UNDECIDED docs/chatbot-events.md#6 :: Serialization of wa_handover_expires_at (naive UTC, existing isoformat emits no offset) is unspecified, so the frontend must guess whether to treat it as UTC before showing local time.
+session verdict: NOT_READY
+judged from the findings, not the session's verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 26.8 万 token（其中缓存读取 23.3 万），折合 API 价约 $0.40；周额度读数 13%。
+退出码 0
+
+第 2 轮 CRM-TASK-007:
+PRECHECK_FINDING: DESIGN_DEFECT §3 :: Normalizing phones on create/edit/import/AutoCount makes shared numbers likely (P2 allows them), and the untouched whatsapp_service._handle_message uses scalar_one_or_none, so Meta and gateway inbound then raise MultipleResultsFound: lost messages or a 500.
+PRECHECK_FINDING: UNDECIDED §5 :: A repeated delivery status (delivered then delivered again) is neither an upgrade nor clearly forbidden; the design does not say whether it returns stored or ignored.
+PRECHECK_FINDING: UNDECIDED §5 :: Not stated whether the event phone is normalized before being stored on a new or BSUID-matched contact and in sender/recipient fields, or what happens when it cannot be normalized.
+PRECHECK_FINDING: TOO_LARGE CRM-TASK-007 :: Ten acceptance criteria exceed the limit of eight; split into normalization plus write-path wiring plus conflict query, then section-five event handling as a dependent task.
+session verdict: NOT_READY
+PRECHECK_RESULT: NOT_READY
+用量：Claude 会话 1 次，共 29.9 万 token（其中缓存读取 24.6 万），折合 API 价约 $0.58；周额度读数 13%。
+退出码 1
+
+第 2 轮 CRM-TASK-008:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 48.5 万 token（其中缓存读取 43.3 万），折合 API 价约 $0.58；周额度读数 13%。
+退出码 0
+
+第 2 轮 CRM-TASK-009:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 19.6 万 token（其中缓存读取 16.9 万），折合 API 价约 $0.31；周额度读数 13%。
+退出码 0
+
+第 2 轮 CRM-TASK-010:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 13 万 token（其中缓存读取 10.1 万），折合 API 价约 $0.29；周额度读数 13%。
+退出码 0
+
+第 3 轮 CRM-TASK-007:
+PRECHECK_FINDING: DESIGN_DEFECT §2 :: P2 allows several live contacts with one number, but whatsapp_service._handle_message looks them up with scalar_one_or_none and returns a 500 once normalization makes such duplicates, and this task may not change that code.
+PRECHECK_FINDING: UNDECIDED §3 :: The conflict query does not say whether contacts sharing the same un-normalizable raw value or an empty string count as a phone conflict.
+PRECHECK_FINDING: UNDECIDED §5 :: The new-contact name falls back to the BSUID, which can be 128 characters, but Contact.name is 100 and only the profile name is truncated.
+PRECHECK_FINDING: TOO_LARGE CRM-TASK-007 :: 10 acceptance criteria exceed 8; split into phone normalization with save paths and conflict query, then event handling rules depending on it.
+session verdict: NOT_READY
+PRECHECK_RESULT: NOT_READY
+用量：Claude 会话 1 次，共 32.7 万 token（其中缓存读取 27.8 万），折合 API 价约 $0.57；周额度读数 13%。
+退出码 1
+```
 
 ---
 
