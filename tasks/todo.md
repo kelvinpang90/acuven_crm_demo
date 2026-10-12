@@ -1019,13 +1019,13 @@ Q3：**选 1**（`E,F,W,I`，忽略 E501、E712）。
 - [x] 登记 CRM-TASK-006（表结构）、007（号码规范化）、011（事件处理规则）、008（接口）、009（存量号码迁移）、010（前端），附设计预审输出（见下「登记 CRM-TASK-006 至 011」）
 - [ ] `ai_chatbot_demo`：C1 事件 outbox 与推送、C2 埋点与 statuses 转推
 
-## 第 2 阶段设计（2026-10-13，待 Kelvin 批准）
+## 第 2 阶段设计（2026-10-13，同日 Kelvin 批准）
 
 设计与接口契约：[docs/chatbot-replies.md](../docs/chatbot-replies.md)。CRM 回复经 chatbot 内部发送接口发出（第二把密钥）、客服回复后 AI 静默 24 小时滑动、
 「交还 AI」、删 CRM 自己的 Meta webhook / 网关 / Graph 直连并作废沙盒号 token、`is_gateway` 先停用再删列；认领与锁、模板、媒体留第 3 阶段。
-待决问题见设计第十二节。批准前不登记任务。
+待决问题 Q1–Q7 Kelvin 2026-10-13 全部按建议定（设计第十二节）。
 
-- [ ] 设计 PR 获 Kelvin 批准
+- [x] 设计 PR 获 Kelvin 批准（kelvinpang90/acuven_crm_demo#28，原话「Q1–Q7 都按建议，批准，开 PR 登记 012 到 019」）
 - [ ] 登记第 2 阶段任务（设计第十节，暂编 012–019），附设计预审输出
 - [ ] `ai_chatbot_demo`：C3 发送接口、C4 交还接口与接管时长 24 小时
 

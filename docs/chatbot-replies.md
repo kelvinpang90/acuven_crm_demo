@@ -1,6 +1,6 @@
 # CRM 客服经 ai_chatbot_demo 回复：第 2 阶段设计
 
-> 状态：**待 Kelvin 批准**。批准前不登记任务、不写代码；设计一变，批准作废。
+> 状态：**已批准**（Kelvin 2026-10-13，原话「Q1–Q7 都按建议，批准，开 PR 登记 012 到 019」）。第 2 阶段任务的设计闸门引用本文件所在的 PR kelvinpang90/acuven_crm_demo#28；设计一变，批准作废。
 > 上位设计：`acuven_hub` 的 `CHATBOT_DEMO_CRM_MULTIAGENT_2026-10-12.md`（下称 MULTI，D1–D11），现行索引 `DECISIONS.md` 的 J-04、A-18。
 > 第 1 阶段契约：[chatbot-events.md](chatbot-events.md)（已批准）。本文件只在它上面**增补**，不改它已定的规则；增补处集中在第四节。
 > 这里是两个仓库共用的接口契约：`ai_chatbot_demo` 的发送与交还接口按本文件实现。
@@ -304,7 +304,7 @@ Kelvin 手工（不在仓库里）：
     - 前：列存在，G1、G2 为 true，其余 false。
     - 后：列与索引不存在；`downgrade` 后列回来、全部 false。
 
-## 十二、需要 Kelvin 拍板
+## 十二、需要 Kelvin 拍板（2026-10-13 已定：Q1–Q7 全部按建议）
 
 | # | 问题 | 选项 | 建议 |
 |---|---|---|---|
