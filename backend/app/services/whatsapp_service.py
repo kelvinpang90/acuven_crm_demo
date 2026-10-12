@@ -1,7 +1,7 @@
 """WhatsApp Cloud API integration service.
 
 Handles inbound webhooks (messages + status callbacks) and outbound message
-sending. Gracefully degrades when credentials are not configured.
+sending. Outbound sending without credentials is refused, not faked.
 """
 
 import hashlib
@@ -40,7 +40,7 @@ _signature_skip_warned = False
 class WhatsAppSendError(Exception):
     """Raised when sending an outbound WhatsApp message fails.
 
-    `reason` is one of: "no_phone", "api_error".
+    `reason` is one of: "no_phone", "not_configured", "api_error".
     """
 
     def __init__(self, reason: str, detail: str = ""):
@@ -286,9 +286,10 @@ async def handle_demo_inbound(db: AsyncSession, msg: dict) -> list[dict]:
 async def send_message(db: AsyncSession, contact_id: str, text: str) -> dict:
     """Send a WhatsApp message to a contact.
 
-    Raises WhatsAppSendError on failure. On success, returns the persisted
-    message as a dict. When credentials are unset, the message is still
-    persisted (dev mode) and a warning is logged.
+    Raises WhatsAppSendError on failure, including when the Graph API
+    credentials are unset — nothing is persisted then, so the inbox never shows
+    a message as sent that never left. On success, returns the persisted
+    message as a dict.
     """
     result = await db.execute(
         select(Contact).where(Contact.id == contact_id, Contact.deleted_at.is_(None))
@@ -323,37 +324,34 @@ async def send_message(db: AsyncSession, contact_id: str, text: str) -> dict:
             )
             raise WhatsAppSendError("api_error", f"HTTP {resp.status_code}: {resp.text}")
     else:
-        creds_configured = bool(
-            settings.whatsapp_access_token and settings.whatsapp_phone_number_id
-        )
-
-        if creds_configured:
-            try:
-                async with httpx.AsyncClient() as client:
-                    resp = await client.post(
-                        f"{GRAPH_API}/{settings.whatsapp_phone_number_id}/messages",
-                        headers={"Authorization": f"Bearer {settings.whatsapp_access_token}"},
-                        json=build_text_message(contact.phone, text),
-                        timeout=10,
-                    )
-            except httpx.HTTPError as exc:
-                logger.exception("WhatsApp send transport error")
-                raise WhatsAppSendError("api_error", str(exc)) from exc
-
-            if resp.status_code != 200:
-                logger.error(
-                    "WhatsApp send failed status=%s body=%s",
-                    resp.status_code,
-                    resp.text,
-                )
-                raise WhatsAppSendError("api_error", f"HTTP {resp.status_code}: {resp.text}")
-
-            data = resp.json()
-            external_id = data.get("messages", [{}])[0].get("id")
-        else:
-            logger.warning(
-                "WhatsApp credentials not configured — persisting outbound message without dispatch"
+        if not (settings.whatsapp_access_token and settings.whatsapp_phone_number_id):
+            logger.warning("WhatsApp credentials not configured — outbound message not sent")
+            raise WhatsAppSendError(
+                "not_configured", "WhatsApp access token or phone number id is not configured"
             )
+
+        try:
+            async with httpx.AsyncClient() as client:
+                resp = await client.post(
+                    f"{GRAPH_API}/{settings.whatsapp_phone_number_id}/messages",
+                    headers={"Authorization": f"Bearer {settings.whatsapp_access_token}"},
+                    json=build_text_message(contact.phone, text),
+                    timeout=10,
+                )
+        except httpx.HTTPError as exc:
+            logger.exception("WhatsApp send transport error")
+            raise WhatsAppSendError("api_error", str(exc)) from exc
+
+        if resp.status_code != 200:
+            logger.error(
+                "WhatsApp send failed status=%s body=%s",
+                resp.status_code,
+                resp.text,
+            )
+            raise WhatsAppSendError("api_error", f"HTTP {resp.status_code}: {resp.text}")
+
+        data = resp.json()
+        external_id = data.get("messages", [{}])[0].get("id")
 
     msg = Message(
         id=str(uuid.uuid4()),

@@ -14,9 +14,6 @@
 <!-- openclaw:planning-v1:begin -->
 ### 当前计划
 
-1. `CRM-TASK-004` 发送失败或未配置时如实报错，不再把消息记为已发出
-2. `CRM-TASK-002` 客户列表支持只看未分派的客户
-3. `CRM-TASK-003` 客户页给管理员显示未分派数量和筛选开关
 
 ### 已阻塞
 
@@ -1016,3 +1013,96 @@ Q3：**选 1**（`E,F,W,I`，忽略 E501、E712）。
 - [ ] 设计 PR 获 Kelvin 批准
 - [ ] 登记 CRM-TASK-006（表结构）、007（业务规则）、008（接口）、009（存量号码迁移）、010（前端），附设计预审输出
 - [ ] `ai_chatbot_demo`：C1 事件 outbox 与推送、C2 埋点与 statuses 转推
+
+---
+
+# CRM-TASK-004：发送失败或未配置时如实报错，不再把消息记为已发出
+
+来源：任务七「发现的问题」里的两条假发送。设计闸门：不适用（只让失败如实暴露）。
+
+## 做了什么
+
+- [x] `backend/app/services/whatsapp_service.py` 的 `send_message`：非演示联系人在 access token 或 phone number id
+      缺任一项时，抛 `WhatsAppSendError("not_configured")`，不发请求、不入库（原来记一条 warning 后照样存成已发出）。
+      凭据齐全时的 Graph API 调用、非 200 / 网络出错抛 `api_error`、演示联系人经网关的分支，逐行未改。
+- [x] `backend/app/services/email_service.py`：新增 `EmailSendError`（`not_configured` / `api_error`）。`send_email`
+      在 SMTP 主机或用户缺任一项时抛 `not_configured`；连接、STARTTLS、认证、发送任一步出错时记 `logger.exception`
+      后抛 `api_error`，两种情况都不入库。联系人不存在或没有邮箱仍返回 `None`，发送成功仍入库并返回原来的字典。
+- [x] `backend/app/routers/messages.py`：两个发送接口把 `not_configured` 映射为 `503 NOT_CONFIGURED`，邮件的
+      `api_error` 映射为 `502 API_ERROR`（与 WhatsApp 原有的一致）；其余分支未改。
+- [x] 测试：`backend/tests/test_whatsapp_service_send.py` 里原来断言未配置仍保存的用例改为经接口断言 503 且不入库、
+      不发请求（缺 token、缺 id、都缺三种）；另补凭据齐全时成功入库、非 200 与网络出错仍 502 不入库的用例。
+      新增 `backend/tests/test_email_send.py`：未配置（三种缺法）、发送出错（连接 / 认证 / 发送三步，含错误日志断言）、
+      发送成功、没有邮箱。每条 docstring 写明守住哪条验收标准。
+- [x] 评审第 1 轮：经接口的 WhatsApp 用例原来 patch 的是 `httpx.AsyncClient.post`，连测试客户端自己的请求也被替换，
+      根本没到应用。改为只替换 `whatsapp_service` 模块里的 `httpx` 名字（`AsyncClient` 换成 mock，`HTTPError`
+      保留真实类），测试客户端不受影响；未配置用例断言 `AsyncClient` 没有被实例化。业务代码未改。
+
+## 偏离
+
+- 没有改演示联系人经网关的分支、前端、表结构、收邮件。
+- WhatsApp 测试里额外补了凭据齐全时的成功与失败用例（验收标准 2 说行为不变，原来没有测试守住）。
+- 邮件的 STARTTLS 失败与连接、认证、发送同样走 `api_error`（原来的 `try` 本就包着它）。
+- 任务七「发现的问题」里对应的两条复选框保持 `[ ]`，等本 PR 合并后再勾。
+
+## 验证到什么程度
+
+- 验证依据是上面的测试加已有后端测试，由 PR 的必需检查 `backend` 执行；检查结果由 Worker 和 CI 记录，不写在这里。
+
+---
+
+# CRM-TASK-002：客户列表支持只看未分派的客户
+
+来源：任务七「发现的问题」里的未分派客户一条（后端这一半，前端由 CRM-TASK-003 接）。设计闸门：不适用（只在管理员已可见的列表上加筛选）。
+
+## 做了什么
+
+- [x] `backend/app/routers/contacts.py` 的 `list_contacts`：新增查询参数 `unassigned`（`Query(0, ge=0, le=1)`），
+      取值 0 或 1、默认 0，其他取值（如 `2`、`-1`、`abc`）由 FastAPI 的参数校验返回 422；原样传给 service。
+- [x] `backend/app/services/contact_service.py` 的 `list_contacts`：新增 `unassigned: int = 0`，为 1 时在角色过滤、
+      搜索、行业、负责人条件之后再加 `Contact.assigned_to IS NULL`，计数、排序、分页都在这条件之后，所以 `total` 是筛选后的数量。
+      为 0 时不加任何条件，查询与原来逐字相同。角色过滤、demo 排除、`access_service` 都没动：销售的 `assigned_to == 自己`、
+      经理的 `assigned_to IN 团队` 与 `IS NULL` 同时成立不了，于是自然得到空列表、`total` 为 0；`assigned_to` 与
+      `unassigned=1` 同传时同理为空。
+- [x] 新增测试 `backend/tests/test_contact_unassigned.py`，每条 docstring 写明守住哪条验收标准：管理员传 1 只看到未分派客户
+      且 `total` 正确（demo 未分派客户仍被排除，分页时 `total` 仍是全量）；与归档、搜索、行业同时生效；销售与经理传 1 得到空列表；
+      `assigned_to` 与 `unassigned=1` 同传为空；不传与传 0 的结果相同且与各角色原有可见范围一致；非法取值返回 422。
+
+## 偏离
+
+- 没有改 `access_service`、角色过滤、demo 排除、仪表盘、前端、表结构，没有加计数接口。
+- 422 用的是 FastAPI 默认的参数校验响应体（与其他查询参数校验失败一致），没有改成 `fail()` 的格式。
+
+## 验证到什么程度
+
+- 验证依据是上面的新测试加已有后端测试，由 PR 的必需检查 `backend` 执行；检查结果由 Worker 和 CI 记录，不写在这里。
+
+---
+
+# CRM-TASK-003：客户页给管理员显示未分派数量和筛选开关
+
+来源：任务七「发现的问题」里的未分派客户一条（前端这一半，接 CRM-TASK-002 的 `unassigned` 参数）。设计闸门：不适用（纯前端筛选）。
+
+## 做了什么
+
+- [x] `frontend/src/services/contacts.ts`：`ContactListParams` 加 `unassigned?: number`。
+- [x] `frontend/src/pages/Contacts/index.tsx`：只在 `user.role === 'admin'` 时，筛选区搜索框旁显示「只看未分派」开关，
+      开关里带一个数量徽标，数量大于 0 时红底白字，为 0 时是灰色。数量取自
+      `GET /contacts?unassigned=1&is_archived=<当前归档视图>&page=1&page_size=1` 的 `total`，在每次 `load()` 时一并请求
+      （所以翻页、搜索、排序、切归档、删除、归档、编辑、同步之后都会刷新）；请求失败时保留上次的数量，不影响列表。
+      打开开关把 `unassigned: 1` 合进列表参数并回到第 1 页，关闭时去掉该参数（也回到第 1 页），搜索、排序、归档切换的参数原样保留。
+      非管理员不渲染开关，`loadUnassignedCount` 直接返回，不发数量请求，列表参数里也不会出现 `unassigned`。
+- [x] `frontend/src/locales/{en,zh}/contacts.json`：新增 `unassignedOnly`（开关文字）、`unassignedCount`（徽标的悬停说明）。
+
+## 偏离
+
+- 数量跟随当前的归档视图（看活跃客户时数活跃的未分派客户，看已归档时数已归档的），不跟随搜索词：
+  它表示「当前视图下有多少未分派客户」，搜索时不会变少，免得误以为未分派的已经处理掉了。
+- 关闭开关时也回到第 1 页（任务只要求打开时回第 1 页；关闭后原来的页码可能超出新列表的范围）。
+- 插值参数用 `number` 而不是 `count`，避开 i18next 按 `count` 找复数 key 的规则。
+- 没有改后端、路由、其他页面，没有加计数接口。
+
+## 验证到什么程度
+
+- 前端类型检查与构建由 PR 的必需检查 `frontend` 执行；检查结果由 Worker 和 CI 记录，不写在这里。
+- 没有在浏览器里实际点过三种角色的页面。

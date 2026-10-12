@@ -78,7 +78,7 @@ tasks:
       同样存成已发出并返回成功。客服因此以为客户收到了。改成如实返回错误、不保存这条出站消息，前端已有的报错提示会显示出来。
       只改这三处失败路径；不改演示联系人经网关发送的分支（等 WhatsApp 接入方案定了另行处理）、不改前端、不改表结构、
       不改收邮件。
-    status: ready
+    status: done
     depends_on: []
     acceptance_criteria:
       - 给非演示联系人发 WhatsApp 时，access token 或 phone number id 缺任一项，接口返回 503、错误码 NOT_CONFIGURED，不保存出站消息，也不发起任何外部请求
@@ -108,7 +108,7 @@ tasks:
       负责人为空的客户只有管理员看得到，但混在全部客户里，没有办法单独筛出来。给客户列表接口加 unassigned 参数，
       让管理员能只看这些客户，前端由 CRM-TASK-003 接上。不改任何角色能看到哪些客户的规则（销售、经理仍看不到未分派客户），
       不加计数接口（列表的 total 就是数量）、不改仪表盘、不改前端、不改表结构。
-    status: ready
+    status: done
     depends_on: []
     acceptance_criteria:
       - 客户列表接口接受 unassigned 参数（0 或 1，默认 0，其他取值返回 422）；为 1 时只返回负责人为空的客户，并与已有的角色过滤、搜索、行业、负责人、归档、排序、分页条件同时生效；返回的 total 是筛选后的数量
@@ -135,7 +135,7 @@ tasks:
     purpose: >-
       在 CRM-TASK-002 的 unassigned 参数之上，让管理员在客户页直接看到有多少未分派客户、一键只看它们，
       未分派的线索不再无声无息。只对管理员显示；不改后端、不改销售与经理看到的页面、不加新页面或路由。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-002
     acceptance_criteria:

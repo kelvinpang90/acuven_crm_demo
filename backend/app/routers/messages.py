@@ -11,6 +11,7 @@ from app.models.message import Message
 from app.models.user import User
 from app.schemas.message import EmailSendRequest, WhatsAppSendRequest
 from app.services import access_service, email_service, whatsapp_service
+from app.services.email_service import EmailSendError
 from app.services.whatsapp_service import WhatsAppSendError
 from app.utils.response import fail, ok
 
@@ -133,6 +134,12 @@ async def send_whatsapp(
             return fail(
                 message="Contact not found or has no phone number", code="NO_PHONE", status_code=400
             )
+        if exc.reason == "not_configured":
+            return fail(
+                message="WhatsApp is not configured; the message was not sent",
+                code="NOT_CONFIGURED",
+                status_code=503,
+            )
         return fail(message=f"WhatsApp API error: {exc.detail}", code="API_ERROR", status_code=502)
     return ok(data=data)
 
@@ -146,7 +153,16 @@ async def send_email(
     if not await access_service.may_access_contact(db, current_user, body.contact_id):
         return fail(message=NOT_YOURS, code="NOT_ASSIGNED", status_code=403)
 
-    data = await email_service.send_email(db, body.contact_id, body.subject, body.body)
+    try:
+        data = await email_service.send_email(db, body.contact_id, body.subject, body.body)
+    except EmailSendError as exc:
+        if exc.reason == "not_configured":
+            return fail(
+                message="Email (SMTP) is not configured; the email was not sent",
+                code="NOT_CONFIGURED",
+                status_code=503,
+            )
+        return fail(message=f"Email send error: {exc.detail}", code="API_ERROR", status_code=502)
     if not data:
         return fail(message="Contact not found or has no email", code=400)
     return ok(data=data)
