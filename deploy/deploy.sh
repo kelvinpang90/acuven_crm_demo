@@ -4,7 +4,7 @@
 # 写法照搬 acuven-shop 的 deploy/deploy.sh，只改了服务名与镜像名。
 #
 # 用法（在服务器上本仓库检出的根目录里）：
-#     CRM_IMAGE_REPO=ghcr.io/所有者/crm_os deploy/deploy.sh 完整的40位commitSHA
+#     CRM_IMAGE_REPO=ghcr.io/所有者/acuven_crm_demo deploy/deploy.sh 完整的40位commitSHA
 #
 # 顺序：记下正在跑的版本 → 拉新镜像 → 迁移 → 换容器 → 等健康 → 不健康则回滚。
 # 成功才以 0 退出；迁移失败、换容器失败、不健康、回滚（无论回滚成败）都以非零退出（部署观察契约 D3）。

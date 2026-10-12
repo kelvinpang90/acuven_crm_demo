@@ -5,7 +5,7 @@
 # Then in PyCharm:
 #   Run -> Edit Configurations -> + -> Python Debug Server
 #   Host: localhost   Port: 5678
-#   Path mapping:  E:\projects\crm_os\backend  =>  /app
+#   Path mapping:  <本机仓库目录>\backend  =>  /app
 #
 # Notes:
 # - Source is bind-mounted so edits reload instantly (uvicorn --reload).

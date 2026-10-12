@@ -23,7 +23,7 @@
 | `123456`                  | crm_user 的 mysql 密码（生产必须强密码） | `openssl rand -base64 24` |
 | `123456`                  | JWT 密钥 | `openssl rand -hex 32`    |
 | `kelvinpang90`            | GitHub 用户名/组织名（小写） | `kelvinpang90`            |
-| `crm_os`                  | 仓库名 | `crm_os`                  |
+| `acuven_crm_demo`         | 仓库名（2026-10-12 前叫 crm_os） | `acuven_crm_demo`         |
 
 ---
 
@@ -81,7 +81,7 @@ networks:
 
 services:
   backend:
-    image: ghcr.io/kelvinpang90/crm_os-backend:latest
+    image: ghcr.io/kelvinpang90/acuven_crm_demo-backend:latest
     env_file: .env
     environment:
       - DB_HOST=infra_mysql
@@ -92,7 +92,7 @@ services:
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000
 
   frontend:
-    image: ghcr.io/kelvinpang90/crm_os-frontend:latest
+    image: ghcr.io/kelvinpang90/acuven_crm_demo-frontend:latest
     networks: [proxy_net]
     restart: unless-stopped
 ```
@@ -282,13 +282,13 @@ GitHub → 仓库 → Settings → Actions → General → Workflow permissions�
 按提交 SHA 部署，满足 OpenClaw 部署观察契约 D1–D5（写法照搬 acuven-shop，细节见文件头注释）：
 
 - **触发**：每次 push 到 `master` 都部署那个提交；例外是只改 `.platform/tasks.yaml` 与 `tasks/todo.md` 的提交（OpenClaw 收尾）不部署；Actions 页面手动 `workflow_dispatch` 时必须填完整 40 位 SHA，用于重部署或回滚
-- **build job**：构建 `backend` / `frontend` 两个镜像，**只打 `<commit_sha>` 标签**（不再推 `latest`），推到 `ghcr.io/<owner>/crm_os-backend|frontend`；构建时把 SHA 写进后端镜像
+- **build job**：构建 `backend` / `frontend` 两个镜像，**只打 `<commit_sha>` 标签**（不再推 `latest`），推到 `ghcr.io/<owner>/acuven_crm_demo-backend|frontend`；构建时把 SHA 写进后端镜像
 - **deploy job**：通过 `appleboy/ssh-action`（校验主机指纹）进 VPS：
   ```
   cd $VPS_APP_DIR
   git fetch && git checkout --detach <DEPLOY_SHA>
   docker login ghcr.io（使用 GITHUB_TOKEN）
-  CRM_IMAGE_REPO=ghcr.io/<owner>/crm_os bash deploy/deploy.sh <DEPLOY_SHA>
+  CRM_IMAGE_REPO=ghcr.io/<owner>/acuven_crm_demo bash deploy/deploy.sh <DEPLOY_SHA>
   ```
   `deploy/deploy.sh`：记下正在跑的版本 → 拉新镜像 → 先跑迁移 → 换容器 → 等 healthcheck → 不健康就回滚到原版本并以失败结束 → 清理本项目旧镜像
 - **结论**：最后轮询 `HEALTHCHECK_URL`，响应里出现这次的 SHA 才算成功
@@ -305,7 +305,7 @@ ssh ubuntu@<VPS 地址>
 cd /opt/crm_os
 
 # 拉代码（首次）
-git clone https://github.com/kelvinpang90/crm_os.git .
+git clone https://github.com/kelvinpang90/acuven_crm_demo.git .
 # 此时 .env 已存在（步骤 1.4），不要被覆盖
 
 # 登录 GHCR（首次拉镜像需要；后续 GHA 会自动登录）
@@ -316,7 +316,7 @@ echo <你的 GitHub PAT> | docker login ghcr.io -u kelvinpang90 --password-stdin
 
 # 等 GHA 构建完成后，VPS 上部署那个提交（<sha> 为完整 40 位）
 git checkout --detach <sha>
-CRM_IMAGE_REPO=ghcr.io/kelvinpang90/crm_os bash deploy/deploy.sh <sha>
+CRM_IMAGE_REPO=ghcr.io/kelvinpang90/acuven_crm_demo bash deploy/deploy.sh <sha>
 
 # 可选：写入种子数据
 docker compose exec backend python seed.py
@@ -361,7 +361,7 @@ GitHub Actions 不可用时，在 VPS 上手工做同样的事：
 ssh ubuntu@<VPS 地址>
 cd /opt/crm_os
 git fetch && git checkout --detach <good-sha>
-CRM_IMAGE_REPO=ghcr.io/kelvinpang90/crm_os bash deploy/deploy.sh <good-sha>
+CRM_IMAGE_REPO=ghcr.io/kelvinpang90/acuven_crm_demo bash deploy/deploy.sh <good-sha>
 ```
 
 > 数据库迁移回滚需手动 `alembic downgrade -1`，且仅适用于向后兼容的迁移。

@@ -30,7 +30,7 @@ execution:
 # 仓库事实：来自 git remote 与 GitHub 设置。GitHub 上改了保护规则要回来同步这里。
 repository:
   host: github.com
-  slug: kelvinpang90/crm_os
+  slug: kelvinpang90/acuven_crm_demo
   default_branch: master
   merge_method: squash
   protected_branches:
