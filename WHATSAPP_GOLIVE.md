@@ -1,7 +1,7 @@
 # WhatsApp Cloud API 联调上线手册
 
 > 适用版本：仓库 master（含 statuses / 非文本消息 / 错误透传 修复）
-> 域名：`crm.kelvinpeng.com` · VPS：`103.40.204.95` · 后端镜像：`ghcr.io/kelvinpang90/crm_os-backend:latest`
+> 域名：`crm.kelvinpeng.com` · VPS：`<VPS 地址>` · 后端镜像：`ghcr.io/kelvinpang90/crm_os-backend:latest`
 
 按节顺序执行；每一节末尾都有"应看到 / 验证"，做不到不要往下走。
 
@@ -58,7 +58,7 @@ curl -i 'https://crm.kelvinpeng.com/api/webhooks/whatsapp?hub.mode=subscribe&hub
 SSH 登 VPS：
 
 ```bash
-ssh ubuntu@103.40.204.95
+ssh ubuntu@<VPS 地址>
 cd /opt/crm_os
 sudo nano .env   # 或 vim
 ```
