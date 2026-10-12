@@ -970,7 +970,8 @@ Q3：**选 1**（`E,F,W,I`，忽略 E501、E712）。
 代码以 master 为准（生产 `/api/health` 报 `ad473ae`，与 master 代码一致）；VPS 上只读核对配置是否填写（不看值）和数据库计数。
 
 - 生产配置：WhatsApp 四项、网关地址、内部密钥、IMAP、SMTP 都已填。CRM 的 WhatsApp phone number id 与 `ai_chatbot_demo`、
-  `acuven_aichat` 的都不同（只比哈希），是第三个号码，待 Kelvin 确认是哪一个。
+  `acuven_aichat` 的都不同（只比哈希）。同日经 Kelvin 同意，用 CRM 的凭据向 Meta 只读查询：是 CRM 自己那个
+  Meta App 的**沙盒测试号**（显示名 Test Number，未验证），只能发给登记过的号码，没有真实顾客；token 仍有效。
 - 流量：WhatsApp 最后入站 2026-08-25、最后出站 08-17；邮件最后入站 05-10、出站 06-10。网关停用后没有流量。
   2 个演示联系人（`is_gateway`），回复它们会打到已停用的网关。当前未分派客户 0 个。
 - 后端日志只有访问日志，应用 INFO 日志没有输出，看不出邮件轮询是否在跑；AutoCount 同步在报域名解析失败（另行处理）。
