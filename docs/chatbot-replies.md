@@ -1,7 +1,7 @@
 # CRM 客服经 ai_chatbot_demo 回复：第 2 阶段设计
 
 > 状态：**已批准**（Kelvin 2026-10-13，原话「Q1–Q7 都按建议，批准，开 PR 登记 012 到 019」）。第 2 阶段任务的设计闸门引用本文件所在的 PR kelvinpang90/acuven_crm_demo#28；设计一变，批准作废。
-> 第一至十三节如上已批准；**第十四节**是登记 CRM-TASK-012 至 019 时按设计预审补的，待 Kelvin 在登记 PR 上批准。
+> 第一至十三节如上已批准；**第十四节**是登记 CRM-TASK-012 至 020 时按设计预审补的（含把原 019 拆成 019、020，第八至十节同步改了），待 Kelvin 在登记 PR 上批准。
 > 上位设计：`acuven_hub` 的 `CHATBOT_DEMO_CRM_MULTIAGENT_2026-10-12.md`（下称 MULTI，D1–D11），现行索引 `DECISIONS.md` 的 J-04、A-18。
 > 第 1 阶段契约：[chatbot-events.md](chatbot-events.md)（已批准）。本文件只在它上面**增补**，不改它已定的规则；增补处集中在第四节。
 > 这里是两个仓库共用的接口契约：`ai_chatbot_demo` 的发送与交还接口按本文件实现。
@@ -27,7 +27,7 @@
 | R1 | 发送失败怎么记 | **明确没发出**：不入库，返回错误，文字留在输入框（沿用 CRM-TASK-004）。**结果不明**（超时、连接中断）：消息留在库里标「未确认送出」，可重试；重试用同一个幂等键，chatbot 去重，不重复发给访客；重试失败不删（第一次的结果仍不明） | 收件箱不显示没发出的消息；结果不明时删掉会丢掉其实已发出的消息 |
 | R2 | 24 小时客服窗口 | CRM 发送前检查：该联系人最后一条 WhatsApp 入站消息在 24 小时内，否则 409 拒绝、不调用 chatbot | Meta 对窗口外的普通文本先收下、再异步报失败（131047），客服当时看不出；也挡住从 demo 号向从没来过消息的联系人（手工新建、AutoCount 同步的）主动发消息 |
 | R3 | 接管状态谁写 | CRM 不自己改接管字段。chatbot 的发送 / 交还响应带上这次接管变化，与随后推送的 `handover_changed` 事件**同一个 `occurred_at`**；CRM 写入响应时要求**严格晚于**已存时间，事件仍按第 1 阶段「不早于」写入 | 页面立刻看到「接管中」（收件箱不自动刷新），又只有一条写入规则、一个时间来源 |
-| R4 | 原有 2 个 `is_gateway` 联系人 | 去掉标记成为普通联系人；先停用代码、再删列，分两次部署 | 网关已停用、入口在本阶段删掉，「是否经网关」不再有意义；CRM 是 demo，这 2 个与 chatbot 访客同样是主数据（P4 同理） |
+| R4 | 原有 2 个 `is_gateway` 联系人 | 去掉标记成为普通联系人；先停用代码、再取消模型映射、最后删列，分三次部署（第十四节第 12 条） | 网关已停用、入口在本阶段删掉，「是否经网关」不再有意义；CRM 是 demo，这 2 个与 chatbot 访客同样是主数据（P4 同理） |
 | R5 | CRM 自己的 Meta webhook 吞异常返回 200、密钥未配时验签放行 | 不修，入口整体删掉 | 已定撤回 CRM-TASK-005；8 月底后零流量；入站可靠性由 chatbot 的事件队列保证 |
 | R6 | 会话认领 / 转派与并发保护（任务二缺口 3） | 本阶段不做；靠现有归属校验（D7）加 `sent_by` 显示是谁回的 | MULTI 第四节已定「负责人与经理同时回第一期接受，认领与锁放第 3 阶段」；转派已能通过改负责人完成、历史消息随行（任务二 2.1） |
 | R7 | 模板与媒体 | 第 3 阶段 | MULTI 第五节已定；R2 让窗口外的情况当场可见 |
@@ -215,13 +215,14 @@ Kelvin 手工（不在仓库里）：
 `demo_scope` 的过滤用在客户列表、商机、看板、分析、管道 5 处，把它们挡在外面。本阶段删掉网关入站后，没有任何代码会再写 true。
 
 - CRM-TASK-018：删 `utils/demo_scope.py` 与 5 处调用。2 个联系人从此和 chatbot 访客一样出现在列表与统计里（各带一条 0 元 lead 商机）。
-- CRM-TASK-019：迁移删列与索引。`downgrade` 重建列、默认 false，**不还原**那 2 个 true（迁移注释写明）。
-- 为什么分两步：部署时迁移先于新容器运行，旧容器还在读这一列；先让代码不再读它，下一次部署再删。
+- CRM-TASK-019：模型取消 `is_gateway` 映射（列与索引留在库里，列有数据库默认值 false，插入照常）。
+- CRM-TASK-020：迁移删列与索引。`downgrade` 重建列、默认 false，**不还原**那 2 个 true（迁移注释写明）。
+- 为什么分三步：部署时迁移先于换容器，删列那一刻在跑的是上一版，失败时也回滚到上一版；所以删列之前的那一版必须连模型都不再映射这一列。
 
 ## 九、表结构
 
 - 迁移 014（CRM-TASK-012）：`messages.sent_by`，字符串 36，可空，不加外键（与 `assigned_to` 一致）、不加索引（不按它查询）。旧数据留空。
-- 迁移 015（CRM-TASK-019）：删 `contacts.is_gateway` 与 `idx_contacts_is_gateway`。
+- 迁移 015（CRM-TASK-020）：删 `contacts.is_gateway` 与 `idx_contacts_is_gateway`。
 - 013 号已给 CRM-TASK-009 的存量号码迁移。
 
 **个人数据**：新增存储的只有 `sent_by`（员工 id）。客服写的正文发给 chatbot 与 Meta（发送本身必需），chatbot 把它连同员工显示名
@@ -238,7 +239,8 @@ Kelvin 手工（不在仓库里）：
 | CRM-TASK-016 | 前端 | 收件箱：窗口关闭提示、发送失败原因、未确认送出与重试、「交还 AI」按钮、「客服 · 名字」；中英文文案 | 015、010 |
 | CRM-TASK-017 | 接口与服务 | 第七节：删 webhook、网关入站与出站、Graph 直连、旧配置、旧测试与文档 | 015 |
 | CRM-TASK-018 | 业务规则 | 删 `demo_scope` 与 5 处调用；第 1 阶段事件处理新建联系人时写的 `is_gateway=false` 去掉（列有默认值）；删 `test_demo_scope.py`，`test_contact_unassigned.py` 里「demo 联系人被排除」的断言改掉 | 017 |
-| CRM-TASK-019 | 数据库 | 迁移 015 删 `is_gateway` 与模型字段；`test_access.py`、`test_contact_access.py`、`test_contact_unassigned.py` 构造联系人时去掉这个参数 | 018 已部署 |
+| CRM-TASK-019 | 数据库（模型） | 模型取消 `is_gateway` 映射；测试构造联系人时去掉这个参数；删 018 新增的 `test_gateway_contacts_visible.py` | 018 已部署 |
+| CRM-TASK-020 | 数据库 | 迁移 015 删 `is_gateway` 列与索引 | 019 已部署 |
 
 `ai_chatbot_demo` 那边（人工会话，沿用 P5，待第十二节 Q6 确认）：
 
@@ -248,7 +250,7 @@ Kelvin 手工（不在仓库里）：
 上线顺序：第 1 阶段全部上线且事件开关已开（发送依赖入站消息算窗口、依赖事件回填送达）→ 012 → chatbot C3、C4 部署（未配密钥，一律 503）
 → 013 → 014 → 015 部署（CRM 未配密钥，发送 503；此前本来就 502）→ 016 → Kelvin 生成第二把密钥，同值写进 CRM 的 `CHATBOT_SEND_SECRET`
 与 chatbot 的 `CRM_SEND_SECRET`，两边重启 → 真机验收（回复、接管中与到期时间、续期、交还、送达对勾、窗口外被拒）→ 017
-→ Kelvin 清 VPS 旧变量、作废沙盒号 token → 018 → 019。
+→ Kelvin 清 VPS 旧变量、作废沙盒号 token → 018 → 019 → 020。
 
 ## 十一、每条改变数据的规则：操作前 → 操作 → 操作后
 
@@ -339,7 +341,7 @@ Kelvin 手工（不在仓库里）：
 
 ## 十四、登记预审后的补充（2026-10-13，待 Kelvin 在登记 PR 上批准）
 
-登记 CRM-TASK-012 至 019 前跑了设计预审（输出在 `tasks/todo.md`「登记 CRM-TASK-012 至 019」），下面几条照原文没写死或走不通，按这里补；
+登记 CRM-TASK-012 至 020 前跑了设计预审（输出在 `tasks/todo.md`「登记 CRM-TASK-012 至 020」），下面几条照原文没写死或走不通，按这里补；
 对应任务的验收标准已按这里写。
 
 1. **`CHATBOT_SEND_URL` 是基地址**：只到端口、不含路径，发送与交还分别接 `/internal/crm/send` 与 `/internal/crm/handback`。
@@ -358,4 +360,12 @@ Kelvin 手工（不在仓库里）：
 10. **`DEPLOY.md` 的变量清单**：第七节原写「只加 `CHATBOT_SEND_URL`、`CHATBOT_SEND_SECRET`，第 1 阶段两项另由人补」；改为 CRM-TASK-017 一次补齐
     `CHATBOT_EVENTS_SECRET`、`CHATBOT_EVENTS_SECRET_PREVIOUS`、`CHATBOT_SEND_URL`、`CHATBOT_SEND_SECRET` 四项空值。
 11. **测试文件范围**：CRM-TASK-007 新增的 `test_contact_phone.py` 有经旧 Meta 回调与网关入站的用例，归 CRM-TASK-017 删；CRM-TASK-018 新增的
-    `test_gateway_contacts_visible.py` 用到 `is_gateway`，归 CRM-TASK-019 删（列不存在后它守的口径已无意义）；019「不再出现 `is_gateway`」不含迁移文件与 `test_migration_015`。
+    `test_gateway_contacts_visible.py` 用到 `is_gateway`，归 CRM-TASK-019 删（模型不再映射后它守的口径已无从构造）；「不再出现 `is_gateway`」不含迁移文件与 `test_migration_015`。
+12. **删列前先取消映射**（设计缺陷）：原 019 在同一次部署里删模型字段与删列，而 `deploy.sh` 先跑迁移、再换容器，失败回滚到上一版；
+    上一版（018）的模型仍映射这一列，删列那一刻起它的联系人查询全部报错，回滚目标也坏。补：拆成 019（模型取消映射，列有数据库默认值 false，插入照常）
+    与 020（迁移删列），各自一次部署。任务从 8 个变成 9 个。
+13. **重试的细节**：先查创建时间（当前时间不早于创建时间 + 24 小时即 `RETRY_EXPIRED`，先于窗口检查）；`visitor.bsuid` 取联系人现在的 BSUID；
+    原发送人已不存在时 `agent.name` 用 `sent_by` 的 id。
+14. **交还的细节**：总时限 30 秒；chatbot 返回 200 但 `ended` 却没有合法的 `handover`，按失败处理、不改，打 ERROR；CRM 接口的失败码为 502 `CHATBOT_FAILED`。
+15. **结果不明的响应形状**：202 用 `ok` 外壳，`data` 是这条消息，`message` 为 `UNCONFIRMED`（`fail` 外壳没有 `data`）。
+16. **前端输入上限**：WhatsApp 回复框限制 4096 字符；没有 `code` 的 422 与不带 Meta 字段的 `SEND_FAILED` 显示通用的发送失败。
