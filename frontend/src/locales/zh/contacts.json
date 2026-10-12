@@ -38,6 +38,8 @@
   "unarchive": "取消归档",
   "viewArchived": "查看已归档",
   "viewActive": "查看活跃客户",
+  "unassignedOnly": "只看未分派",
+  "unassignedCount": "未分派客户 {{number}} 个",
   "autocountCustomer": "AutoCount 客户编号",
   "autocountDocuments": "AutoCount 单据",
   "autocountDocType": {

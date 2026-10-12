@@ -1068,3 +1068,33 @@ Q3：**选 1**（`E,F,W,I`，忽略 E501、E712）。
 ## 验证到什么程度
 
 - 验证依据是上面的新测试加已有后端测试，由 PR 的必需检查 `backend` 执行；检查结果由 Worker 和 CI 记录，不写在这里。
+
+---
+
+# CRM-TASK-003：客户页给管理员显示未分派数量和筛选开关
+
+来源：任务七「发现的问题」里的未分派客户一条（前端这一半，接 CRM-TASK-002 的 `unassigned` 参数）。设计闸门：不适用（纯前端筛选）。
+
+## 做了什么
+
+- [x] `frontend/src/services/contacts.ts`：`ContactListParams` 加 `unassigned?: number`。
+- [x] `frontend/src/pages/Contacts/index.tsx`：只在 `user.role === 'admin'` 时，筛选区搜索框旁显示「只看未分派」开关，
+      开关里带一个数量徽标，数量大于 0 时红底白字，为 0 时是灰色。数量取自
+      `GET /contacts?unassigned=1&is_archived=<当前归档视图>&page=1&page_size=1` 的 `total`，在每次 `load()` 时一并请求
+      （所以翻页、搜索、排序、切归档、删除、归档、编辑、同步之后都会刷新）；请求失败时保留上次的数量，不影响列表。
+      打开开关把 `unassigned: 1` 合进列表参数并回到第 1 页，关闭时去掉该参数（也回到第 1 页），搜索、排序、归档切换的参数原样保留。
+      非管理员不渲染开关，`loadUnassignedCount` 直接返回，不发数量请求，列表参数里也不会出现 `unassigned`。
+- [x] `frontend/src/locales/{en,zh}/contacts.json`：新增 `unassignedOnly`（开关文字）、`unassignedCount`（徽标的悬停说明）。
+
+## 偏离
+
+- 数量跟随当前的归档视图（看活跃客户时数活跃的未分派客户，看已归档时数已归档的），不跟随搜索词：
+  它表示「当前视图下有多少未分派客户」，搜索时不会变少，免得误以为未分派的已经处理掉了。
+- 关闭开关时也回到第 1 页（任务只要求打开时回第 1 页；关闭后原来的页码可能超出新列表的范围）。
+- 插值参数用 `number` 而不是 `count`，避开 i18next 按 `count` 找复数 key 的规则。
+- 没有改后端、路由、其他页面，没有加计数接口。
+
+## 验证到什么程度
+
+- 前端类型检查与构建由 PR 的必需检查 `frontend` 执行；检查结果由 Worker 和 CI 记录，不写在这里。
+- 没有在浏览器里实际点过三种角色的页面。

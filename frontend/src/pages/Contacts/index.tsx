@@ -25,6 +25,8 @@ export default function ContactsPage() {
   const canArchive = user?.role === 'admin' || user?.role === 'manager';
   // The sync route is admin/manager only.
   const canSync = user?.role === 'admin' || user?.role === 'manager';
+  // Unassigned contacts are only visible to admins, so only they get the filter.
+  const isAdmin = user?.role === 'admin';
 
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [total, setTotal] = useState(0);
@@ -37,9 +39,24 @@ export default function ContactsPage() {
   const [deleting, setDeleting] = useState<Contact | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const [unassignedCount, setUnassignedCount] = useState(0);
+
+  const loadUnassignedCount = useCallback(async () => {
+    if (!isAdmin) return;
+    try {
+      const res = await contactsApi.getContacts({
+        unassigned: 1,
+        is_archived: params.is_archived,
+        page: 1,
+        page_size: 1,
+      });
+      setUnassignedCount(res.data.data.total);
+    } catch { /* ignore */ }
+  }, [isAdmin, params.is_archived]);
 
   const load = useCallback(async () => {
     setLoading(true);
+    loadUnassignedCount();
     try {
       const res = await contactsApi.getContacts(params);
       const d = res.data.data;
@@ -47,7 +64,7 @@ export default function ContactsPage() {
       setTotal(d.total);
     } catch { /* ignore */ }
     setLoading(false);
-  }, [params]);
+  }, [params, loadUnassignedCount]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -159,6 +176,26 @@ export default function ContactsPage() {
             onChange={(v) => setParams((p) => ({ ...p, search: v, page: 1 }))}
           />
         </div>
+        {isAdmin && (
+          <button
+            onClick={() => setParams((p) => ({ ...p, unassigned: p.unassigned ? undefined : 1, page: 1 }))}
+            className={`flex items-center gap-2 text-xs px-3 py-2 rounded-lg border transition-colors ${
+              params.unassigned
+                ? 'border-primary text-primary bg-primary/10'
+                : 'border-dark-border text-text-muted hover:text-text-secondary'
+            }`}
+          >
+            {t('unassignedOnly')}
+            <span
+              title={t('unassignedCount', { number: unassignedCount })}
+              className={`min-w-[1.25rem] px-1.5 py-0.5 rounded-full text-center font-medium ${
+                unassignedCount > 0 ? 'bg-red-500 text-white' : 'bg-dark-hover text-text-muted'
+              }`}
+            >
+              {unassignedCount}
+            </span>
+          </button>
+        )}
       </div>
 
       {/* List */}
