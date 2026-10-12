@@ -158,3 +158,203 @@ tasks:
       - format.check
     creates_branch: true
     creates_pull_request: true
+
+  # 以下六个是 ai_chatbot_demo 会话事件第 1 阶段「入站进 CRM」，设计与接口契约见 docs/chatbot-events.md
+  # （Kelvin 2026-10-12 批准，设计闸门引用 kelvinpang90/acuven_crm_demo#17）。拆分照设计第七节（007 按 Kelvin 2026-10-12 的决定拆出 011）：一个任务一层，依赖串起来。
+  # 设计闸门：六个都适用——006/009 改表结构与存量数据，007 改所有保存号码的入口（个人数据），
+  # 011 是接管与送达两个只升不降的状态规则、并存储 BSUID 与资料名，
+  # 008 是接收个人数据的内部接口与验签，010 展示经 chatbot 进来的对话与号码冲突。
+  # 设计预审的完整输出在 tasks/todo.md「登记 CRM-TASK-006 至 011」；预审报出的设计缺陷按设计第九节补充修正
+  # （第九节 Kelvin 2026-10-12 批准），其余发现写进了各任务的验收标准或说明了为什么不成立。
+  # 与 ai_chatbot_demo 已实现推送（其任务 40.1、40.2）的对齐点写进了 008 的验收标准：密钥按字符串的 UTF-8 字节进 HMAC、
+  # 响应体顶层只有 result、ai_reply 的 bot_id 可为空。
+  - id: CRM-TASK-006
+    title: 会话事件第1阶段的表结构迁移与模型
+    purpose: >-
+      按 docs/chatbot-events.md 第六节给 contacts 与 messages 加列，让后续任务能存 BSUID、接管状态、消息来源与送达状态。
+      一次 Alembic 迁移加列加索引，模型同步。只做表结构：不改任何服务、接口、前端，不改存量数据
+      （存量号码规范化是 CRM-TASK-009）。
+    status: ready
+    depends_on: []
+    acceptance_criteria:
+      - contacts 新增 whatsapp_bsuid（字符串 128，可空，唯一索引，多个空值互不冲突）、wa_handover_active（布尔，非空，默认 false，带数据库默认值让存量行取 false）、wa_handover_expires_at 与 wa_handover_updated_at（时间，可空，存 UTC）；phone 列加普通索引
+      - messages 新增 author_kind（枚举 customer、ai、console、agent，可空）、bot_id（字符串 50，可空）、delivery_status（枚举 sent、delivered、read、failed，可空）、delivery_error（字符串 300，可空）
+      - 新增迁移 012，down_revision 为 011：upgrade 只加上面的列与索引、不改存量数据；downgrade 按相反顺序删掉它们回到 011 的形状；模型与迁移逐列一致
+      - 模型只加字段不加行为；不改任何服务、路由、schema、前端
+      - 新增测试：用 Alembic 的 Operations 在内存 SQLite 上对只含 id 与 phone 的最小 contacts 表、只含 id 的最小 messages 表执行 012 的 upgrade 再 downgrade，断言新列与索引先出现后消失；按模型建表后，两个联系人用同一个 whatsapp_bsuid 插入失败、两个空值插入成功；每条测试写明守住的是哪一条验收标准；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
+      - tasks/todo.md 新增 CRM-TASK-006 记录段（做了什么、偏离了什么、验证到什么程度）；不改 planning-v1 块；复选框只允许 [ ] / [x]
+      - 改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖
+      - allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#17），不合并、不直推
+    allowed_change_paths:
+      - backend/alembic/versions/012_add_chatbot_event_fields.py
+      - backend/app/models/contact.py
+      - backend/app/models/message.py
+      - backend/tests/test_migration_012.py
+      - tasks/todo.md
+    allowed_commands:
+      - lint.check
+      - format.check
+    creates_branch: true
+    creates_pull_request: true
+
+  # 007 与 011 原是设计第七节的一个 007，验收标准 10 条超过拆分线，Kelvin 2026-10-12 定拆成两个：
+  # 007 做号码规范化、各保存入口与冲突查询，011 做第五节的事件处理规则（依赖 006 的新列与 007 的规范化函数）。
+  - id: CRM-TASK-007
+    title: 号码规范化、各保存入口统一规范化与号码冲突查询
+    purpose: >-
+      实现 docs/chatbot-events.md 第三节与第九节第 2、3 条的号码规范化：一个函数、一处定义，联系人新建、编辑、表格导入与
+      AutoCount 同步保存号码前都用它；再加号码冲突查询，供 CRM-TASK-008 返回 phone_conflict。CRM 自己的 Meta webhook 与网关入站
+      （第 2 阶段删除）只把按号码找联系人改成取最早创建的一条（设计 P2），其余不动。不处理会话事件（CRM-TASK-011）、
+      不加接口、不改表结构、不迁移存量号码（CRM-TASK-009）、不改前端。
+    status: ready
+    depends_on: []
+    acceptance_criteria:
+      - 新增号码规范化函数，按设计第三节与第九节第 3 条：先去掉非数字，对剩下的数字去掉开头的 00，恰好一个开头的 0 换成 60，仍以 0 开头或不在 8 到 15 位的无法规范化：+60 12-345 6789、012-345 6789、0060123456789、+0060123456789、60123456789 都得到 60123456789；0000123456789、不足 8 位、超过 15 位、空值或没有数字的返回无法规范化；规范化结果再规范化一次不变
+      - 联系人新建、编辑、表格导入与 AutoCount 客户同步保存号码前都经这个函数：能规范化的存规范化结果，无法规范化的原样保存，不带号码时行为不变，AutoCount 同步拉回同一个号码时不产生改动
+      - 新增号码冲突查询：给定一组号码，先规范化，再与库里存的号码按原值比较（存量号码由 CRM-TASK-009 规范化），返回其中被两个及以上未删除联系人共用的号码、以规范化形式返回（只看能规范化的号码，空值、空串与无法规范化的原文不算冲突），联系人改号或删除后不再算冲突
+      - 现有 Meta webhook 与网关入站按号码找联系人时取最早创建的一条（创建时间相同按 id 取最小），多个联系人同号码时不报错；这两个入口的其余行为不变
+      - 新增测试逐条覆盖上面的规则（含规范化的每个例子与幂等、四个保存入口、冲突查询的改号与删除、同号码时旧入站挂到最早的联系人）；每条测试写明守住的是哪一条验收标准；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
+      - tasks/todo.md 新增 CRM-TASK-007 记录段（做了什么、偏离了什么、验证到什么程度）；不改 planning-v1 块；复选框只允许 [ ] / [x]
+      - 改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不加表、不加迁移、不改接口与前端
+      - allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#17），不合并、不直推
+    allowed_change_paths:
+      - backend/app/utils/phone.py
+      - backend/app/services/contact_service.py
+      - backend/app/services/autocount_service.py
+      - backend/app/services/whatsapp_service.py
+      - backend/tests/test_phone.py
+      - backend/tests/test_contact_phone.py
+      - tasks/todo.md
+    allowed_commands:
+      - lint.check
+      - format.check
+    creates_branch: true
+    creates_pull_request: true
+
+  - id: CRM-TASK-011
+    title: 会话事件的处理规则，找联系人、消息入库、接管与送达状态
+    purpose: >-
+      实现 docs/chatbot-events.md 第五节与第九节第 1、4 条对五种事件的处理：找联系人（必要时新建并指派、建 lead 商机）、
+      消息按 wa_message_id 去重入库、接管状态按事件时间更新、送达状态只升不降。只做业务规则层，入口只收已校验的普通参数，
+      由 CRM-TASK-008 的接口调用。不加接口与验签、不改表结构、不改号码规范化与各保存入口（CRM-TASK-007）、不改前端。
+    status: ready
+    depends_on:
+      - CRM-TASK-006
+      - CRM-TASK-007
+    acceptance_criteria:
+      - 消息类事件按设计第五节找联系人（事件里的号码一律先用 CRM-TASK-007 的函数规范化，联系人号码与收发件人字段都存规范化结果；无法规范化的号码由 CRM-TASK-008 拒收，处理入口遇到时按没有号码处理）：先按规范化号码找未删除的联系人，多个取最早创建的（创建时间相同按 id 取最小），该联系人没有 BSUID 且这个 BSUID 没被别的未删除联系人占用时补上；号码没找到再按 BSUID 找，找到且它没有号码时补上号码；号码无法规范化又没有 BSUID 时返回 ignored、不改数据；都没找到就新建（名字依次取资料名、号码、BSUID，截断到 100 字符；is_gateway 为 false；经 assign_contact 指派；建一条 lead 商机）；已有联系人的名字不被资料名覆盖；按第九节第 1 条，要用的 BSUID 只被已软删除的联系人占着时，先把它从那些联系人身上清掉再用，不因唯一索引报错
+      - 消息类事件按 wa_message_id 去重，已存在返回 duplicate 且不改任何数据；customer_message 存为未读的入站消息、author_kind 为 customer；ai_reply 存为已读的出站消息、author_kind 为 ai、记 bot_id（可为空）；console_reply 存为已读的出站消息、author_kind 为 console；渠道为 whatsapp，负责人取联系人当前负责人，访客一侧填号码（没有号码填 BSUID）、chatbot 一侧填 ai_chatbot_demo，消息时间取事件的 occurred_at（转成无时区的 UTC 存储）；成功返回 stored
+      - handover_changed 只找联系人，不新建、不补 BSUID 或号码、不清已删除联系人的 BSUID（找不到返回 ignored）；occurred_at 早于联系人已存的接管更新时间时返回 ignored 且不改数据，否则写入是否接管、到期时间（结束接管时为空）与更新时间，返回 stored
+      - delivery_status 只更新 external_id 等于 wa_message_id 的那条消息（找不到返回 ignored）；只升不降：sent 小于 delivered 小于 read，failed 只能覆盖空值、sent、delivered，已是 failed 的不再改变，同一状态重复到达也不算升级，不满足时返回 ignored 且不改数据；failed 时把错误码与标题以一个空格相连存进 delivery_error（只有一个就只存它，都没有存空）并截断到 300 字符，其他状态不改 delivery_error
+      - 事件处理入口只接受已校验的普通参数，不依赖接口层的请求模型、不发外部请求；新增测试逐条覆盖上面的规则，以及设计第八节前三条边缘情况（只有 BSUID 的访客后来公开的号码属于别的联系人、号码撞上 is_gateway 联系人、补投的旧事件不改坏状态）；每条测试写明守住的是哪一条验收标准；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
+      - tasks/todo.md 新增 CRM-TASK-011 记录段（做了什么、偏离了什么、验证到什么程度）；不改 planning-v1 块；复选框只允许 [ ] / [x]
+      - 改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不加表、不加迁移、不改接口与前端
+      - allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#17），不合并、不直推
+    allowed_change_paths:
+      - backend/app/services/chatbot_event_service.py
+      - backend/tests/test_chatbot_event_service.py
+      - tasks/todo.md
+    allowed_commands:
+      - lint.check
+      - format.check
+    creates_branch: true
+    creates_pull_request: true
+
+  - id: CRM-TASK-008
+    title: 会话事件接收接口与验签，消息和联系人接口返回新字段
+    purpose: >-
+      按 docs/chatbot-events.md 第四节加 ai_chatbot_demo 推送会话事件的内部接口（只在共享 Docker 网络内可达，nginx 不转发），
+      验签后交给 CRM-TASK-011 的处理规则；消息与联系人接口返回新字段和 phone_conflict，供 CRM-TASK-010 显示。
+      验签与响应形状要和 ai_chatbot_demo 已实现的推送（其任务 40.1、40.2）一致。只做接口层：不改处理规则、
+      不改表结构、不改前端、不改 nginx 与部署配置、不动现有 X-Internal-Secret 的网关入口；不写任何真实密钥。
+    status: ready
+    depends_on:
+      - CRM-TASK-011
+    acceptance_criteria:
+      - 新增 POST /internal/chatbot/events（不带 /api 前缀，与 chatbot 推送地址的路径一致），一次一个事件，先验签再解析请求体；请求头 X-Acuven-Timestamp 是 Unix 秒、X-Acuven-Signature 是 sha256= 接十六进制；签名为 HMAC-SHA256，密钥是 CHATBOT_EVENTS_SECRET 字符串的 UTF-8 字节，被签内容是时间戳与一个点的字节再接原始请求体字节；常数时间比较，CHATBOT_EVENTS_SECRET 或 CHATBOT_EVENTS_SECRET_PREVIOUS 任一把验过即可；缺头、格式不对、签名不符、时间戳与当前相差超过 300 秒返回 401（签名不对时无论请求体是否合法都是 401）；两把都未配置返回 503；两项配置加进配置类，默认空，旁边注释写明与 chatbot 一侧的 CRM_EVENTS_SECRET 同值（backend/.env.example 是凭据形状的文件名，Worker 改不了，由人另补）
+      - 请求体按设计第四节校验：type 只能是五种之一；occurred_at 是带时区的时间；visitor 的 phone 与 bsuid 至少一个非空，phone 非空时必须能被 CRM-TASK-007 的函数规范化；三种消息事件必须带 message 的 wa_message_id 与 body；ai_reply 的 bot_id 可为空或缺省；handover_changed 带 handover 的 active 与 expires_at，active 为真时 expires_at 必须非空、为假时为空（第九节第 5 条）；delivery_status 带 status 的 wa_message_id、四种之一的 status 与可空的 error_code（整数或字符串）、error_title；不合法返回 422；event_id 只进日志不存
+      - 合法事件交给 CRM-TASK-011 的事件处理，返回 200，响应体顶层就是 result 一个键（stored、duplicate、ignored 之一），不套通用的 success 与 data 外壳（chatbot 只读顶层 result）；处理中的其他错误照常返回 5xx，不吞成 200
+      - 消息列表、联系人消息与标记已读接口返回的每条消息多出 author_kind、bot_id、delivery_status、delivery_error
+      - 联系人列表与详情多出 wa_handover_active（标着接管中但到期时间已过或为空的按 false 返回）、wa_handover_expires_at、wa_handover_updated_at（两个时间按现有响应约定带 UTC 标记输出）与 phone_conflict；phone_conflict 只对管理员按 CRM-TASK-007 的冲突查询计算、其他角色恒为 false，列表一次批量查询、不逐条查库；不返回 whatsapp_bsuid
+      - 新增测试：测试里独立重算签名，五种事件各一条合法请求入库并返回对应 result；改一个字节、换错密钥、时间戳差 301 秒、缺头都是 401，旧密钥验得过，未配置 503，未签名的坏请求是 401，签名正确的各类坏请求是 422；响应体只有 result；消息与联系人接口的新字段、过期接管按 false、管理员看得到 phone_conflict 而销售恒为 false；每条测试写明守住的是哪一条验收标准；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
+      - tasks/todo.md 新增 CRM-TASK-008 记录段（做了什么、偏离了什么、验证到什么程度）；不改 planning-v1 块；复选框只允许 [ ] / [x]
+      - 改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置、nginx；不装依赖；不加表、不加迁移、不改前端；allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#17），不合并、不直推
+    allowed_change_paths:
+      - backend/app/routers/internal_chatbot.py
+      - backend/app/schemas/chatbot_event.py
+      - backend/app/main.py
+      - backend/app/config.py
+      - backend/app/routers/messages.py
+      - backend/app/routers/contacts.py
+      - backend/app/services/contact_service.py
+      - backend/app/schemas/message.py
+      - backend/app/schemas/contact.py
+      - backend/tests/test_chatbot_events_api.py
+      - backend/tests/test_chatbot_fields_api.py
+      - tasks/todo.md
+    allowed_commands:
+      - lint.check
+      - format.check
+    creates_branch: true
+    creates_pull_request: true
+
+  - id: CRM-TASK-009
+    title: 存量联系人号码按统一规则规范化的数据迁移
+    purpose: >-
+      按 docs/chatbot-events.md 第六节末尾，把存量联系人的号码用 CRM-TASK-007 的同一个规范化函数改写，
+      让 chatbot 推来的号码能匹配上已有联系人。只改号码一列：不合并、不删除撞号的联系人（由 phone_conflict 显示），
+      不改表结构、不改服务与接口、不改前端。
+    status: ready
+    depends_on:
+      - CRM-TASK-007
+    acceptance_criteria:
+      - 新增迁移 013，down_revision 为 012：upgrade 用 CRM-TASK-007 的同一个规范化函数改写 contacts 每一行（含已软删除的）非空号码，能规范化的改成规范化结果，无法规范化的与空值不动；只改 phone 一列，updated_at 等其他列不变
+      - 再执行一次 upgrade 的改写逻辑不产生任何改动；规范化后同号码的多个联系人不合并、不删除
+      - downgrade 不改数据（原始写法没有保留，无法还原），在迁移的 docstring 写明；迁移不建表、不改表结构
+      - 新增测试：在内存 SQLite 上按模型建表，放入带空格横线加号的号码、本地 0 开头的号码、00 开头的号码、已规范化的号码、无法规范化的号码、空号码和一个已软删除的联系人，执行 013 的 upgrade 后逐行断言结果且 updated_at 未变，再执行一次结果不变；每条测试写明守住的是哪一条验收标准；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
+      - tasks/todo.md 新增 CRM-TASK-009 记录段（做了什么、偏离了什么、验证到什么程度）；不改 planning-v1 块；复选框只允许 [ ] / [x]
+      - 改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不改服务、接口与前端
+      - allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#17），不合并、不直推
+    allowed_change_paths:
+      - backend/alembic/versions/013_normalize_contact_phones.py
+      - backend/tests/test_migration_013.py
+      - tasks/todo.md
+    allowed_commands:
+      - lint.check
+      - format.check
+    creates_branch: true
+    creates_pull_request: true
+
+  - id: CRM-TASK-010
+    title: 收件箱显示消息来源、送达与接管状态，管理员看得到号码冲突
+    purpose: >-
+      在 CRM-TASK-008 返回的新字段之上，按 docs/chatbot-events.md 第七节让客服在收件箱看到每条消息是谁发的
+      （AI 与行业、控制台）、送达状态与失败原因、这个访客现在是否被人工接管；让管理员在客户页看到号码冲突。
+      只改前端展示：不改后端、不加页面或路由、不做回复经 chatbot 发出与交还 AI（第 2 阶段）。
+    status: ready
+    depends_on:
+      - CRM-TASK-008
+    acceptance_criteria:
+      - 收件箱会话里每条消息按 author_kind 标来源：ai 显示 AI 加行业名（bot_id 为 food、hotel、realestate、retail、saas 时映射到行业文案，其他值原样显示，为空只显示 AI），console 显示控制台，customer、agent 与旧数据的空值不加标记；出站消息按 delivery_status 显示已发出、已送达、已读或未送达，未送达时显示 delivery_error，没有状态的不显示
+      - 会话头部显示接管状态：wa_handover_updated_at 为空时不显示；wa_handover_active 为真时显示接管中与到期时间（接口给的是带 UTC 标记的时间，按浏览器本地时间显示）；否则显示 AI 在回复
+      - 客户列表与客户详情在 phone_conflict 为真时显示号码冲突标记（接口只对管理员计算，销售与经理看不到）
+      - 新文案同时加在 en 与 zh 的 inbox、contacts 命名空间，不写硬编码文字；类型定义与接口字段一致
+      - 前端类型检查与构建由 PR 的必需 CI 检查 frontend 执行并通过（Worker 沙箱不跑 npm）
+      - tasks/todo.md 新增 CRM-TASK-010 记录段（做了什么、偏离了什么、验证到什么程度）；不改 planning-v1 块；复选框只允许 [ ] / [x]
+      - 改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不改后端
+      - allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#17），不合并、不直推
+    allowed_change_paths:
+      - frontend/src/types/index.ts
+      - frontend/src/pages/Inbox/ConversationView.tsx
+      - frontend/src/pages/Contacts/index.tsx
+      - frontend/src/pages/Contacts/ContactDetailPanel.tsx
+      - frontend/src/locales/en/inbox.json
+      - frontend/src/locales/zh/inbox.json
+      - frontend/src/locales/en/contacts.json
+      - frontend/src/locales/zh/contacts.json
+      - tasks/todo.md
+    allowed_commands:
+      - lint.check
+      - format.check
+    creates_branch: true
+    creates_pull_request: true
