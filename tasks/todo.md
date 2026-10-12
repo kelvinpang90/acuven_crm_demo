@@ -18,14 +18,21 @@
 2. `CRM-TASK-008` 会话事件接收接口与验签，消息和联系人接口返回新字段
 3. `CRM-TASK-009` 存量联系人号码按统一规则规范化的数据迁移
 4. `CRM-TASK-010` 收件箱显示消息来源、送达与接管状态，管理员看得到号码冲突
+5. `CRM-TASK-012` 第2阶段的表结构迁移，消息记实际发送人
+6. `CRM-TASK-013` 经 chatbot 发出客服回复的发送服务，含窗口校验与结果不明的处理
+7. `CRM-TASK-014` 未确认送出的重试、agent_reply 事件规则与交还 AI 的调用
+8. `CRM-TASK-015` 回复与交还接口改经 chatbot，事件接口接受 agent_reply，返回发送人与回复窗口
+9. `CRM-TASK-016` 收件箱回复改经 chatbot，显示发送人、未确认与重试、窗口关闭和交还 AI
 
 ### 已阻塞
 
 - 待登记：CRM AI 客户摘要接入 acuven_ai_api｜阻塞：等 acuven_ai_api 的客户摘要能力与 Billing Hub 第 3 阶段验收
+- `CRM-TASK-017` 删掉 CRM 自己的 Meta webhook、网关入口与直连发送及其配置｜阻塞：等第 2 阶段真机验收通过（chatbot 侧 C3、C4 上线并配好第二把密钥）
 
 ### 后续计划
 
-- 待登记：demo 号第 2 阶段，CRM 回复经 ai_chatbot_demo 发出、交还 AI、作废 CRM 自己的沙盒号凭据（任务七，待设计）
+- `CRM-TASK-018` 去掉 is_gateway 的全部用处，原有网关联系人回到列表与统计
+- `CRM-TASK-019` 删除联系人表的 is_gateway 列
 <!-- openclaw:planning-v1:end -->
 
 ---
