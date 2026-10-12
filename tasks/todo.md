@@ -14,6 +14,11 @@
 <!-- openclaw:planning-v1:begin -->
 ### 当前计划
 
+1. `CRM-TASK-006` 加会话事件所需的联系人与消息字段，只含迁移与模型
+2. `CRM-TASK-007` 号码规范化与会话事件处理规则，含入库、指派、接管与送达
+3. `CRM-TASK-008` 新增会话事件接收接口与签名校验
+4. `CRM-TASK-009` 存量联系人号码按统一规则规范化的数据迁移
+5. `CRM-TASK-010` 收件箱显示消息来源、送达与接管状态，管理员看到号码冲突
 
 ### 已阻塞
 
@@ -21,7 +26,7 @@
 
 ### 后续计划
 
-- 待登记：demo 号经 ai_chatbot_demo 收发、一个号码多客服分别回复（任务七，设计已批准，待拆任务）
+- 待登记：demo 号多客服第 2 阶段，CRM 回复经 ai_chatbot_demo 发出并交还 AI（任务七，第 1 阶段上线后设计与拆分）
 <!-- openclaw:planning-v1:end -->
 
 ---
@@ -1010,8 +1015,8 @@ Q3：**选 1**（`E,F,W,I`，忽略 E501、E712）。
 设计与接口契约：[docs/chatbot-events.md](../docs/chatbot-events.md)。Kelvin 同日定：本地号码按 60 补国家码；号码冲突挂最早的联系人并显示冲突；
 接管变化与送达状态第 1 阶段就存；chatbot 来的新访客不标 `is_gateway`；chatbot 那边人工会话做，不登记进 OpenClaw。
 
-- [ ] 设计 PR 获 Kelvin 批准
-- [ ] 登记 CRM-TASK-006（表结构）、007（业务规则）、008（接口）、009（存量号码迁移）、010（前端），附设计预审输出
+- [x] 设计 PR 获 Kelvin 批准（kelvinpang90/acuven_crm_demo#17 合并）
+- [x] 登记 CRM-TASK-006（表结构）、007（业务规则）、008（接口）、009（存量号码迁移）、010（前端），附设计预审输出
 - [ ] `ai_chatbot_demo`：C1 事件 outbox 与推送、C2 埋点与 statuses 转推
 
 ---
