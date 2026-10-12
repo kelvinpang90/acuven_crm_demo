@@ -174,7 +174,7 @@ tasks:
       按 docs/chatbot-events.md 第六节给 contacts 与 messages 加列，让后续任务能存 BSUID、接管状态、消息来源与送达状态。
       一次 Alembic 迁移加列加索引，模型同步。只做表结构：不改任何服务、接口、前端，不改存量数据
       （存量号码规范化是 CRM-TASK-009）。
-    status: ready
+    status: done
     depends_on: []
     acceptance_criteria:
       - contacts 新增 whatsapp_bsuid（字符串 128，可空，唯一索引，多个空值互不冲突）、wa_handover_active（布尔，非空，默认 false，带数据库默认值让存量行取 false）、wa_handover_expires_at 与 wa_handover_updated_at（时间，可空，存 UTC）；phone 列加普通索引
