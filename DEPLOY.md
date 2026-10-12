@@ -12,7 +12,7 @@
 |---------------------------|------|---------------------------|
 | `crm.kelvinpeng.com`      | CRM 子域名 | `crm.kelvinpeng.com`      |
 | `ubuntu`                  | VPS 登录用户 | `ubuntu`                  |
-| `103.40.204.95`           | VPS IP 或域名 | `103.40.204.95`           |
+| `<VPS 地址>`              | VPS IP 或域名 | `203.0.113.10`（文档示例地址） |
 | `/opt/crm_os`             | 项目在 VPS 的目录 | `/opt/crm_os`             |
 | `proxy_net`               | nginx 所在网络（前端层） | `proxy_net`               |
 | `data_net`                | mysql/redis 所在网络（数据层） | `data_net`                |
@@ -34,7 +34,7 @@
 SSH 进 VPS：
 
 ```bash
-ssh ubuntu@103.40.204.95
+ssh ubuntu@<VPS 地址>
 
 # 确认共享网络
 docker network ls
@@ -264,7 +264,7 @@ GitHub → 仓库 → Settings → Actions → General → Workflow permissions�
 
 | Secret 名 | 值                                                                |
 |-----------|------------------------------------------------------------------|
-| `VPS_HOST` | `103.40.204.95`                                                  |
+| `VPS_HOST` | `<VPS 地址>`                                                  |
 | `VPS_USER` | `ubuntu`                                                         |
 | `VPS_SSH_KEY` | 在 VPS 上 `ssh-keygen -t ed25519 -f ~/.ssh/gha_deploy` 生成的**私钥**全文 |
 | `VPS_PORT` | SSH 端口（默认 22）                                                    |
@@ -301,7 +301,7 @@ GitHub → 仓库 → Settings → Actions → General → Workflow permissions�
 ## 2. 首次手动部署（验证链路）
 
 ```bash
-ssh ubuntu@103.40.204.95
+ssh ubuntu@<VPS 地址>
 cd /opt/crm_os
 
 # 拉代码（首次）
@@ -358,7 +358,7 @@ docker compose exec backend python seed.py
 GitHub Actions 不可用时，在 VPS 上手工做同样的事：
 
 ```bash
-ssh ubuntu@103.40.204.95
+ssh ubuntu@<VPS 地址>
 cd /opt/crm_os
 git fetch && git checkout --detach <good-sha>
 CRM_IMAGE_REPO=ghcr.io/kelvinpang90/crm_os bash deploy/deploy.sh <good-sha>

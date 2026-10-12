@@ -746,7 +746,7 @@ proxy_pass http://$crm_frontend;
 - 本地快照 `acuventech.com.conf`（09-16 16:02）里 demo 的 server 块已整段注释，并写明：
   「2026-09-16 已下线（Kelvin：项目不再使用），容器 demo_os_backend 与镜像已删除，数据保留在 /opt/demo_os/data 与 infra_mysql 的 demo_os 库」。
 - 注释掉后，这个域名落到 `nginx.conf` 的默认 server（`server_name _`，`return 444`）——直接断开连接、不回任何响应。
-- 2026-10-09 实测：经 Cloudflare 访问 → `520`（`server: cloudflare`）；绕过 Cloudflare 直连源站 103.40.204.95 → curl 退出码 56
+- 2026-10-09 实测：经 Cloudflare 访问 → `520`（`server: cloudflare`）；绕过 Cloudflare 直连源站 IP → curl 退出码 56
   （连接被对端关闭），正是 444 的表现。Cloudflare 收到空响应就报 520。
 - 当时的注释写着「curl 显示为 000，已实测确认」，说明 09-16 就已经是这个状态。19:18 的 reload 只会重新加载同一份配置，
   不会让一个早已注释掉的站点改变行为。
