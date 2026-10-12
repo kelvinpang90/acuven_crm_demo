@@ -43,6 +43,7 @@ async def list_contacts(
     sort_by: str = Query("created_at"),
     order: str = Query("desc"),
     is_archived: int = Query(0),
+    unassigned: int = Query(0, ge=0, le=1),
 ):
     result = await contact_service.list_contacts(
         db,
@@ -55,6 +56,7 @@ async def list_contacts(
         sort_by,
         order,
         is_archived,
+        unassigned,
     )
     return ok(data=result)
 
