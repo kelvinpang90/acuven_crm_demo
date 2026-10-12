@@ -1041,3 +1041,31 @@ Q3：**选 1**（`E,F,W,I`，忽略 E501、E712）。
 ## 验证到什么程度
 
 - 验证依据是上面的测试加已有后端测试，由 PR 的必需检查 `backend` 执行；检查结果由 Worker 和 CI 记录，不写在这里。
+
+---
+
+# CRM-TASK-002：客户列表支持只看未分派的客户
+
+来源：任务七「发现的问题」里的未分派客户一条（后端这一半，前端由 CRM-TASK-003 接）。设计闸门：不适用（只在管理员已可见的列表上加筛选）。
+
+## 做了什么
+
+- [x] `backend/app/routers/contacts.py` 的 `list_contacts`：新增查询参数 `unassigned`（`Query(0, ge=0, le=1)`），
+      取值 0 或 1、默认 0，其他取值（如 `2`、`-1`、`abc`）由 FastAPI 的参数校验返回 422；原样传给 service。
+- [x] `backend/app/services/contact_service.py` 的 `list_contacts`：新增 `unassigned: int = 0`，为 1 时在角色过滤、
+      搜索、行业、负责人条件之后再加 `Contact.assigned_to IS NULL`，计数、排序、分页都在这条件之后，所以 `total` 是筛选后的数量。
+      为 0 时不加任何条件，查询与原来逐字相同。角色过滤、demo 排除、`access_service` 都没动：销售的 `assigned_to == 自己`、
+      经理的 `assigned_to IN 团队` 与 `IS NULL` 同时成立不了，于是自然得到空列表、`total` 为 0；`assigned_to` 与
+      `unassigned=1` 同传时同理为空。
+- [x] 新增测试 `backend/tests/test_contact_unassigned.py`，每条 docstring 写明守住哪条验收标准：管理员传 1 只看到未分派客户
+      且 `total` 正确（demo 未分派客户仍被排除，分页时 `total` 仍是全量）；与归档、搜索、行业同时生效；销售与经理传 1 得到空列表；
+      `assigned_to` 与 `unassigned=1` 同传为空；不传与传 0 的结果相同且与各角色原有可见范围一致；非法取值返回 422。
+
+## 偏离
+
+- 没有改 `access_service`、角色过滤、demo 排除、仪表盘、前端、表结构，没有加计数接口。
+- 422 用的是 FastAPI 默认的参数校验响应体（与其他查询参数校验失败一致），没有改成 `fail()` 的格式。
+
+## 验证到什么程度
+
+- 验证依据是上面的新测试加已有后端测试，由 PR 的必需检查 `backend` 执行；检查结果由 Worker 和 CI 记录，不写在这里。

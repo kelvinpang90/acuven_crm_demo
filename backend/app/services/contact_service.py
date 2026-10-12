@@ -27,6 +27,7 @@ async def list_contacts(
     sort_by: str = "created_at",
     order: str = "desc",
     is_archived: int = 0,
+    unassigned: int = 0,
 ) -> dict:
     query = select(Contact).where(
         Contact.deleted_at.is_(None),
@@ -56,6 +57,10 @@ async def list_contacts(
         query = query.where(Contact.industry == industry)
     if assigned_to:
         query = query.where(Contact.assigned_to == assigned_to)
+    # Stacks on the data permission above: sales and managers only ever reach
+    # owned customers, so for them this narrows to nothing rather than widening.
+    if unassigned:
+        query = query.where(Contact.assigned_to.is_(None))
 
     # Count
     count_q = select(func.count()).select_from(query.subquery())
