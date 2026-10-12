@@ -1038,9 +1038,10 @@ Kelvin 2026-10-12 批准设计（kelvinpang90/acuven_crm_demo#17），原话「�
 
 - 设计闸门：五个都适用，都引用 #17（006/009 改表结构与存量数据；007 有接管、送达两个状态规则并存 BSUID 与资料名；
   008 是接收个人数据的接口与验签；010 展示经 chatbot 进来的对话与号码冲突）。
-- 预审：按控制面 `docs/ONBOARD-PROJECT.md`「登记任务之前」，五个都跑了（`python -m worker.design_precheck`，对本分支的干净克隆，
-  设计文件 `docs/chatbot-events.md`）。第 1 轮全跑；修改契约与设计后第 2 轮复查 007–010；007 第 3 轮。最终：006、008、009、010 READY；
-  007 第 3 轮仍 NOT_READY，第 3 轮之后的处理见下表最后几行（**之后没有再跑第 4 轮**）。
+- 预审：按控制面 `docs/ONBOARD-PROJECT.md`「登记任务之前」，六个都跑了（`python -m worker.design_precheck`，对本分支的干净克隆，
+  设计文件 `docs/chatbot-events.md`）。第 1 轮 006–010 全跑；修改契约与设计后第 2 轮复查 007–010；原 007 第 3 轮仍 NOT_READY
+  （含 TOO_LARGE）；拆分后第 4 轮复查 007、011、008（008 的依赖改了）。最终：006、007、008、009、010、011 全部 READY。
+  第 4 轮报的三条 UNDECIDED 已写进验收标准（见下表最后三行），之后没有再跑预审。
 
 逐条处理（成立的已修，不成立的写明理由）：
 
@@ -1063,7 +1064,10 @@ Kelvin 2026-10-12 批准设计（kelvinpang90/acuven_crm_demo#17），原话「�
 | 2 / 007 | 同一送达状态重复到达算什么 | 写进 007 验收：不算升级，返回 ignored。第 3 轮前改的 |
 | 2 / 007 | 事件里的号码要不要先规范化、无法规范化怎么办 | 写进 007 验收：一律先规范化；无法规范化的由 008 拒收（422），处理入口按无号码处理。第 3 轮前改的 |
 | 3 / 007 | 空串、无法规范化的原文算不算号码冲突 | 写进 007 验收：只看能规范化的号码。第 3 轮之后改的 |
-| 3 / 007 | 名字回退到 BSUID 时可能超过 100 字符 | 写进 007 验收：三种来源都截断到 100。第 3 轮之后改的 |
+| 3 / 007 | 名字回退到 BSUID 时可能超过 100 字符 | 写进验收（现属 011）：三种来源都截断到 100。第 3 轮之后改的 |
+| 4 / 007 | 冲突查询比较前规范不规范化、返回什么形式 | 写进 007 验收：输入先规范化，与库里号码按原值比较（存量由 009 规范化），以规范化形式返回 |
+| 4 / 011 | 接管事件找联系人时补不补 BSUID / 号码、清不清已删除联系人的 BSUID | 写进 011 验收：只找，不补、不清 |
+| 4 / 011 | 号码无法规范化又没有 BSUID 的消息事件返回什么 | 写进 011 验收：返回 ignored、不改数据（正常情况下 008 已拒收） |
 
 ### 与 ai_chatbot_demo 已实现推送的对齐（读其 `tasks/todo.md` 任务 40.1、40.2，未改那个仓库）
 
@@ -1080,9 +1084,9 @@ Kelvin 2026-10-12 批准设计（kelvinpang90/acuven_crm_demo#17），原话「�
 ### 验证到什么程度
 
 - 契约自检：控制面 `python -m worker.contract_check --repo <本分支干净克隆> --project-id crm_os --task-id-pattern '^CRM-TASK-[0-9]{3}$' --planning tasks/todo.md`，
-  `result: ready to register`，退出码 0。WARN：Worker 主机要固定 python、ruff 要登记 `check_win32k`（已有项目级 WARN，与本次无关）、
-  007 验收标准 10 条建议拆分。planning-v1 评估 `ok, next: CRM-TASK-006`。
-- 预审：上面所述；第 3 轮之后对 007 的四处修改没有再跑预审。
+  `result: ready to register`，退出码 0。WARN 只剩 Worker 主机要固定 python、ruff 要登记 `check_win32k`（已有项目级 WARN，与本次无关）；
+  拆分前 007 的「验收标准 10 条建议拆分」已消失。planning-v1 评估 `ok, next: CRM-TASK-006`。
+- 预审：上面所述；第 4 轮之后的三处补充没有再跑预审。
 - 没验：Worker 主机上的真实就绪上报、Telegram 推荐行（合并后由 Worker 空闲刷新时上报）。
 
 ### 预审完整输出
@@ -1175,6 +1179,28 @@ session verdict: NOT_READY
 PRECHECK_RESULT: NOT_READY
 用量：Claude 会话 1 次，共 32.7 万 token（其中缓存读取 27.8 万），折合 API 价约 $0.57；周额度读数 13%。
 退出码 1
+
+第 4 轮（拆分后）CRM-TASK-007:
+PRECHECK_FINDING: UNDECIDED 三 :: The conflict query doesn't say whether input and not-yet-migrated stored phones are normalised before comparing, nor whether returned numbers use the caller's form or the normalised form.
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 11.7 万 token（其中缓存读取 9 万），折合 API 价约 $0.28；周额度读数 14%。
+退出码 0
+
+第 4 轮（拆分后）CRM-TASK-011:
+PRECHECK_FINDING: UNDECIDED §5 :: Whether the handover_changed lookup also back-fills BSUID/phone or clears soft-deleted BSUIDs is unstated; if it does, an older ignored event still changes data, contradicting criterion 3.
+PRECHECK_FINDING: UNDECIDED §5 :: The result for a message event whose phone cannot be normalized and that has no BSUID, leaving no identity, is not specified (ignored or error).
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 15.4 万 token（其中缓存读取 10.9 万），折合 API 价约 $0.47；周额度读数 14%。
+退出码 0
+
+第 4 轮（拆分后）CRM-TASK-008:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 38.3 万 token（其中缓存读取 31.5 万），折合 API 价约 $0.68；周额度读数 14%。
+退出码 0
 ```
 
 ---
