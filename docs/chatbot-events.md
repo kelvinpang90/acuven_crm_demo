@@ -1,7 +1,7 @@
 # ai_chatbot_demo → CRM 会话事件：第 1 阶段设计
 
-> 状态：初版经 Kelvin 批准合并（kelvinpang90/acuven_crm_demo#17）；**修订一（设计预审发现，见第九节）待 Kelvin 批准**，
-> 批准前 CRM-TASK-006 至 009 不登记为 ready。设计一变，批准作废。
+> 状态：初版经 Kelvin 批准合并（kelvinpang90/acuven_crm_demo#17）。**修订一（设计预审发现，见第九节）与 CRM-TASK-006 至 010 的登记
+> 放在同一个 PR**：Kelvin 批准并合并那个 PR，即批准修订一，006 至 009 的设计闸门同时引用 #17 与那个 PR。设计一变，批准作废。
 > 上位设计：`acuven_hub` 的 `CHATBOT_DEMO_CRM_MULTIAGENT_2026-10-12.md`（D1–D11，2026-10-12 批准），现行索引 `DECISIONS.md` 的 J-04、A-18。
 > 本文件只管第 1 阶段「入站进 CRM」；CRM 经 chatbot 发送、交还 AI、作废沙盒号凭据在第 2 阶段另行设计。
 > 这里是两个仓库共用的接口契约：`ai_chatbot_demo` 那边的推送按本文件实现。
@@ -88,7 +88,7 @@
 `phone` 与 `bsuid` 至少一个非空。`profile_name` 只在新建联系人时用作名字，不覆盖已有联系人的名字；超过 100 字符截断到 100。
 
 **`occurred_at`** 是 chatbot 一侧事件发生的时刻（消息类取 Meta 时间戳或 chatbot 发出的时刻，接管类取状态改变的时刻），
-必须带时区、**精确到微秒**，且不得晚于 CRM 当前时间 300 秒以上（否则 422）。消息入库时用它作 `created_at`（换算成 UTC），
+必须带时区，且不得晚于 CRM 当前时间 300 秒以上（否则 422）。chatbot 应当传到微秒；没有小数秒的也接受，按 0 微秒处理。消息入库时用它作 `created_at`（换算成 UTC），
 死信补投的消息因此仍按真实时间排在会话里。
 
 ### 各类型的附加字段
@@ -108,17 +108,18 @@
 | 字段 | 规则 |
 |---|---|
 | `event_id` | 非空字符串，最长 64 |
-| `visitor.phone` | 可空；非空时 8–15 位纯数字 |
+| `visitor.phone` | 可空；非空时必须已是第三节的有效规范化形式（规范化后等于自身），否则 422。Meta 给的 E.164 数字天然满足 |
 | `visitor.bsuid` | 可空；非空时最长 140 |
 | `message.wa_message_id`、`status.wa_message_id` | 非空，最长 200 |
-| `message.body` | 非空字符串 |
-| `bot_id` | `ai_reply` 必填，非空，最长 50；其他类型不得出现 |
+| `message.body` | 非空字符串；超过 16000 字符时 CRM 截断到 16000 入库（不拒收，免得一条长转写进死信） |
+| `bot_id` | `ai_reply` 必填，非空，最长 50；其他类型里出现则忽略 |
 | `handover.active` | 布尔，必填 |
 | `handover.expires_at` | `active` 为 true 时必填、带时区；为 false 时必须为 null |
 | `status.status` | 只接受 `sent`、`delivered`、`read`、`failed` |
-| `status.error_code`、`status.error_title` | 可空 |
+| `status.error_code` | 可空；整数或字符串（Meta 给的是整数），按字符串存，最长 50 |
+| `status.error_title` | 可空；字符串 |
 
-请求体里未列出的字段忽略（chatbot 以后加字段不会让旧 CRM 拒收）。
+请求体里未列出的字段忽略（chatbot 以后加字段不会让旧 CRM 拒收）；每种类型只读自己的附加字段，带了别的类型的附加字段也忽略。
 
 ### 返回
 
@@ -139,7 +140,7 @@ chatbot 按顺序投递：队首没成功之前不发后面的，保证同一访
 1. 有 `phone`：按号码找未删除的联系人；多于一个取最早创建的，`created_at` 相同再按 `id` 字典序取最小（P2，结果确定）。
    找到且事件带 `bsuid`、该联系人还没有、也没有别的**未删除**联系人占用这个 `bsuid`：补上（被已删除联系人占用时按下面「BSUID 让位」处理）。
 2. 按号码没找到、但带 `bsuid`：按 `bsuid` 找**未删除**的联系人；找到且它还没有号码，补上号码（访客后来公开了号码）。
-3. 都没找到：新建联系人。名字取 `profile_name`，没有就取号码，再没有取 `bsuid`；`is_gateway=false`（P4）；
+3. 都没找到：新建联系人。名字取 `profile_name`，没有就取号码，再没有取 `bsuid`，不论哪个来源都截断到 100 字符；`is_gateway=false`（P4）；
    调 `assign_contact()` 指派；建 lead 商机。与现有入站逻辑一致。
 
 **BSUID 让位**：`whatsapp_bsuid` 是全表唯一（含已删除行）。要把某个 `bsuid` 写到未删除联系人上、而它被一个已删除联系人占着时，
@@ -149,7 +150,8 @@ chatbot 按顺序投递：队首没成功之前不发后面的，保证同一访
 A 的 `bsuid` 清空、B 的 `bsuid=MY.1`；下一条同一访客的消息按第 2 步找到 B。
 
 消息类事件都会走这一步（AI 回复或控制台回复先于顾客消息到达时也一样建联系人，正常顺序下不会发生）。
-`handover_changed` 与 `delivery_status` 找不到联系人或消息时返回 `ignored`，不新建。
+`handover_changed` 按上面第 1、2 步同样的方式找联系人，但不补 `bsuid` 或号码、不新建，找不到返回 `ignored`；
+`delivery_status` 只按 `wa_message_id` 找消息，找不到返回 `ignored`。
 
 ### 消息
 
@@ -204,6 +206,7 @@ A 的 `bsuid` 清空、B 的 `bsuid=MY.1`；下一条同一访客的消息按第
 | `bot_id` | 字符串，可空 | 行业 bot 标识，收件箱显示「AI · 行业」 |
 | `delivery_status` | 枚举 sent / delivered / read / failed，可空 | |
 | `delivery_error` | 字符串（300），可空 | |
+| `created_at` 改为微秒精度 | | 消息按 `occurred_at` 入库，同一秒内的几条按真实先后排；存量值不变 |
 
 另一次数据迁移把存量联系人的号码按第三节规范化；无法规范化的原样保留。
 
@@ -256,5 +259,9 @@ A 的 `bsuid` 清空、B 的 `bsuid=MY.1`；下一条同一访客的消息按第
 | 「最早创建」没有平局规则，MySQL 时间精确到秒 | 再按 `id` 取最小 | 五 |
 | `failed` 之后能否变成别的状态、相等状态、入站消息的状态、错误码与标题怎么拼没写 | 一条线排序、只升不降，`read` 可盖 `failed`；只更新出站消息；写明拼法 | 五 |
 
-对 `ai_chatbot_demo` 的影响（C2 按此实现）：`occurred_at` 精确到微秒；`event_id` 最长 64；`active=false` 时 `expires_at` 传 null；
+第二轮预审（同日）又发现并已改：用 BSUID 作名字可能超过 100 字符（一律截断）；`messages.created_at` 只到秒，同秒消息顺序不定（改为微秒精度）；
+`visitor.phone` 须已是规范化形式；正文没有上限（超过 16000 截断入库）；`error_code` 类型（整数或字符串）；不带小数秒的时间、
+别的类型的附加字段与非 `ai_reply` 的 `bot_id`（接受、忽略）；接管事件找联系人的方式（同第 1、2 步，不补、不建）。
+
+对 `ai_chatbot_demo` 的影响（C2 按此实现）：`occurred_at` 尽量精确到微秒；`event_id` 最长 64；`visitor.phone` 传 Meta 给的 E.164 数字；`active=false` 时 `expires_at` 传 null；
 `ai_reply` 以外不带 `bot_id`。
