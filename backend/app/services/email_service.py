@@ -1,7 +1,8 @@
 """Email IMAP/SMTP integration service.
 
 Handles inbound email polling and outbound sending.
-Gracefully degrades when credentials are not configured.
+Polling is skipped when IMAP is not configured; sending without SMTP, or a
+failed send, raises EmailSendError and persists nothing.
 """
 
 import email
@@ -24,6 +25,18 @@ from app.models.message import Message
 from app.services import routing_service
 
 logger = logging.getLogger(__name__)
+
+
+class EmailSendError(Exception):
+    """Raised when sending an outbound email fails.
+
+    `reason` is one of: "not_configured", "api_error".
+    """
+
+    def __init__(self, reason: str, detail: str = ""):
+        super().__init__(detail or reason)
+        self.reason = reason
+        self.detail = detail
 
 
 async def poll_emails(db: AsyncSession) -> int:
@@ -137,7 +150,12 @@ async def _process_email(db: AsyncSession, msg: email.message.Message) -> bool:
 
 
 async def send_email(db: AsyncSession, contact_id: str, subject: str, body: str) -> Optional[dict]:
-    """Send an email to a contact via SMTP."""
+    """Send an email to a contact via SMTP.
+
+    Returns None when the contact is missing or has no email. Raises
+    EmailSendError when SMTP is not configured or the send fails; nothing is
+    persisted then. On success, returns the persisted message as a dict.
+    """
     result = await db.execute(
         select(Contact).where(Contact.id == contact_id, Contact.deleted_at.is_(None))
     )
@@ -145,21 +163,24 @@ async def send_email(db: AsyncSession, contact_id: str, subject: str, body: str)
     if not contact or not contact.email:
         return None
 
-    # Send via SMTP if configured
-    if settings.smtp_host and settings.smtp_user:
-        try:
-            msg = MIMEMultipart()
-            msg["From"] = settings.smtp_from or settings.smtp_user
-            msg["To"] = contact.email
-            msg["Subject"] = subject
-            msg.attach(MIMEText(body, "plain", "utf-8"))
+    if not (settings.smtp_host and settings.smtp_user):
+        logger.warning("SMTP not configured — outbound email not sent")
+        raise EmailSendError("not_configured", "SMTP host or user is not configured")
 
-            with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as server:
-                server.starttls()
-                server.login(settings.smtp_user, settings.smtp_password)
-                server.send_message(msg)
-        except Exception:
-            logger.exception("Failed to send email")
+    try:
+        msg = MIMEMultipart()
+        msg["From"] = settings.smtp_from or settings.smtp_user
+        msg["To"] = contact.email
+        msg["Subject"] = subject
+        msg.attach(MIMEText(body, "plain", "utf-8"))
+
+        with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as server:
+            server.starttls()
+            server.login(settings.smtp_user, settings.smtp_password)
+            server.send_message(msg)
+    except Exception as exc:
+        logger.exception("Failed to send email")
+        raise EmailSendError("api_error", str(exc)) from exc
 
     # Save outbound message
     message = Message(
