@@ -1,4 +1,4 @@
-# crm_os — 项目规则
+# acuven_crm_demo — 项目规则
 
 > 本文件与同目录 `AGENTS.md` 是同一份内容的两个副本，改一个必须同步另一个。
 > 「角色与流程」到「高风险操作」几节来自 Acuven 项目模板（OpenClaw 接入要求）；「Kelvin 的规则」是本项目原有的规则。
@@ -7,7 +7,9 @@
 
 ## 项目概况
 
-- **是什么**：CRM 客户关系管理系统（客户、商机、任务、收件箱、WhatsApp / 邮件消息、AutoCount 同步）
+- **是什么**：CRM 客户关系管理系统（客户、商机、任务、收件箱、WhatsApp / 邮件消息、AutoCount 同步）。
+  **demo 项目**，不承载 Acuven 真实客户（Kelvin 2026-10-12）。原名 `crm_os`，2026-10-12 改名；OpenClaw 的 project_id `crm_os`、
+  任务编号、VPS 目录、容器名、数据库名与域名都没改
 - **技术栈**：后端 FastAPI + SQLAlchemy（async）+ Alembic + MySQL / Redis（共享基建）；前端 Vite + React + TypeScript；
   Docker Compose 部署，合并到 master 即按提交 SHA 自动部署生产（[DEPLOY.md](DEPLOY.md)）
 - **任务编号**：`CRM-TASK-NNN`（控制面登记的 task_id_pattern：`^CRM-TASK-[0-9]{3}$`）

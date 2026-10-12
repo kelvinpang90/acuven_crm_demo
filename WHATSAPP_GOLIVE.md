@@ -1,7 +1,7 @@
 # WhatsApp Cloud API 联调上线手册
 
 > 适用版本：仓库 master（含 statuses / 非文本消息 / 错误透传 修复）
-> 域名：`crm.kelvinpeng.com` · VPS：`<VPS 地址>` · 后端镜像：`ghcr.io/kelvinpang90/crm_os-backend:latest`
+> 域名：`crm.kelvinpeng.com` · VPS：`<VPS 地址>` · 后端镜像：`ghcr.io/kelvinpang90/acuven_crm_demo-backend:latest`
 
 按节顺序执行；每一节末尾都有"应看到 / 验证"，做不到不要往下走。
 
