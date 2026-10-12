@@ -1020,6 +1020,16 @@ Q3：**选 1**（`E,F,W,I`，忽略 E501、E712）。
 - [x] 登记 CRM-TASK-006（表结构）、007（号码规范化）、011（事件处理规则）、008（接口）、009（存量号码迁移）、010（前端），附设计预审输出（见下「登记 CRM-TASK-006 至 011」）
 - [ ] `ai_chatbot_demo`：C1 事件 outbox 与推送、C2 埋点与 statuses 转推
 
+## 第 2 阶段设计（2026-10-13，同日 Kelvin 批准）
+
+设计与接口契约：[docs/chatbot-replies.md](../docs/chatbot-replies.md)。CRM 回复经 chatbot 内部发送接口发出（第二把密钥）、客服回复后 AI 静默 24 小时滑动、
+「交还 AI」、删 CRM 自己的 Meta webhook / 网关 / Graph 直连并作废沙盒号 token、`is_gateway` 先停用再删列；认领与锁、模板、媒体留第 3 阶段。
+待决问题 Q1–Q7 Kelvin 2026-10-13 全部按建议定（设计第十二节）。
+
+- [x] 设计 PR 获 Kelvin 批准（kelvinpang90/acuven_crm_demo#28，原话「Q1–Q7 都按建议，批准，开 PR 登记 012 到 019」）
+- [ ] 登记第 2 阶段任务（设计第十节，暂编 012–019），附设计预审输出
+- [ ] `ai_chatbot_demo`：C3 发送接口、C4 交还接口与接管时长 24 小时
+
 ## 登记 CRM-TASK-006 至 011（2026-10-12）
 
 Kelvin 2026-10-12 批准设计（kelvinpang90/acuven_crm_demo#17），原话「批准，开 PR 登记 006 到 010」。本段是登记 PR 的记录。
@@ -1369,6 +1379,50 @@ PRECHECK_RESULT: READY
 
 - 验证依据是上面的新测试加已有后端测试，由 PR 的必需检查 `backend` 执行；检查结果由 Worker 和 CI 记录，不写在这里。
 - 冲突查询与同号码取最早的查询只在 SQLite 上由测试覆盖，没有在 MySQL 上实际跑过。
+
+---
+
+# CRM-TASK-011：会话事件的处理规则，找联系人、消息入库、接管与送达状态
+
+来源：`docs/chatbot-events.md` 第五节、第九节第 1、4 条与第八节前三条。设计闸门：kelvinpang90/acuven_crm_demo#17。
+
+## 做了什么
+
+- [x] 新增 `backend/app/services/chatbot_event_service.py`，入口 `process_event(db, *, event_type, occurred_at, phone, bsuid,
+      profile_name, wa_message_id, body, bot_id, handover_active, handover_expires_at, status, error_code, error_title)`，
+      只收普通参数，返回 `stored` / `duplicate` / `ignored`；不认识的事件类型抛 `ValueError`。只 flush 不 commit，
+      与 `get_db` 一样由调用方提交。不依赖 `app.schemas`、路由、FastAPI，不发外部请求。
+- [x] 消息类事件（`store_message`）：先按 `wa_message_id` 查重，重复直接返回 `duplicate`，不碰联系人；号码经 `normalize_phone`，
+      无法规范化的按没有号码处理，又没有 BSUID 时返回 `ignored`。找联系人按第五节：按号码找未删除联系人（`created_at`、`id`
+      升序取第一个），没有 BSUID 且没有别的未删除联系人占用时补上；号码没找到再按 BSUID 找，没号码就补规范化号码；都没找到就新建
+      （名字取资料名 / 号码 / BSUID，截断到 100；`is_gateway=False`；`assign_contact` 指派；建 lead 商机）。要用的 BSUID 只被
+      已软删除的联系人占着时先把那些联系人的 `whatsapp_bsuid` 清空（第九节第 1 条）。消息存 `channel=whatsapp`、负责人取联系人
+      当前负责人、访客一侧填号码（没有填 BSUID）、chatbot 一侧填 `ai_chatbot_demo`、`created_at` 取 `occurred_at` 转成的无时区 UTC；
+      `customer_message` 入站未读 `customer`，`ai_reply` 出站已读 `ai` 记 `bot_id`，`console_reply` 出站已读 `console`。
+- [x] `handover_changed`（`update_handover`）：只按号码、再按 BSUID 找，不新建、不补、不清已删除联系人的 BSUID；
+      `occurred_at` 早于已存的 `wa_handover_updated_at` 返回 `ignored`，相等或更晚则写入是否接管、到期时间（结束时为空）与更新时间。
+- [x] `delivery_status`（`update_delivery_status`）：只按 `external_id` 找那条消息；`sent < delivered < read` 只升，重复不算升级；
+      `failed` 只覆盖空值、`sent`、`delivered`；已是 `failed` 的不再改变。`failed` 时 `delivery_error` 存「错误码 标题」
+      （只有一个就只存它，都没有存空），截断到 300；其他状态不改 `delivery_error`。
+- [x] 新增测试 `backend/tests/test_chatbot_event_service.py`，每条 docstring 写明守住哪条验收标准：号码规范化后匹配、同号码取最早 /
+      同时间取 id 最小、已删除的不匹配、补 BSUID 与不覆盖已有 BSUID、按 BSUID 补号码与不覆盖已有号码、无法规范化的号码、
+      无号码无 BSUID 时 ignored 且数据不变、新建联系人的字段 / 指派 / lead 商机、名字取值顺序与截断、不覆盖已有名字、
+      软删除联系人占着 BSUID 时新建与补上两种情况；重复消息数据不变、三种消息的各字段、BSUID 作访客一侧、带时区的
+      `occurred_at` 存成 UTC、回复先到也建联系人；接管的找不到、不补不清、开始与结束、旧事件 ignored 且数据不变、同一时间生效；
+      送达状态的全部升降组合、错误文本的各种组合与截断、非 failed 不改错误文本；入口不导入接口层；第八节前三条边缘情况。
+
+## 偏离
+
+- 消息事件先查重再看号码与 BSUID：同一 `wa_message_id` 已存在时一律返回 `duplicate`，即使这次的访客身份无法使用。
+- 「没有号码」包括联系人号码为空串的情况；联系人存着一个无法规范化的号码时算有号码，不被事件里的号码替换。
+- `bot_id` 只在 `ai_reply` 时存，另两种消息即使传了也存空。`failed` 时错误码与标题都为空（`None` 或空串）则 `delivery_error` 存 `None`。
+- 状态值不在 sent / delivered / read / failed 之内时抛 `ValueError`（接口层 CRM-TASK-008 会先按 422 拒收）。
+- 没有加接口与验签（CRM-TASK-008）、没有改表结构、没有改号码规范化与各保存入口、没有改前端。
+
+## 验证到什么程度
+
+- 验证依据是上面的新测试加已有后端测试，由 PR 的必需检查 `backend` 执行；检查结果由 Worker 和 CI 记录，不写在这里。
+- 软删除联系人释放 BSUID 用的批量 UPDATE 与按号码取最早的查询只在 SQLite 上由测试覆盖，没有在 MySQL 上实际跑过。
 
 ---
 
