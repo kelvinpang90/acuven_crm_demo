@@ -26,7 +26,8 @@
 
 ## 三、号码规范化
 
-一个函数、一处定义，入站匹配、联系人新建 / 编辑 / 表格导入、存量迁移都用它：
+一个函数、一处定义，入站匹配、联系人新建 / 编辑 / 表格导入、AutoCount 客户同步（每轮把 `Phone1` 写进联系人）、存量迁移都用它。
+AutoCount 同步不规范化的话，每 60 秒就会把规范化过的号码改回原样；规范化结果每轮相同，不会让行每轮都变脏：
 
 每一步都作用在上一步得到的数字串上（不看原文）：
 
@@ -155,7 +156,7 @@ A 的 `bsuid` 清空、B 的 `bsuid=MY.1`；下一条同一访客的消息按第
 
 ### 消息
 
-- 按 `wa_message_id` 去重（沿用 `messages.external_id` 唯一键），重复返回 `duplicate`。
+- **先**按 `wa_message_id` 去重（沿用 `messages.external_id` 唯一键），重复直接返回 `duplicate`，不找联系人、不新建、不让位 BSUID。
 - 消息的 `assigned_to` 取联系人当前负责人，与现有入站一致；转派时随联系人一起转（任务二 2.1 已做）。
 - 收件人 / 发件人字段：访客一侧填号码（没有号码填 `bsuid`），chatbot 一侧填固定值 `ai_chatbot_demo`。
 
@@ -262,6 +263,7 @@ A 的 `bsuid` 清空、B 的 `bsuid=MY.1`；下一条同一访客的消息按第
 第二轮预审（同日）又发现并已改：用 BSUID 作名字可能超过 100 字符（一律截断）；`messages.created_at` 只到秒，同秒消息顺序不定（改为微秒精度）；
 `visitor.phone` 须已是规范化形式；正文没有上限（超过 16000 截断入库）；`error_code` 类型（整数或字符串）；不带小数秒的时间、
 别的类型的附加字段与非 `ai_reply` 的 `bot_id`（接受、忽略）；接管事件找联系人的方式（同第 1、2 步，不补、不建）。
+第三轮预审：AutoCount 客户同步每 60 秒把原样号码写回（同步时也规范化）；去重须先于找联系人（写明）。
 
 对 `ai_chatbot_demo` 的影响（C2 按此实现）：`occurred_at` 尽量精确到微秒；`event_id` 最长 64；`visitor.phone` 传 Meta 给的 E.164 数字；`active=false` 时 `expires_at` 传 null；
 `ai_reply` 以外不带 `bot_id`。
