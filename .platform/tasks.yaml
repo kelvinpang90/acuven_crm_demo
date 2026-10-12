@@ -69,7 +69,7 @@ tasks:
     creates_pull_request: true
 
   # 以下四个来自 2026-10-12 对回复模块的核实（tasks/todo.md「任务七」）。
-  # 设计闸门与设计预审：均不适用——004/005 只让失败如实暴露（失败的消息不再入库，存的个人数据只会更少），
+  # 设计闸门与设计预审：均不适用——004 只让失败如实暴露（失败的消息不再入库，存的个人数据只会更少），
   # 002/003 只在管理员已经看得到的列表上加筛选；都不碰钱、状态机、表结构，文件与验收标准都远低于拆分线。
   - id: CRM-TASK-004
     title: 发送失败或未配置时如实报错，不再把消息记为已发出
@@ -95,35 +95,6 @@ tasks:
       - backend/app/routers/messages.py
       - backend/tests/test_whatsapp_service_send.py
       - backend/tests/test_email_send.py
-      - tasks/todo.md
-    allowed_commands:
-      - lint.check
-      - format.check
-    creates_branch: true
-    creates_pull_request: true
-
-  - id: CRM-TASK-005
-    title: WhatsApp 入站处理失败时返回错误让 Meta 重投
-    purpose: >-
-      WhatsApp webhook 处理入站消息时如果出错（例如写库失败），现在吞掉异常并返回 200，Meta 收到 200 就不再重投，
-      这条客户消息永久丢失。改成出错时记录错误日志并返回 500，让 Meta 重投；已有的按消息 id 去重保证重投不会重复入库。
-      建议由路由显式捕获并返回 500，而不是让异常冒出框架。只改入站处理的失败路径；不改验签、去重、建联系人与分派逻辑，
-      不保存送达状态回调（另行处理）、不改表结构。
-    status: ready
-    depends_on:
-      - CRM-TASK-004
-    acceptance_criteria:
-      - 处理入站消息时出错，webhook 返回 500 而不是 200，并记录带异常信息的错误日志
-      - 同一次回调里出错之前已经保存的消息，在 Meta 重投同一份回调时按消息 id 去重，不会重复保存；整份回调都处理成功时仍返回 200，行为不变
-      - 验签失败仍返回 403；只含送达状态回调的请求仍返回 200
-      - 新增测试覆盖：写库出错时返回 500；同一份回调重投后消息不重复；正常回调返回 200 且消息入库；每条测试写明守住的是哪一条验收标准；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
-      - tasks/todo.md 新增 CRM-TASK-005 记录段（做了什么、偏离了什么、验证到什么程度）；不改 planning-v1 块；复选框只允许 [ ] / [x]
-      - 改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不加表、不加迁移、不改前端
-      - allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：不适用，只让失败如实暴露），不合并、不直推
-    allowed_change_paths:
-      - backend/app/services/whatsapp_service.py
-      - backend/app/routers/webhooks.py
-      - backend/tests/test_whatsapp_webhook.py
       - tasks/todo.md
     allowed_commands:
       - lint.check
