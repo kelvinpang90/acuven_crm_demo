@@ -67,3 +67,123 @@ tasks:
       - format.check
     creates_branch: true
     creates_pull_request: true
+
+  # 以下四个来自 2026-10-12 对回复模块的核实（tasks/todo.md「任务七」）。
+  # 设计闸门与设计预审：均不适用——004/005 只让失败如实暴露（失败的消息不再入库，存的个人数据只会更少），
+  # 002/003 只在管理员已经看得到的列表上加筛选；都不碰钱、状态机、表结构，文件与验收标准都远低于拆分线。
+  - id: CRM-TASK-004
+    title: 发送失败或未配置时如实报错，不再把消息记为已发出
+    purpose: >-
+      收件箱发 WhatsApp 时如果凭据没配，现在会把消息存成已发出并返回成功，实际没有发出；发邮件时 SMTP 没配或发送出错，
+      同样存成已发出并返回成功。客服因此以为客户收到了。改成如实返回错误、不保存这条出站消息，前端已有的报错提示会显示出来。
+      只改这三处失败路径；不改演示联系人经网关发送的分支（等 WhatsApp 接入方案定了另行处理）、不改前端、不改表结构、
+      不改收邮件。
+    status: ready
+    depends_on: []
+    acceptance_criteria:
+      - 给非演示联系人发 WhatsApp 时，access token 或 phone number id 缺任一项，接口返回 503、错误码 NOT_CONFIGURED，不保存出站消息，也不发起任何外部请求
+      - 凭据齐全时发送成功、Graph API 返回非 200 或网络出错的行为都不变（失败仍是 502 API_ERROR 且不保存消息）；演示联系人经网关发送的分支不变
+      - 发邮件时 SMTP 主机或用户缺任一项，接口返回 503、错误码 NOT_CONFIGURED，不保存出站消息
+      - SMTP 连接、认证或发送任一步出错时，接口返回 502、错误码 API_ERROR，不保存出站消息并记录错误日志；发送成功、以及联系人不存在或没有邮箱时的行为不变
+      - 原来断言未配置时仍保存消息的测试改为断言 503 且不入库；新增邮件发送测试覆盖未配置、发送出错、发送成功、没有邮箱四种情况；每条测试写明守住的是哪一条验收标准；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
+      - tasks/todo.md 新增 CRM-TASK-004 记录段（做了什么、偏离了什么、验证到什么程度）；不改 planning-v1 块；复选框只允许 [ ] / [x]
+      - 改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不加表、不加迁移、不改前端
+      - allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：不适用，只让失败如实暴露），不合并、不直推
+    allowed_change_paths:
+      - backend/app/services/whatsapp_service.py
+      - backend/app/services/email_service.py
+      - backend/app/routers/messages.py
+      - backend/tests/test_whatsapp_service_send.py
+      - backend/tests/test_email_send.py
+      - tasks/todo.md
+    allowed_commands:
+      - lint.check
+      - format.check
+    creates_branch: true
+    creates_pull_request: true
+
+  - id: CRM-TASK-005
+    title: WhatsApp 入站处理失败时返回错误让 Meta 重投
+    purpose: >-
+      WhatsApp webhook 处理入站消息时如果出错（例如写库失败），现在吞掉异常并返回 200，Meta 收到 200 就不再重投，
+      这条客户消息永久丢失。改成出错时记录错误日志并返回 500，让 Meta 重投；已有的按消息 id 去重保证重投不会重复入库。
+      建议由路由显式捕获并返回 500，而不是让异常冒出框架。只改入站处理的失败路径；不改验签、去重、建联系人与分派逻辑，
+      不保存送达状态回调（另行处理）、不改表结构。
+    status: ready
+    depends_on:
+      - CRM-TASK-004
+    acceptance_criteria:
+      - 处理入站消息时出错，webhook 返回 500 而不是 200，并记录带异常信息的错误日志
+      - 同一次回调里出错之前已经保存的消息，在 Meta 重投同一份回调时按消息 id 去重，不会重复保存；整份回调都处理成功时仍返回 200，行为不变
+      - 验签失败仍返回 403；只含送达状态回调的请求仍返回 200
+      - 新增测试覆盖：写库出错时返回 500；同一份回调重投后消息不重复；正常回调返回 200 且消息入库；每条测试写明守住的是哪一条验收标准；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
+      - tasks/todo.md 新增 CRM-TASK-005 记录段（做了什么、偏离了什么、验证到什么程度）；不改 planning-v1 块；复选框只允许 [ ] / [x]
+      - 改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不加表、不加迁移、不改前端
+      - allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：不适用，只让失败如实暴露），不合并、不直推
+    allowed_change_paths:
+      - backend/app/services/whatsapp_service.py
+      - backend/app/routers/webhooks.py
+      - backend/tests/test_whatsapp_webhook.py
+      - tasks/todo.md
+    allowed_commands:
+      - lint.check
+      - format.check
+    creates_branch: true
+    creates_pull_request: true
+
+  - id: CRM-TASK-002
+    title: 客户列表支持只看未分派的客户
+    purpose: >-
+      负责人为空的客户只有管理员看得到，但混在全部客户里，没有办法单独筛出来。给客户列表接口加 unassigned 参数，
+      让管理员能只看这些客户，前端由 CRM-TASK-003 接上。不改任何角色能看到哪些客户的规则（销售、经理仍看不到未分派客户），
+      不加计数接口（列表的 total 就是数量）、不改仪表盘、不改前端、不改表结构。
+    status: ready
+    depends_on: []
+    acceptance_criteria:
+      - 客户列表接口接受 unassigned 参数（0 或 1，默认 0，其他取值返回 422）；为 1 时只返回负责人为空的客户，并与已有的角色过滤、搜索、行业、负责人、归档、排序、分页条件同时生效；返回的 total 是筛选后的数量
+      - 不传 unassigned 或传 0 时，列表行为不变
+      - 销售和经理传 1 时返回空列表、total 为 0，不报错；同时传 assigned_to 与 unassigned=1 时返回空列表
+      - 不改 access_service、不改列表的角色过滤与 demo 排除
+      - 新增测试覆盖：管理员传 1 只看到未分派客户且 total 正确；与归档条件同时生效；销售与经理传 1 得到空列表；不传时结果不变；非法取值返回 422；每条测试写明守住的是哪一条验收标准；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
+      - tasks/todo.md 新增 CRM-TASK-002 记录段（做了什么、偏离了什么、验证到什么程度）；不改 planning-v1 块；复选框只允许 [ ] / [x]
+      - 改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不加表、不加迁移、不改前端
+      - allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：不适用，只在管理员已可见的列表上加筛选），不合并、不直推
+    allowed_change_paths:
+      - backend/app/routers/contacts.py
+      - backend/app/services/contact_service.py
+      - backend/tests/test_contact_unassigned.py
+      - tasks/todo.md
+    allowed_commands:
+      - lint.check
+      - format.check
+    creates_branch: true
+    creates_pull_request: true
+
+  - id: CRM-TASK-003
+    title: 客户页给管理员显示未分派数量和筛选开关
+    purpose: >-
+      在 CRM-TASK-002 的 unassigned 参数之上，让管理员在客户页直接看到有多少未分派客户、一键只看它们，
+      未分派的线索不再无声无息。只对管理员显示；不改后端、不改销售与经理看到的页面、不加新页面或路由。
+    status: ready
+    depends_on:
+      - CRM-TASK-002
+    acceptance_criteria:
+      - 管理员打开客户页时，筛选区显示未分派开关和未分派客户数量（取自 unassigned=1 的列表 total），数量大于 0 时醒目显示；列表每次重新加载时数量一并刷新
+      - 打开开关后列表只显示未分派客户并回到第 1 页，关闭后恢复原列表；与搜索、归档切换可以同时使用
+      - 销售和经理看不到这个开关，也不发起未分派数量的请求，页面行为不变
+      - 新文案同时加在 en 与 zh 的 contacts 命名空间，不写硬编码文字
+      - 前端类型检查与构建由 PR 的必需 CI 检查 frontend 执行并通过（Worker 沙箱不跑 npm）
+      - tasks/todo.md 新增 CRM-TASK-003 记录段（做了什么、偏离了什么、验证到什么程度）；不改 planning-v1 块；复选框只允许 [ ] / [x]
+      - 改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不改后端
+      - allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：不适用，纯前端筛选），不合并、不直推
+    allowed_change_paths:
+      - frontend/src/pages/Contacts/index.tsx
+      - frontend/src/services/contacts.ts
+      - frontend/src/locales/en/contacts.json
+      - frontend/src/locales/zh/contacts.json
+      - tasks/todo.md
+    allowed_commands:
+      - lint.check
+      - format.check
+    creates_branch: true
+    creates_pull_request: true
