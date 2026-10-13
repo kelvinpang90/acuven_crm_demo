@@ -61,6 +61,14 @@ class Settings(BaseSettings):
     chatbot_events_secret: str = ""
     chatbot_events_secret_previous: str = ""
 
+    # CRM -> ai_chatbot_demo replies. CHATBOT_SEND_SECRET has the same value
+    # as CRM_SEND_SECRET on the chatbot side and must differ from
+    # CHATBOT_EVENTS_SECRET. The URL is an internal base URL including a port,
+    # without an endpoint path; send and handback append /internal/crm/send
+    # and /internal/crm/handback respectively.
+    chatbot_send_url: str = ""
+    chatbot_send_secret: str = ""
+
     @property
     def database_url(self) -> str:
         return (
