@@ -331,7 +331,7 @@ tasks:
       在 CRM-TASK-008 返回的新字段之上，按 docs/chatbot-events.md 第七节让客服在收件箱看到每条消息是谁发的
       （AI 与行业、控制台）、送达状态与失败原因、这个访客现在是否被人工接管；让管理员在客户页看到号码冲突。
       只改前端展示：不改后端、不加页面或路由、不做回复经 chatbot 发出与交还 AI（第 2 阶段）。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-008
     acceptance_criteria:
