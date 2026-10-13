@@ -310,7 +310,7 @@ async def test_handback_validates_before_http_and_returns_current_state(
 async def test_handback_ended_writes_strictly_newer_state_and_bad_responses_do_not_change_it(
     async_session_maker, monkeypatch, caplog
 ):
-    """Guards design §11 examples 8/9: ended writes response handover; not_active and invalid ended keep state."""
+    """Guards design §11 examples 8/9: only inactive ended handovers can update state."""
     await _seed(
         async_session_maker,
         _contact(
@@ -322,6 +322,7 @@ async def test_handback_ended_writes_strictly_newer_state_and_bad_responses_do_n
     )
     _configured(monkeypatch)
     ended_at = (T0 + timedelta(minutes=1)).replace(tzinfo=timezone.utc).isoformat()
+    contradictory_at = (T0 + timedelta(minutes=2)).replace(tzinfo=timezone.utc).isoformat()
     _http(
         monkeypatch,
         AsyncMock(
@@ -341,9 +342,16 @@ async def test_handback_ended_writes_strictly_newer_state_and_bad_responses_do_n
                         "result": "ended",
                         "handover": {
                             "active": True,
-                            "expires_at": ended_at,
-                            "occurred_at": ended_at,
+                            "expires_at": contradictory_at,
+                            "occurred_at": contradictory_at,
                         },
+                    },
+                ),
+                _response(
+                    200,
+                    {
+                        "result": "ended",
+                        "handover": {"active": False, "expires_at": None, "occurred_at": ended_at},
                     },
                 ),
                 _response(200, {"result": "unexpected"}),
@@ -355,6 +363,9 @@ async def test_handback_ended_writes_strictly_newer_state_and_bad_responses_do_n
         ended = await handback_to_ai(session, contact_id="c1", agent_id="u1", agent_name="Agent")
         inactive = await handback_to_ai(session, contact_id="c1", agent_id="u1", agent_name="Agent")
         invalid = await handback_to_ai(session, contact_id="c1", agent_id="u1", agent_name="Agent")
+        contradictory = await handback_to_ai(
+            session, contact_id="c1", agent_id="u1", agent_name="Agent"
+        )
         equal_time = await handback_to_ai(
             session, contact_id="c1", agent_id="u1", agent_name="Agent"
         )
@@ -369,6 +380,9 @@ async def test_handback_ended_writes_strictly_newer_state_and_bad_responses_do_n
     )
     assert inactive.category == HANDBACK_NOT_ACTIVE and inactive.updated_at == ended.updated_at
     assert invalid.category == HANDBACK_FAILED and invalid.updated_at == ended.updated_at
+    assert (
+        contradictory.category == HANDBACK_FAILED and contradictory.updated_at == ended.updated_at
+    )
     assert equal_time.category == HANDBACK_ENDED and equal_time.active is False
     assert (
         unknown_result.category == HANDBACK_FAILED and unknown_result.updated_at == ended.updated_at
@@ -376,5 +390,9 @@ async def test_handback_ended_writes_strictly_newer_state_and_bad_responses_do_n
     assert failed.category == HANDBACK_FAILED and failed.updated_at == ended.updated_at
     assert any(
         record.levelname == "ERROR" and "invalid result" in record.message
+        for record in caplog.records
+    )
+    assert any(
+        record.levelname == "ERROR" and "inactive handover" in record.message
         for record in caplog.records
     )

@@ -416,9 +416,10 @@ async def handback_to_ai(
         )
         return _handover_result(HANDBACK_FAILED, contact)
     handover = _handover(response_payload)
-    if handover is None:
+    if handover is None or handover["active"] or handover["expires_at"] is not None:
         logger.error(
-            "chatbot handback ended without a valid handover", extra={"contact_id": contact.id}
+            "chatbot handback ended without a valid inactive handover",
+            extra={"contact_id": contact.id},
         )
         return _handover_result(HANDBACK_FAILED, contact)
     await chatbot_event_service.write_response_handover(db, contact_id=contact.id, **handover)
