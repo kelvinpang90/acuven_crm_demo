@@ -26,7 +26,7 @@
 ### 已阻塞
 
 - 待登记：CRM AI 客户摘要接入 Billing Hub 的 AI 模块｜阻塞：等 acuven_ai_api 并入 ai_billing_hub 的 AI 模块上线与第 3 阶段验收
-- 待登记：收件箱 AI 会话简报、起草回复与翻译（任务八）｜阻塞：等 AI 模块上线对应的三个能力
+- 待登记：收件箱 AI 会话简报、起草回复与翻译（任务八）｜阻塞：等 AI 模块上线、为 CRM 项目建好客户端密钥
 - 待登记：跟进记录 AI 整理成结构化记录并生成任务草稿（任务八）｜阻塞：待设计，等 AI 模块上线
 - `CRM-TASK-017` 删掉 CRM 自己的 Meta webhook、网关入口与直连发送及其配置｜阻塞：等第 2 阶段真机验收通过（chatbot 侧 C3、C4 上线并配好第二把密钥）
 
@@ -1685,8 +1685,8 @@ PRECHECK_RESULT: READY
 
 | 优先 | 模块 | 功能 | 状态 |
 |---|---|---|---|
-| 1 | 收件箱 | 会话简报、起草回复、翻译 | 设计已批准：`docs/inbox-ai-assist.md`（PR kelvinpang90/acuven_crm_demo#29） |
-| 2 | 联系人 | 客户摘要（`crm.contact_summary` v1，契约已批准） | 已阻塞，待登记 |
+| 1 | 收件箱 | 会话简报、起草回复、翻译 | 第一版已批准（PR kelvinpang90/acuven_crm_demo#29）；AI 分工改了，第二版 2026-10-13 已批准：`docs/inbox-ai-assist.md`（PR kelvinpang90/acuven_crm_demo#34） |
+| 2 | 联系人 | 客户摘要（`crm.contact_summary`；原为 AI API 的契约 v1，按 ai_billing_hub 设计 #281 改为 CRM 自己的内部设计，待另写） | 已阻塞，待登记 |
 | 3 | 跟进记录 / 任务 | 把员工的速记整理成结构化跟进记录，并生成任务草稿（E-09 原定的「任务草稿」） | 待设计 |
 | 4 | 商机 | 下一步建议、商机停滞的原因说明（只给文字，不改状态） | 想法 |
 | 4 | 仪表盘 | 经理看板的数据解读：数字由 CRM 算好，AI 只写解读 | 想法 |
@@ -1695,5 +1695,8 @@ PRECHECK_RESULT: READY
 | 6 | 分配规则、屋顶项目、AutoCount | 建议分配给谁；根据勘察和完工照片起草报告；汇总客户的单据 | 想法 |
 
 - [x] Kelvin 批准 `docs/inbox-ai-assist.md`（2026-10-13，第三节 Q1 至 Q6 均按建议）
-- [ ] 在 `ai_billing_hub` 提出三个能力的契约（2026-10-13 已在该仓库另开会话起草）
-- [ ] AI 模块上线后，按设计第七节拆分并登记
+- [x] ~~在 `ai_billing_hub` 提出三个能力的契约~~：不再需要。Kelvin 2026-10-13 定「每一个 AI 功能都在本系统修改，ai_billing_hub 只负责计费和调用 AI」
+      （规格 §141 与设计 #281：AI 模块只有 `POST /v1/messages` 加 `feature` 标签，提示词与输出结构归调用方）。那边起草契约的会话没写任何东西就停了
+- [x] 设计第二版（AI 分工改了，并补与第 2 阶段 CRM-TASK-012 至 020 的衔接，第八节）获 Kelvin 批准（2026-10-13，PR kelvinpang90/acuven_crm_demo#34，第十节 Q7 至 Q10 均按建议：共用一个 `AI_MODEL`、评测样例用 demo 数据、客户摘要另写设计、归档 ai_billing_hub 起草契约的会话）
+- [ ] AI 模块上线后，由管理员在 Billing Hub 为 CRM 项目建 AI 客户端密钥
+- [ ] 按设计第七节拆分并登记（6 个任务；前端两个依赖 CRM-TASK-016）
