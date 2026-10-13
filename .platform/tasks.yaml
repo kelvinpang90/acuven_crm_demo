@@ -27,6 +27,7 @@ default: deny
 #   allowed_change_paths * 本 run 允许改动的文件：仓库根相对的 POSIX 路径，逐个精确匹配；
 #                          不能是 .platform/ 下、.git、凭据形状的文件名
 #   allowed_commands *     非空列表，只能引用 .platform/commands.yaml 里已有的 id
+#                          列了 format.apply 的任务由 Worker 在每轮检查之前先格式化；不能只列它，至少要有一条检查
 #   creates_branch *       必须是 true
 #   creates_pull_request * 必须是 true（Worker 以 Draft PR 交付，不合并、不直推）
 #
@@ -450,6 +451,7 @@ tasks:
     allowed_commands:
       - lint.check
       - format.check
+      - format.apply
     creates_branch: true
     creates_pull_request: true
 
@@ -486,6 +488,7 @@ tasks:
     allowed_commands:
       - lint.check
       - format.check
+      - format.apply
     creates_branch: true
     creates_pull_request: true
 
@@ -520,6 +523,7 @@ tasks:
     allowed_commands:
       - lint.check
       - format.check
+      - format.apply
     creates_branch: true
     creates_pull_request: true
 
@@ -556,6 +560,7 @@ tasks:
     allowed_commands:
       - lint.check
       - format.check
+      - format.apply
     creates_branch: true
     creates_pull_request: true
 
@@ -590,6 +595,7 @@ tasks:
     allowed_commands:
       - lint.check
       - format.check
+      - format.apply
     creates_branch: true
     creates_pull_request: true
 
@@ -622,6 +628,7 @@ tasks:
     allowed_commands:
       - lint.check
       - format.check
+      - format.apply
     creates_branch: true
     creates_pull_request: true
 
@@ -649,6 +656,7 @@ tasks:
     allowed_commands:
       - lint.check
       - format.check
+      - format.apply
     creates_branch: true
     creates_pull_request: true
 
@@ -684,6 +692,7 @@ tasks:
     allowed_commands:
       - lint.check
       - format.check
+      - format.apply
     creates_branch: true
     creates_pull_request: true
 
@@ -717,6 +726,7 @@ tasks:
     allowed_commands:
       - lint.check
       - format.check
+      - format.apply
     creates_branch: true
     creates_pull_request: true
 
@@ -745,6 +755,7 @@ tasks:
     allowed_commands:
       - lint.check
       - format.check
+      - format.apply
     creates_branch: true
     creates_pull_request: true
 
@@ -774,6 +785,7 @@ tasks:
     allowed_commands:
       - lint.check
       - format.check
+      - format.apply
     creates_branch: true
     creates_pull_request: true
 
@@ -805,6 +817,7 @@ tasks:
     allowed_commands:
       - lint.check
       - format.check
+      - format.apply
     creates_branch: true
     creates_pull_request: true
 
@@ -837,5 +850,6 @@ tasks:
     allowed_commands:
       - lint.check
       - format.check
+      - format.apply
     creates_branch: true
     creates_pull_request: true

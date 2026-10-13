@@ -31,7 +31,8 @@ default: deny
 #   risk             只写 low
 #   timeout_seconds * 1–7200 的整数
 #   network *        布尔；false 在进程边界上强制无出站网络
-#   writes *         none = 不写工作区任何文件；cache = 只写已被 .gitignore 忽略的缓存
+#   writes *         none = 不写工作区任何文件；cache = 只写已被 .gitignore 忽略的缓存；
+#                    format = 只改写已有文件的内容（格式化器），Worker 在检查之前运行
 commands:
   - id: lint.check
     description: 后端 lint（ruff check，只报告不改写；规则见仓库根 ruff.toml）
@@ -52,6 +53,16 @@ commands:
     timeout_seconds: 300
     network: false
     writes: cache
+
+  - id: format.apply
+    description: 后端格式化（ruff format，改写已有文件；Worker 在每轮检查之前运行，不计修复次数）
+    executable: python
+    args: ["-I", "-m", "ruff", "format", "."]
+    working_directory: repository_root
+    risk: low
+    timeout_seconds: 300
+    network: false
+    writes: format
 
 # 下面这些不是命令，是明确不得混进 allowlist 的动作类别，由人或 CI/CD 做。
 never_low_risk:
