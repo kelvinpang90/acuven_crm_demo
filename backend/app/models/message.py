@@ -25,6 +25,8 @@ class Message(Base):
     external_id: Mapped[str | None] = mapped_column(String(200), unique=True, nullable=True)
     is_read: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     assigned_to: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    sent_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
+
     # Who wrote it; NULL for messages from before ai_chatbot_demo events.
     author_kind: Mapped[str | None] = mapped_column(
         Enum("customer", "ai", "console", "agent", name="message_author_kind"), nullable=True
