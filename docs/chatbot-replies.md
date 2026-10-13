@@ -222,7 +222,7 @@ Kelvin 手工（不在仓库里）：
 ## 九、表结构
 
 - 迁移 014（CRM-TASK-012）：`messages.sent_by`，字符串 36，可空，不加外键（与 `assigned_to` 一致）、不加索引（不按它查询）。旧数据留空。
-- 迁移 015（CRM-TASK-020）：删 `contacts.is_gateway` 与 `idx_contacts_is_gateway`。
+- 迁移 016（CRM-TASK-020）：删 `contacts.is_gateway` 与 `idx_contacts_is_gateway`。原为 015，登记收件箱 AI 的 CRM-TASK-021 时 015 给了 `ai_requests` 建表，按 [inbox-ai-assist.md](inbox-ai-assist.md) 第八节第 4 条顺延。
 - 013 号已给 CRM-TASK-009 的存量号码迁移。
 
 **个人数据**：新增存储的只有 `sent_by`（员工 id）。客服写的正文发给 chatbot 与 Meta（发送本身必需），chatbot 把它连同员工显示名
@@ -240,7 +240,7 @@ Kelvin 手工（不在仓库里）：
 | CRM-TASK-017 | 接口与服务 | 第七节：删 webhook、网关入站与出站、Graph 直连、旧配置、旧测试与文档 | 015 |
 | CRM-TASK-018 | 业务规则 | 删 `demo_scope` 与 5 处调用；第 1 阶段事件处理新建联系人时写的 `is_gateway=false` 去掉（列有默认值）；删 `test_demo_scope.py`，`test_contact_unassigned.py` 里「demo 联系人被排除」的断言改掉 | 017 |
 | CRM-TASK-019 | 数据库（模型） | 模型取消 `is_gateway` 映射；测试构造联系人时去掉这个参数；删 018 新增的 `test_gateway_contacts_visible.py` | 018 已部署 |
-| CRM-TASK-020 | 数据库 | 迁移 015 删 `is_gateway` 列与索引 | 019 已部署 |
+| CRM-TASK-020 | 数据库 | 迁移 016 删 `is_gateway` 列与索引 | 019 已部署、021 |
 
 `ai_chatbot_demo` 那边（人工会话，沿用 P5，待第十二节 Q6 确认）：
 
@@ -303,7 +303,7 @@ Kelvin 手工（不在仓库里）：
 11. **去掉 `is_gateway` 的用处（CRM-TASK-018）**
     - 前：联系人 G1、G2 `is_gateway=true`，不在客户列表、商机、看板、分析、管道里。
     - 后：列还在、值不变，但不再被读取；G1、G2 与各自的 0 元 lead 商机出现在上述页面与统计里。
-12. **删列（迁移 015）**
+12. **删列（迁移 016）**
     - 前：列存在，G1、G2 为 true，其余 false。
     - 后：列与索引不存在；`downgrade` 后列回来、全部 false。
 
@@ -360,7 +360,7 @@ Kelvin 手工（不在仓库里）：
 10. **`DEPLOY.md` 的变量清单**：第七节原写「只加 `CHATBOT_SEND_URL`、`CHATBOT_SEND_SECRET`，第 1 阶段两项另由人补」；改为 CRM-TASK-017 一次补齐
     `CHATBOT_EVENTS_SECRET`、`CHATBOT_EVENTS_SECRET_PREVIOUS`、`CHATBOT_SEND_URL`、`CHATBOT_SEND_SECRET` 四项空值。
 11. **测试文件范围**：CRM-TASK-007 新增的 `test_contact_phone.py` 有经旧 Meta 回调与网关入站的用例，归 CRM-TASK-017 删；CRM-TASK-018 新增的
-    `test_gateway_contacts_visible.py` 用到 `is_gateway`，归 CRM-TASK-019 删（模型不再映射后它守的口径已无从构造）；「不再出现 `is_gateway`」不含迁移文件与 `test_migration_015`。
+    `test_gateway_contacts_visible.py` 用到 `is_gateway`，归 CRM-TASK-019 删（模型不再映射后它守的口径已无从构造）；「不再出现 `is_gateway`」不含迁移文件与 `test_migration_016`（原写 015，见第九节的顺延）。
 12. **删列前先取消映射**（设计缺陷）：原 019 在同一次部署里删模型字段与删列，而 `deploy.sh` 先跑迁移、再换容器，失败回滚到上一版；
     上一版（018）的模型仍映射这一列，删列那一刻起它的联系人查询全部报错，回滚目标也坏。补：拆成 019（模型取消映射，列有数据库默认值 false，插入照常）
     与 020（迁移删列），各自一次部署。任务从 8 个变成 9 个。
