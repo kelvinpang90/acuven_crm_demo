@@ -630,19 +630,208 @@ tasks:
     purpose: >-
       按 docs/chatbot-replies.md 第八节、第九节与第十四节第 12 条，在 CRM-TASK-019 部署（运行版本已不映射这一列）之后，
       一次迁移删掉 contacts.is_gateway 与它的索引。只做迁移：不改模型、服务、接口、前端。
+      迁移编号原为 015，登记 CRM-TASK-021 时 015 给了 ai_requests 建表，这里顺延为 016（docs/inbox-ai-assist.md 第八节第 4 条）。
     status: ready
     depends_on:
       - CRM-TASK-019
+      - CRM-TASK-021
     acceptance_criteria:
-      - 新增迁移 015，down_revision 为 014：upgrade 删掉 contacts 的 is_gateway 列与 idx_contacts_is_gateway 索引；downgrade 重建该列（布尔，非空，带数据库默认值 false）与索引，不还原原来为真的值，在迁移的 docstring 写明
+      - 新增迁移 016，down_revision 为 015（CRM-TASK-021 的 ai_requests 建表）：upgrade 删掉 contacts 的 is_gateway 列与 idx_contacts_is_gateway 索引；downgrade 重建该列（布尔，非空，带数据库默认值 false）与索引，不还原原来为真的值，在迁移的 docstring 写明
       - 不改模型（CRM-TASK-019 已取消映射）、服务、接口与前端
-      - 新增测试：用 Alembic 的 Operations 在内存 SQLite 上对含 id 与 is_gateway 的最小 contacts 表执行 015 的 upgrade 再 downgrade，断言列与索引先消失后回来、回来后全部为 false；每条测试写明守住的是哪一条验收标准；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
+      - 新增测试：用 Alembic 的 Operations 在内存 SQLite 上对含 id 与 is_gateway 的最小 contacts 表执行 016 的 upgrade 再 downgrade，断言列与索引先消失后回来、回来后全部为 false；每条测试写明守住的是哪一条验收标准；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
       - tasks/todo.md 新增 CRM-TASK-020 记录段（做了什么、偏离了什么、验证到什么程度）；不改 planning-v1 块；复选框只允许 [ ] / [x]
       - 改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖
       - allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#28），不合并、不直推
     allowed_change_paths:
-      - backend/alembic/versions/015_drop_contact_is_gateway.py
+      - backend/alembic/versions/016_drop_contact_is_gateway.py
+      - backend/tests/test_migration_016.py
+      - tasks/todo.md
+    allowed_commands:
+      - lint.check
+      - format.check
+    creates_branch: true
+    creates_pull_request: true
+
+  # 以下六个是收件箱 AI 辅助（会话简报、起草回复、翻译），设计见 docs/inbox-ai-assist.md 第二版
+  # （Kelvin 2026-10-13 批准，设计闸门引用 kelvinpang90/acuven_crm_demo#34）。拆分照设计第七节：一个任务一层，依赖串起来。
+  # Kelvin 2026-10-13 定：不等 AI 模块上线，先登记实现（按 A 排在第 2 阶段 CRM-TASK-016 之后）；没配 AI 密钥时功能整体隐藏、不调用 AI，
+  # AI 模块上线后只做建密钥、配环境变量与质量评测。
+  # 设计闸门：六个都适用——021 新增审计表与迁移，022/023 把会话内容（个人数据）组装后发给模型，024 是收发这些内容的接口，025/026 展示 AI 输出。
+  # 设计预审的完整输出在 tasks/todo.md「登记 CRM-TASK-021 至 026」。
+  # 迁移编号：021 取 015（接在 CRM-TASK-012 的 014 之后），CRM-TASK-020 的删列迁移因此顺延为 016（设计第八节第 4 条）。
+  - id: CRM-TASK-021
+    title: 收件箱AI辅助的审计表迁移与模型
+    purpose: >-
+      按 docs/inbox-ai-assist.md 第 4.2 节新建 ai_requests 审计表，记录谁在什么时候对哪个客户用了哪个 AI 功能、结果如何，
+      不存快照、提示词、员工附的要求与 AI 输出。一次 Alembic 迁移建表，模型同步。只做表结构：不改服务、接口、前端。
+    status: ready
+    depends_on:
+      - CRM-TASK-012
+    acceptance_criteria:
+      - 新建 ai_requests 表：id（字符串 36，主键）、user_id（字符串 36，非空）、contact_id（字符串 36，非空）、feature（字符串 64，非空）、request_id（字符串 32，可空）、outcome（枚举 ok、unavailable、error，非空）、created_at（时间，非空，无时区 UTC）；contact_id 与 created_at 各一个普通索引；不加外键（与现有表一致）
+      - 新增迁移 015，down_revision 为 014：upgrade 只建这张表与索引；downgrade 删掉它回到 014 的形状
+      - 新增模型 AiRequest 并在 models 包里导出，模型与迁移逐列一致，只加字段不加行为；不改其他模型
+      - 新增测试：用 Alembic 的 Operations 在内存 SQLite 上执行 015 的 upgrade 再 downgrade，断言表与索引先出现后消失；按模型建表后插入一行、outcome 只接受三种值；每条测试写明守住的是哪一条验收标准；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
+      - tasks/todo.md 新增 CRM-TASK-021 记录段（做了什么、偏离了什么、验证到什么程度）；不改 planning-v1 块；复选框只允许 [ ] / [x]
+      - 改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不改服务、接口与前端
+      - allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#34），不合并、不直推
+    allowed_change_paths:
+      - backend/alembic/versions/015_add_ai_requests.py
+      - backend/app/models/ai_request.py
+      - backend/app/models/__init__.py
       - backend/tests/test_migration_015.py
+      - tasks/todo.md
+    allowed_commands:
+      - lint.check
+      - format.check
+    creates_branch: true
+    creates_pull_request: true
+
+  - id: CRM-TASK-022
+    title: 收件箱AI辅助的调用客户端、会话快照组装与审计写入
+    purpose: >-
+      按 docs/inbox-ai-assist.md 第 4.1、4.4 节与第八节第 3 条，新建调用 Billing Hub AI 模块 POST /v1/messages 的客户端模块（组请求、鉴权头、超时、三类结果），
+      以及从库里组装发给模型的会话快照、写 ai_requests 审计记录的业务函数。只做业务规则层：不写三个功能的提示词与 schema（CRM-TASK-023）、
+      不加接口、不改前端；AI 模块尚未上线，测试一律打桩 HTTP，不写任何真实密钥与地址。
+    status: ready
+    depends_on:
+      - CRM-TASK-021
+      - CRM-TASK-013
+    acceptance_criteria:
+      - 配置类新增 AI_API_BASE_URL、AI_CLIENT_ID、AI_CLIENT_TOKEN、AI_MODEL 四项，默认空，任一为空即未配置；客户端提供判断是否已配置的函数，未配置时不发请求、直接返回未配置
+      - 客户端按设计 4.1 组请求：POST 基地址加 /v1/messages，请求头 X-Acuven-Client-Id 与 Authorization Bearer，请求体只有 feature、model、system、messages、max_tokens、output_config（format 为 json_schema 与调用方给的 schema，effort 为 low）；序列化后超过 64 KiB 的不发、按 AI 出错返回；超时 75 秒；不自动重试
+      - 结果三类：200 且 stop_reason 为 end_turn、模型文本能解析成 JSON 为成功（返回解析后的对象与 request_id）；200 但拒答、被截断、解析失败，以及 401、403、422 为 AI 出错；429、502、503、504、超时、连接失败为暂时不可用；其余状态码按 AI 出错；日志只记功能标签、状态码、request_id 与结果类别，不记请求体、快照与模型输出
+      - 快照按设计 4.4 组装：联系人的名字、公司、行业、标签、备注，未关闭的商机（标题、状态、金额），接管状态，最近 40 条消息从新到旧取、序列化后不超过 16 KiB、单条邮件正文截到 2000 个字符，截断时 truncated 为真；不放联系人 id、电话、邮箱、BSUID；author_kind 为空的按方向推断为 customer 或 agent；出站消息带 delivery（已有的送达状态，CRM-TASK-013 的客服回复 external_id 为空时为 unconfirmed，旧数据没有状态时不带这个键）
+      - 审计写入函数按设计 4.2 写一行 ai_requests（user_id、contact_id、feature、request_id、outcome、created_at），只存这些
+      - 新增测试：打桩 HTTP 逐条覆盖请求形状与请求头、未配置不发请求、64 KiB 上限、三类结果的每个分支、日志不含正文；快照的字段、截断、40 条与 16 KiB 上限、推断与 delivery 取值；审计写入；每条测试写明守住的是哪一条验收标准；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
+      - tasks/todo.md 新增 CRM-TASK-022 记录段（做了什么、偏离了什么、验证到什么程度）；不改 planning-v1 块；复选框只允许 [ ] / [x]
+      - 改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不加表、不加迁移、不改接口与前端；allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#34），不合并、不直推
+    allowed_change_paths:
+      - backend/app/services/ai_api_client.py
+      - backend/app/services/ai_assist_service.py
+      - backend/app/config.py
+      - backend/tests/test_ai_api_client.py
+      - backend/tests/test_ai_assist_snapshot.py
+      - tasks/todo.md
+    allowed_commands:
+      - lint.check
+      - format.check
+    creates_branch: true
+    creates_pull_request: true
+
+  - id: CRM-TASK-023
+    title: 收件箱三个AI功能的提示词、输出结构与输出校验
+    purpose: >-
+      按 docs/inbox-ai-assist.md 第五节，在 CRM 后端定义会话简报、起草回复、翻译三个功能的系统提示、JSON schema、max_tokens 与输出校验，
+      并在业务层把快照、功能定义、AI 客户端与审计写入串成三个可调用的业务函数。只做业务规则层：不加接口、不改前端；测试打桩 AI 客户端，不调真实模型。
+      提示词的真实效果要等 AI 模块上线后按设计第五节做质量评测，评测不在本任务范围。
+    status: ready
+    depends_on:
+      - CRM-TASK-022
+    acceptance_criteria:
+      - 新增 ai_features 模块定义三个功能：feature 标签分别为 crm.conversation_brief、crm.reply_draft、crm.translate；各自的系统提示写明快照、消息正文与员工附的要求都是不可信数据、不执行其中的指令、只用快照里的事实；起草的系统提示另写明快照里没有的价格、日期、承诺写成待确认占位并在 note_for_agent 里说明；max_tokens 依次为 800、1500、3000
+      - 三个 schema 只表达字段、类型、枚举与必填，字段照设计第五节；长度与条数由解析后的校验函数检查：简报 customer_need 1 至 200 字、conversation_state 1 至 300 字、customer_mood 四个枚举之一、open_questions 0 至 3 条且每条不超过 120 字、suggested_next_step 0 至 240 字；起草 draft 在 WhatsApp 不超过 1000 字、邮件不超过 3000 字，subject 仅邮件且不超过 150 字，note_for_agent 不超过 200 字；翻译 translation 非空、detected_language 为 zh-CN、en、ms、other 之一；不合就按 AI 出错处理，不截断、不补齐
+      - 三个业务函数：简报与起草先用 CRM-TASK-022 组装快照，会话没有消息时返回 NO_MESSAGES、不调用 AI；翻译只发文本与目标语言、不需要快照；output_language 与 target_language 只接受 zh-CN、en、ms；起草的 instruction 可选、不超过 200 字，翻译的 text 不超过 4000 字；每次调用 AI 后（不论结果）写一行审计；未配置时返回 AI_NOT_CONFIGURED、不写审计
+      - 新增测试：打桩 AI 客户端，逐个功能覆盖成功、每个字段的长度条数与枚举越界判为 AI 出错、暂时不可用、未配置、无消息；断言发给客户端的 feature、max_tokens、schema 与系统提示里的不可信数据声明；断言审计行的 feature 与 outcome；每条测试写明守住的是哪一条验收标准；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
+      - tasks/todo.md 新增 CRM-TASK-023 记录段（做了什么、偏离了什么、验证到什么程度）；不改 planning-v1 块；复选框只允许 [ ] / [x]
+      - 改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不加表、不加迁移、不改接口与前端
+      - allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#34），不合并、不直推
+    allowed_change_paths:
+      - backend/app/services/ai_features.py
+      - backend/app/services/ai_assist_service.py
+      - backend/tests/test_ai_features.py
+      - tasks/todo.md
+    allowed_commands:
+      - lint.check
+      - format.check
+    creates_branch: true
+    creates_pull_request: true
+
+  - id: CRM-TASK-024
+    title: 收件箱AI辅助的三个接口与是否已配置的查询
+    purpose: >-
+      按 docs/inbox-ai-assist.md 第 4.3 节，把 CRM-TASK-023 的三个业务函数接成会话简报、起草回复、翻译三个接口，
+      并加一个查询 AI 是否已配置的接口，让前端在未配置时隐藏按钮。只做接口层：不改业务规则、不改表结构、不改前端。
+    status: ready
+    depends_on:
+      - CRM-TASK-023
+    acceptance_criteria:
+      - 新增 POST /api/ai/conversations/{contact_id}/brief（请求体 output_language）、POST /api/ai/conversations/{contact_id}/reply-draft（channel 为 whatsapp 或 email、instruction 可选、output_language）、POST /api/ai/translate（contact_id、text、target_language），字段与长度校验写在请求模型里，不合法返回 422；在 main.py 注册 router
+      - 三个接口都要求登录，先用 may_access_contact 判断，不通过、或联系人不存在或已删除，一律返回同一个 403 NOT_ASSIGNED
+      - output_language 缺省时取当前用户的界面语言（zh 映射为 zh-CN，en 为 en）
+      - 成功返回 200 与设计 4.3 列出的字段（含 request_id 与简报的 truncated）；AI_NOT_CONFIGURED 返回 503 AI_NOT_CONFIGURED，暂时不可用返回 503 AI_UNAVAILABLE，AI 出错返回 502 AI_ERROR，NO_MESSAGES 返回 400；错误照现有 fail 外壳
+      - 新增 GET /api/ai/status，要求登录，返回 enabled（AI 四项配置是否齐全），不返回任何配置值
+      - 新增测试：打桩业务函数，逐条覆盖上面的校验、权限、默认语言、结果映射与 status 接口；每条测试写明守住的是哪一条验收标准；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
+      - tasks/todo.md 新增 CRM-TASK-024 记录段（做了什么、偏离了什么、验证到什么程度）；不改 planning-v1 块；复选框只允许 [ ] / [x]
+      - 改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置、nginx；不装依赖；不加表、不加迁移、不改前端；allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#34），不合并、不直推
+    allowed_change_paths:
+      - backend/app/routers/ai.py
+      - backend/app/schemas/ai.py
+      - backend/app/main.py
+      - backend/tests/test_ai_api.py
+      - tasks/todo.md
+    allowed_commands:
+      - lint.check
+      - format.check
+    creates_branch: true
+    creates_pull_request: true
+
+  - id: CRM-TASK-025
+    title: 收件箱会话顶部加AI会话简报卡片
+    purpose: >-
+      按 docs/inbox-ai-assist.md 第 4.5 节第一条，在 CRM-TASK-016 之后的会话视图顶部加会话简报按钮与卡片。
+      AI 未配置时整体不显示。只改前端：不改后端、不加页面或路由、不做起草与翻译（CRM-TASK-026）。
+    status: ready
+    depends_on:
+      - CRM-TASK-024
+      - CRM-TASK-016
+    acceptance_criteria:
+      - 进入收件箱时读一次 AI 状态接口，enabled 为假或读取失败时不显示任何 AI 按钮
+      - 会话头部加会话简报按钮，请求进行中置灰防止连点；AI 请求单独设 80 秒超时；会话没有消息时按钮置灰
+      - 结果显示为可以收起的卡片：顾客需求、会话进展、情绪、未回答的问题、建议下一步，truncated 为真时注明只看了最近一部分；卡片带 AI 生成未核实的标识；切换到别的会话时丢弃还没回来的结果，不把简报贴到错的会话上；刷新页面后不保留
+      - 失败时按错误码提示（AI 暂时不可用、AI 出错、无权），不影响收件箱其他功能
+      - 新文案同时加在 en 与 zh 的 inbox 命名空间，不写硬编码文字；类型定义与接口字段一致；前端类型检查与构建由 PR 的必需 CI 检查 frontend 执行并通过（Worker 沙箱不跑 npm）
+      - tasks/todo.md 新增 CRM-TASK-025 记录段（做了什么、偏离了什么、验证到什么程度）；不改 planning-v1 块；复选框只允许 [ ] / [x]
+      - 改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不改后端
+      - allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#34），不合并、不直推
+    allowed_change_paths:
+      - frontend/src/pages/Inbox/ConversationView.tsx
+      - frontend/src/services/ai.ts
+      - frontend/src/types/index.ts
+      - frontend/src/locales/en/inbox.json
+      - frontend/src/locales/zh/inbox.json
+      - tasks/todo.md
+    allowed_commands:
+      - lint.check
+      - format.check
+    creates_branch: true
+    creates_pull_request: true
+
+  - id: CRM-TASK-026
+    title: 回复框加AI起草与翻译，消息气泡加翻译
+    purpose: >-
+      按 docs/inbox-ai-assist.md 第 4.5 节与第八节第 1、2 条，在 CRM-TASK-016 的回复框之上加 AI 起草与翻译成某语言，在每条消息气泡上加翻译。
+      草稿与译文只填进回复框或显示在原文下方，发不发由员工决定，发送、超时、重试全按 CRM-TASK-016 的规则。AI 未配置时整体不显示。
+      只改前端：不改后端、不加页面或路由。
+    status: ready
+    depends_on:
+      - CRM-TASK-025
+    acceptance_criteria:
+      - 回复框改成多行文本框，沿用 CRM-TASK-016 的 4096 字符上限与禁用规则；起草按钮旁可写一句不超过 200 字的要求，可选输出语言（zh-CN、en、ms，默认界面语言）；邮件会话的草稿同时填主题
+      - 翻译成某语言把回复框里的文字翻译后填回；草稿或译文要覆盖回复框里已有的内容时先确认
+      - 回复框因窗口关闭、没有号码而禁用时，起草与翻译回复一起置灰；会话没有消息时起草置灰
+      - 每条消息气泡加翻译，译文显示在原文下方并带 AI 生成未核实的标识，只保存在当前页面；起草的 note_for_agent 显示在回复框旁并带同样标识
+      - 请求进行中按钮置灰防止连点；AI 请求单独设 80 秒超时；失败时按错误码提示，手动回复不受影响；AI 状态接口 enabled 为假时不显示任何 AI 按钮
+      - 新文案同时加在 en 与 zh 的 inbox 命名空间，不写硬编码文字；类型定义与接口字段一致；前端类型检查与构建由 PR 的必需 CI 检查 frontend 执行并通过（Worker 沙箱不跑 npm）
+      - tasks/todo.md 新增 CRM-TASK-026 记录段（做了什么、偏离了什么、验证到什么程度）；不改 planning-v1 块；复选框只允许 [ ] / [x]
+      - 改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不改后端；allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#34），不合并、不直推
+    allowed_change_paths:
+      - frontend/src/pages/Inbox/ReplyBox.tsx
+      - frontend/src/pages/Inbox/ConversationView.tsx
+      - frontend/src/services/ai.ts
+      - frontend/src/types/index.ts
+      - frontend/src/locales/en/inbox.json
+      - frontend/src/locales/zh/inbox.json
       - tasks/todo.md
     allowed_commands:
       - lint.check

@@ -22,11 +22,16 @@
 6. `CRM-TASK-014` 未确认送出的重试、agent_reply 事件规则与交还 AI 的调用
 7. `CRM-TASK-015` 回复与交还接口改经 chatbot，事件接口接受 agent_reply，返回发送人与回复窗口
 8. `CRM-TASK-016` 收件箱回复改经 chatbot，显示发送人、未确认与重试、窗口关闭和交还 AI
+9. `CRM-TASK-021` 收件箱AI辅助的审计表迁移与模型
+10. `CRM-TASK-022` 收件箱AI辅助的调用客户端、会话快照组装与审计写入
+11. `CRM-TASK-023` 收件箱三个AI功能的提示词、输出结构与输出校验
+12. `CRM-TASK-024` 收件箱AI辅助的三个接口与是否已配置的查询
+13. `CRM-TASK-025` 收件箱会话顶部加AI会话简报卡片
+14. `CRM-TASK-026` 回复框加AI起草与翻译，消息气泡加翻译
 
 ### 已阻塞
 
 - 待登记：CRM AI 客户摘要接入 Billing Hub 的 AI 模块｜阻塞：等 acuven_ai_api 并入 ai_billing_hub 的 AI 模块上线与第 3 阶段验收
-- 待登记：收件箱 AI 会话简报、起草回复与翻译（任务八）｜阻塞：等 AI 模块上线、为 CRM 项目建好客户端密钥
 - 待登记：跟进记录 AI 整理成结构化记录并生成任务草稿（任务八）｜阻塞：待设计，等 AI 模块上线
 - `CRM-TASK-017` 删掉 CRM 自己的 Meta webhook、网关入口与直连发送及其配置｜阻塞：等第 2 阶段真机验收通过（chatbot 侧 C3、C4 上线并配好第二把密钥）
 
@@ -1699,4 +1704,5 @@ PRECHECK_RESULT: READY
       （规格 §141 与设计 #281：AI 模块只有 `POST /v1/messages` 加 `feature` 标签，提示词与输出结构归调用方）。那边起草契约的会话没写任何东西就停了
 - [x] 设计第二版（AI 分工改了，并补与第 2 阶段 CRM-TASK-012 至 020 的衔接，第八节）获 Kelvin 批准（2026-10-13，PR kelvinpang90/acuven_crm_demo#34，第十节 Q7 至 Q10 均按建议：共用一个 `AI_MODEL`、评测样例用 demo 数据、客户摘要另写设计、归档 ai_billing_hub 起草契约的会话）
 - [ ] AI 模块上线后，由管理员在 Billing Hub 为 CRM 项目建 AI 客户端密钥
-- [ ] 按设计第七节拆分并登记（6 个任务；前端两个依赖 CRM-TASK-016）
+- [x] 按设计第七节拆分并登记 CRM-TASK-021 至 026（Kelvin 2026-10-13 定不等 AI 模块上线、按 A 排在 016 之后，见下「登记 CRM-TASK-021 至 026」）
+- [ ] AI 模块上线后：建客户端密钥、配四项环境变量、按设计第五节用 demo 会话做质量评测，Kelvin 打分认可
