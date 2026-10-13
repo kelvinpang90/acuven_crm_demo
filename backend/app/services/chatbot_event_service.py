@@ -283,6 +283,39 @@ async def update_handover(
     return STORED
 
 
+async def write_response_handover(
+    db: AsyncSession,
+    *,
+    contact_id: str,
+    active: bool,
+    expires_at: Optional[datetime],
+    occurred_at: datetime,
+) -> str:
+    """Write a send/handback response's handover state only if it is newer.
+
+    Event delivery deliberately permits an equal timestamp (arrival order is
+    authoritative there). A synchronous response does not share that ordering,
+    so it must lose equal-timestamp races to the event writer.
+    """
+    occurred_at = to_naive_utc(occurred_at)
+    result = await db.execute(
+        update(Contact)
+        .where(
+            Contact.id == contact_id,
+            (Contact.wa_handover_updated_at.is_(None))
+            | (Contact.wa_handover_updated_at < occurred_at),
+        )
+        .values(
+            wa_handover_active=active,
+            wa_handover_expires_at=to_naive_utc(expires_at) if active else None,
+            wa_handover_updated_at=occurred_at,
+        )
+        .execution_options(synchronize_session=False)
+    )
+    await db.flush()
+    return STORED if result.rowcount else IGNORED
+
+
 def _status_may_replace(current: Optional[str], new: str) -> bool:
     if new != "failed" and (new is None or new not in _DELIVERY_RANK):
         raise ValueError(f"unknown delivery status: {new!r}")
