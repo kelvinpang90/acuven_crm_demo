@@ -1703,6 +1703,208 @@ PRECHECK_RESULT: READY
 - [x] ~~在 `ai_billing_hub` 提出三个能力的契约~~：不再需要。Kelvin 2026-10-13 定「每一个 AI 功能都在本系统修改，ai_billing_hub 只负责计费和调用 AI」
       （规格 §141 与设计 #281：AI 模块只有 `POST /v1/messages` 加 `feature` 标签，提示词与输出结构归调用方）。那边起草契约的会话没写任何东西就停了
 - [x] 设计第二版（AI 分工改了，并补与第 2 阶段 CRM-TASK-012 至 020 的衔接，第八节）获 Kelvin 批准（2026-10-13，PR kelvinpang90/acuven_crm_demo#34，第十节 Q7 至 Q10 均按建议：共用一个 `AI_MODEL`、评测样例用 demo 数据、客户摘要另写设计、归档 ai_billing_hub 起草契约的会话）
-- [ ] AI 模块上线后，由管理员在 Billing Hub 为 CRM 项目建 AI 客户端密钥
 - [x] 按设计第七节拆分并登记 CRM-TASK-021 至 026（Kelvin 2026-10-13 定不等 AI 模块上线、按 A 排在 016 之后，见下「登记 CRM-TASK-021 至 026」）
 - [ ] AI 模块上线后：建客户端密钥、配四项环境变量、按设计第五节用 demo 会话做质量评测，Kelvin 打分认可
+
+## 登记 CRM-TASK-021 至 026（2026-10-13）
+
+Kelvin 2026-10-13 批准收件箱 AI 辅助设计第二版（kelvinpang90/acuven_crm_demo#34），并定不等 AI 模块上线、先登记实现，按 A 排在第 2 阶段 CRM-TASK-016 之后（原话「按 A，登记」）。本段是登记 PR 的记录。
+
+### 做了什么
+
+- `.platform/tasks.yaml`：登记 021–026，全部 `ready`。依赖：021 依赖 012（迁移 015 接 012 的 014）；022 依赖 021、013（快照要用第 2 阶段客服回复的送达语义）；023 依赖 022；024 依赖 023；
+  025 依赖 024、016（与 016 改同一批前端文件）；026 依赖 025。
+- **CRM-TASK-020 顺延**：它的删列迁移原为 015，现在 015 给了 `ai_requests` 建表，改为 016、接 015，并加依赖 021（设计第八节第 4 条）；`docs/chatbot-replies.md` 第九、十、十一（例 12）、十四节的迁移号同步改了。
+- planning-v1：「当前计划」在 016 之后接 021–026；「已阻塞」里「待登记：收件箱 AI 会话简报、起草回复与翻译」一行删掉。
+- `docs/inbox-ai-assist.md`：第七节写明先登记实现、AI 模块上线后只做建密钥、配环境变量与质量评测，并加只读的 `GET /api/ai/status`（前端未配置时隐藏按钮要用）；
+  加第十一节「登记预审后的补充」（17 条），正文相应处同步改了。第十一节待 Kelvin 在本 PR 上批准。
+
+### 设计闸门与预审
+
+- 设计闸门：六个都适用，都引用 #34（021 新增审计表与迁移；022、023 把会话内容组装后发给模型；024 是收发这些内容的接口；025、026 展示 AI 输出）。020 仍引用 #28。
+- 预审：021–026 都跑了（设计文件 `docs/inbox-ai-assist.md`），020 因迁移号改了也复跑（设计文件 `docs/chatbot-replies.md`）。每轮只复跑改过或未通过的任务。
+  最终 020、021、023、024、025、026 READY，022 第 4 轮只剩上一行两条文字层面的发现、已改；024、025、026 第 2 轮 READY 时报的 UNDECIDED 与 023 第 3 轮的 UNDECIDED 已写进验收标准与第十一节，之后没有再对它们跑预审。
+
+逐条处理（全部成立，已改；编号指设计第十一节）：
+
+| 轮次 / 任务 | 发现 | 处理 |
+|---|---|---|
+| 1 / 022 | **设计缺陷**：`author_kind` 为空的旧出站邮件按推断成了 `agent`，会全被标 `unconfirmed` | 第 4 条：只给 WhatsApp 出站带 `delivery`，且只看存的 `author_kind` |
+| 1 / 022 | **设计缺陷**：发送途中（不足 45 秒）的客服回复没有对应取值 | 第 4 条：`sending` |
+| 1 / 022 | **范围缺口**：`DEPLOY.md` 不在路径里 | 第 12 条，022 加这个路径 |
+| 1 / 022 | 16 KiB 怎么算、`truncated` 何时为真、消息顺序；`request_id` 与模型文本在哪、哪个 `stop_reason` 算拒答 | 第 3、5 条 |
+| 1 / 023 | **设计缺陷**：翻译没有快照，却也要求「只用快照里的事实」 | 第 6 条 |
+| 1 / 023 | 校验不过由谁改判、起草 schema 按渠道、`as_of`、简报怎么说明截断、参数不合法的结果、超 64 KiB 写不写审计 | 第 7、8、9、3 条 |
+| 1 / 024 | **设计缺陷**：管理员对不存在的联系人会调 AI 并写审计 | 第 10 条 |
+| 1 / 024 | **设计缺陷**：后端 75 秒、前端 80 秒超过 nginx 的 60 秒 | 第 1 条：50 秒与 58 秒 |
+| 1 / 024 | WhatsApp 起草的 `subject`；空文本与空要求 | 第 7 条；024 验收写最小长度 |
+| 1 / 025 | 状态读几次、未列出的错误怎么提示 | 第 11 条 |
+| 1 / 026 | **设计缺陷**：回复框 4096 字、翻译接口 4000 字，中间的必然 422 | 第 2 条：翻译 2000 字，超出置灰 |
+| 1 / 026 | **设计缺陷**：消息气泡翻译超长正文 | 第 2 条 |
+| 1 / 026 | **设计缺陷**：4000 字输入配 3000 `max_tokens` 必然被截断 | 第 2 条：`max_tokens` 4000 |
+| 1 / 026 | 译文超 4096、邮件主题、默认语言、`note_for_agent` 何时清 | 第 2、11 条 |
+| 2 / 022、023 | **设计缺陷**：只截邮件正文，长 WhatsApp 消息可能把最新一条也挤掉 | 第 13 条：所有正文截 2000 字、标签设上限、至少保留最新一条 |
+| 2 / 022 | 邮件主题、同一时间的排序、哪些商机、接管块怎么输出 | 第 13 条 |
+| 2 / 023 | 改判时审计留不留 `request_id`、`instruction` 缺省、检查顺序与审计、输出去空白与翻译上限 | 第 14 条 |
+| 2 / 024 | 业务函数的返回形状、`INVALID_INPUT` 的映射 | 第 14 条 |
+| 2 / 025、026 | 输出语言怎么由界面语言映射、未列出错误的提示、切换会话后迟到的结果、`note_for_agent` 在 202 与失败时、空正文与按什么计长度 | 第 15 条 |
+| 3 / 022 | **设计缺陷**：中文每字 3 字节，上限合计约 19.6 KB 仍超 16 KiB | 第 16 条：收紧上限，最坏约 12.6 KB；字节按紧凑 JSON 算 |
+| 3 / 023 | 哪些字段必填、返回去空白后的文本、`channel` 不合法、结果类别的名字 | 第 17 条 |
+| 4 / 022 | 商机同一更新时间的次序；第十一节第 3、13 条还写着旧上限，与第 16 条不一致 | 加按 id 排；第 3、13 条改为指向第 16 条。第 4 轮之后的这两处修正没有再跑预审 |
+
+### 验证到什么程度
+
+- 契约自检：控制面 `python -m worker.contract_check --repo <本分支干净克隆> --project-id crm_os --task-id-pattern '^CRM-TASK-[0-9]{3}$' --planning tasks/todo.md`，
+  `result: ready to register`，退出码 0；planning-v1 `ok, next: CRM-TASK-008`。WARN 只有原有的三条，与本次无关。
+- 预审：上面所述。它调模型、不是确定性的，READY 不保证没有缺陷。
+- 没验：AI 模块还没上线，接口格式以 ai_billing_hub 设计 #281 v5 为准，实现时若有变动只改 `ai_api_client.py`；合并后 Worker 主机的就绪上报与 Telegram 推荐行。
+
+### 预审完整输出
+
+```text
+第 1 轮 CRM-TASK-020:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 24.9 万 token（其中缓存读取 20.7 万），折合 API 价约 $0.42；周额度读数 31%。
+退出码 0
+
+第 1 轮 CRM-TASK-021:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 19.9 万 token（其中缓存读取 16.8 万），折合 API 价约 $0.32；周额度读数 31%。
+退出码 0
+
+第 1 轮 CRM-TASK-022:
+PRECHECK_FINDING: DESIGN_DEFECT 4.4 :: Old outbound emails have empty author_kind, external_id and delivery_status; inferred as agent, the literal unconfirmed rule labels every one unconfirmed. The rule must check stored author_kind agent on whatsapp only.
+PRECHECK_FINDING: DESIGN_DEFECT 4.4 :: An agent reply with empty external_id less than 45 s old is still sending under CRM-TASK-014/016, yet the snapshot can only call it unconfirmed; there is no value for in-flight replies.
+PRECHECK_FINDING: SCOPE_GAP DEPLOY.md :: Design 8.6 says this design's tasks add the four AI settings to the config class and DEPLOY.md, but no task 021-026, including this one that adds the settings, lists DEPLOY.md.
+PRECHECK_FINDING: UNDECIDED 4.4 :: Undecided whether the 16 KiB cap covers messages only or the whole snapshot (unbounded notes can exceed it alone), and whether it counts UTF-8 bytes with or without ensure_ascii.
+PRECHECK_FINDING: UNDECIDED 4.4 :: Undecided whether truncated is set by the 40-message cap, the 16 KiB cut, a 2000-character email body cut, or all three, and whether messages are output newest-first or oldest-first.
+PRECHECK_FINDING: UNDECIDED 4.1 :: The design does not say where request_id comes from (response body or header), where the model text sits, or which stop_reason means refusal, so stubbed tests would encode guesses.
+session verdict: NOT_READY
+PRECHECK_RESULT: NOT_READY
+用量：Claude 会话 1 次，共 35 万 token（其中缓存读取 30.6 万），折合 API 价约 $0.49；周额度读数 31%。
+退出码 1
+
+第 1 轮 CRM-TASK-023:
+PRECHECK_FINDING: DESIGN_DEFECT 5 :: The shared prompt rule (only use snapshot facts; snapshot and staff request are untrusted) is also required for crm.translate, which has no snapshot or request, so read literally the translate prompt forbids all facts.
+PRECHECK_FINDING: UNDECIDED 4.1 :: Success in 4.1 needs the section-five checks, but the CRM-TASK-022 client already returns ok after JSON parsing; the design never says the service must turn that into error before writing the audit outcome and logging.
+PRECHECK_FINDING: UNDECIDED 5 :: For reply_draft: one schema or one per channel, is subject required for email, and is a WhatsApp output with subject an AI error or dropped § all undecided, which changes the schema sent and the error tests.
+PRECHECK_FINDING: UNDECIDED 5 :: as_of is listed as an input to the brief and draft but its value, format and place in the request are never defined, and the CRM-TASK-022 snapshot does not include it.
+PRECHECK_FINDING: UNDECIDED 3 :: Q3 says the brief must mention that only recent history was seen when truncated, but no output field covers this and the prompt wording is not specified.
+PRECHECK_FINDING: UNDECIDED 4.3 :: No result code is defined for bad business-function input (unsupported language, instruction over 200, text over 4000 or empty), and character counting (code points or otherwise) is not defined.
+PRECHECK_FINDING: UNDECIDED 4.2 :: When the client refuses a request over 64 KiB without sending it, the design does not say whether that counts as a call that needs an audit row.
+session verdict: NOT_READY
+PRECHECK_RESULT: NOT_READY
+用量：Claude 会话 1 次，共 10.2 万 token（其中缓存读取 7.6 万），折合 API 价约 $0.28；周额度读数 31%。
+退出码 1
+
+第 1 轮 CRM-TASK-024:
+PRECHECK_FINDING: DESIGN_DEFECT 4.3 :: Read literally, may_access_contact lets an admin through for a missing or deleted contact, so translate calls the AI and audits a nonexistent contact_id and brief returns 400 not 403; the router needs its own existence check.
+PRECHECK_FINDING: DESIGN_DEFECT 4.1 :: The 75s backend AI timeout and 80s frontend timeout exceed the nginx /api/ proxy_read_timeout of 60s, so slow calls get a proxy 504 outside the fail format while tokens are charged and audited as ok; nginx is out of scope here.
+PRECHECK_FINDING: UNDECIDED 4.3 :: For WhatsApp reply drafts, the design does not say whether subject is omitted from the response or returned as null, and frontend tasks 025/026 will type against that choice.
+PRECHECK_FINDING: UNDECIDED 4.3 :: No minimum length is set for translate text or reply-draft instruction, so whether empty or whitespace-only values get a 422 is left to the implementer.
+session verdict: READY
+judged from the findings, not the session's verdict: NOT_READY
+PRECHECK_RESULT: NOT_READY
+用量：Claude 会话 1 次，共 20.6 万 token（其中缓存读取 16.7 万），折合 API 价约 $0.40；周额度读数 31%。
+退出码 1
+
+第 1 轮 CRM-TASK-025:
+PRECHECK_FINDING: UNDECIDED frontend/src/pages/Inbox/ConversationView.tsx :: The criterion says read AI status once on entering the inbox, but the inbox page (index.tsx) is not an allowed path; choose a ConversationView-mount read or a module-level cache in services/ai.ts.
+PRECHECK_FINDING: UNDECIDED 4.3 :: The task maps only AI_UNAVAILABLE, AI_ERROR and NOT_ASSIGNED; the message for 503 AI_NOT_CONFIGURED, 400 NO_MESSAGES, and the client-side 80 s timeout or network failure is not specified.
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 10.1 万 token（其中缓存读取 7.8 万），折合 API 价约 $0.23；周额度读数 31%。
+退出码 0
+
+第 1 轮 CRM-TASK-026:
+PRECHECK_FINDING: DESIGN_DEFECT 4.3 :: The reply box keeps 016's 4096-character cap but /api/ai/translate accepts at most 4000, so 4001§4096-character replies always fail with an uncoded 422; no rule says whether to disable the button or what to show.
+PRECHECK_FINDING: DESIGN_DEFECT 4.5 :: Bubble translation applies to every message, but email bodies over 4000 characters exceed the translate limit; truncation, disabling or a specific message is not specified.
+PRECHECK_FINDING: DESIGN_DEFECT 五 :: Translate allows 4000 input characters but max_tokens 3000; a 4000-character Chinese text translated to English or Malay needs more output tokens, gets truncated and is always AI_ERROR.
+PRECHECK_FINDING: UNDECIDED 八 :: A WhatsApp reply translated into a longer language can exceed the 4096-character send cap after being filled back; truncate, refuse to fill, or warn is not decided.
+PRECHECK_FINDING: UNDECIDED 4.5 :: For email conversations it is open whether translating the reply also translates the subject, and whether a draft overwriting an existing subject needs confirmation.
+PRECHECK_FINDING: UNDECIDED 4.5 :: No default target language is given for translating the reply box or message bubbles, and when note_for_agent is cleared (send, new draft, conversation switch) is unspecified.
+session verdict: NOT_READY
+PRECHECK_RESULT: NOT_READY
+用量：Claude 会话 1 次，共 13.8 万 token（其中缓存读取 10.6 万），折合 API 价约 $0.32；周额度读数 31%。
+退出码 1
+
+第 2 轮 CRM-TASK-022:
+PRECHECK_FINDING: DESIGN_DEFECT §11.3 :: Only email bodies are truncated and tags are unbounded, so one long WhatsApp body plus full notes and deals forces dropping every message, including the newest, and the snapshot can stay over 16 KiB with nothing left to drop; no end state is defined.
+PRECHECK_FINDING: UNDECIDED §4.4 :: The snapshot message shape omits the email subject; whether to include it, and whether it is truncated, is not decided.
+PRECHECK_FINDING: UNDECIDED §11.3 :: Ordering is unspecified: no tie-break for messages with the same created_at second (ids are random UUIDs), and no rule on whether recent open deals sort by created_at or updated_at or exclude soft-deleted deals.
+PRECHECK_FINDING: UNDECIDED §4.4 :: The handover block is unspecified when handover is inactive or expires_at is null or past: whether to emit it, and whether active means the stored flag or the effective state.
+session verdict: NOT_READY
+PRECHECK_RESULT: NOT_READY
+用量：Claude 会话 1 次，共 14.8 万 token（其中缓存读取 11.8 万），折合 API 价约 $0.33；周额度读数 32%。
+退出码 1
+
+第 2 轮 CRM-TASK-023:
+PRECHECK_FINDING: DESIGN_DEFECT 11.3 :: WhatsApp bodies are not truncated, so one long newest message plus notes and deals can push the snapshot over 16 KiB and dropping from the oldest empties messages; NO_MESSAGES vs calling the AI with no messages is undefined.
+PRECHECK_FINDING: UNDECIDED 4.2 :: When a 200 response fails CRM's output checks and is re-judged as error, it's unspecified whether the audit row keeps the billed request_id; 4.2 says empty on failure, which breaks Billing Hub reconciliation.
+PRECHECK_FINDING: UNDECIDED 4.3 :: instruction is optional but empty-after-strip is INVALID_INPUT; unclear whether None and "" differ, whether stripped text is sent, and whether absent instruction is null or omitted in the data block.
+PRECHECK_FINDING: UNDECIDED 11.9 :: Order of INVALID_INPUT, AI_NOT_CONFIGURED and NO_MESSAGES checks is unspecified, as is whether INVALID_INPUT and NO_MESSAGES write an audit row.
+PRECHECK_FINDING: UNDECIDED 5 :: Whether whitespace-only output counts as empty for translation and the minimum-1 fields (customer_need, draft, subject) is not stated, and translation has no upper length bound.
+session verdict: NOT_READY
+PRECHECK_RESULT: NOT_READY
+用量：Claude 会话 1 次，共 10.8 万 token（其中缓存读取 8.2 万），折合 API 价约 $0.29；周额度读数 32%。
+退出码 1
+
+第 2 轮 CRM-TASK-024:
+PRECHECK_FINDING: UNDECIDED 4.3 :: CRM-TASK-023 never fixes its functions' return shape, so the brief's truncated and request_id may not be exposed; meeting this task would then require editing ai_assist_service.py, outside allowed_change_paths.
+PRECHECK_FINDING: UNDECIDED 4.3 :: No HTTP status or code is specified for an INVALID_INPUT result from the business functions (e.g. 400 INVALID_INPUT), even though request-model validation should normally make it unreachable.
+session verdict: NOT_READY
+judged from the findings, not the session's verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 15 万 token（其中缓存读取 11.6 万），折合 API 价约 $0.35；周额度读数 32%。
+退出码 0
+
+第 2 轮 CRM-TASK-025:
+PRECHECK_FINDING: UNDECIDED 4.3 :: Brief output_language must be zh-CN/en/ms, but i18n.language can be zh, en-US, zh-TW or other navigator values; the mapping (and fallback) is unspecified and a raw value gets INVALID_INPUT.
+PRECHECK_FINDING: UNDECIDED 11.11 :: The error-to-message mapping omits INVALID_INPUT and any unlisted status or code; the implementer must choose the fallback message.
+session verdict: NOT_READY
+judged from the findings, not the session's verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 10.6 万 token（其中缓存读取 8.4 万），折合 API 价约 $0.23；周额度读数 32%。
+退出码 0
+
+第 2 轮 CRM-TASK-026:
+PRECHECK_FINDING: UNDECIDED 4.5 :: ReplyBox isn't remounted when switching conversations (no key at pages/Inbox/index.tsx:140); the design says to discard late results only for the brief, so a late draft or translation could fill the wrong customer's reply box.
+PRECHECK_FINDING: UNDECIDED 11.11 :: It isn't decided whether note_for_agent is cleared on 016's 202 unconfirmed result (input cleared) or on a timeout or network error (input kept); only "send succeeded" is named.
+PRECHECK_FINDING: UNDECIDED 4.3 :: "Interface language" could mean i18n.language (may be en-US, zh-TW or other; only zh maps to zh-CN) or the stored user language the backend uses; they can differ because the sidebar toggle doesn't save it.
+PRECHECK_FINDING: UNDECIDED 11.2 :: Bubble translate only greys out above 2000 characters; whitespace-only bodies get a backend 422 with no message in the 025 list, and trimmed vs raw and code points vs UTF-16 counting are unspecified.
+session verdict: NOT_READY
+judged from the findings, not the session's verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 27.2 万 token（其中缓存读取 22.2 万），折合 API 价约 $0.51；周额度读数 33%。
+退出码 0
+
+第 3 轮 CRM-TASK-022:
+PRECHECK_FINDING: DESIGN_DEFECT 11.13 :: With CJK text (3 bytes per char) the capped contact, 10 deal titles (200 chars, uncapped), tags, notes and the newest message total about 19.6 KB, so keeping the newest message can still exceed 16 KiB, contradicting the stated guarantee.
+PRECHECK_FINDING: UNDECIDED 11.3 :: The design fixes UTF-8 without escaping but not the JSON separators (compact or default with spaces) used to measure the 16 KiB snapshot and 64 KiB request limits, which changes how many messages are dropped.
+session verdict: NOT_READY
+PRECHECK_RESULT: NOT_READY
+用量：Claude 会话 1 次，共 19.2 万 token（其中缓存读取 14.7 万），折合 API 价约 $0.45；周额度读数 33%。
+退出码 1
+
+第 3 轮 CRM-TASK-023:
+PRECHECK_FINDING: UNDECIDED 5 :: The design never lists which schema fields are required; it is unclear whether fields that may be empty (suggested_next_step, note_for_agent, open_questions) are required, or whether an empty-after-trim open question is allowed.
+PRECHECK_FINDING: UNDECIDED 11 :: It does not say whether returned outputs are the trimmed or original text, whether translate sends the trimmed text, or whether a draft channel other than whatsapp/email returns INVALID_INPUT.
+PRECHECK_FINDING: UNDECIDED 11 :: How the unified result object labels INVALID_INPUT, AI_NOT_CONFIGURED and NO_MESSAGES next to ok/unavailable/error is not fixed, although CRM-TASK-024 depends on it.
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 19.6 万 token（其中缓存读取 16.7 万），折合 API 价约 $0.32；周额度读数 33%。
+退出码 0
+
+第 4 轮 CRM-TASK-022:
+PRECHECK_FINDING: UNDECIDED 11.13 :: Open deals are picked as the 5 most recently updated with no tie-break (messages get one by id), so deals updated in the same second make the 5-deal cut nondeterministic and hard to test.
+PRECHECK_FINDING: DESIGN_DEFECT 11.3 :: §11.3 still says notes 1000 chars and 10 deals, and §11.13 says 20 tags/10 deals; §11.16 overrides both, and the task uses the final values, so it only misleads someone reading the design text.
+session verdict: READY
+judged from the findings, not the session's verdict: NOT_READY
+PRECHECK_RESULT: NOT_READY
+用量：Claude 会话 1 次，共 26.1 万 token（其中缓存读取 22.3 万），折合 API 价约 $0.42；周额度读数 33%。
+退出码 1
+```
