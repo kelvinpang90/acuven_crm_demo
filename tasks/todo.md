@@ -17,16 +17,24 @@
 1. `CRM-TASK-008` 会话事件接收接口与验签，消息和联系人接口返回新字段
 2. `CRM-TASK-009` 存量联系人号码按统一规则规范化的数据迁移
 3. `CRM-TASK-010` 收件箱显示消息来源、送达与接管状态，管理员看得到号码冲突
+4. `CRM-TASK-012` 第2阶段的表结构迁移，消息记实际发送人
+5. `CRM-TASK-013` 经 chatbot 发出客服回复的发送服务，含窗口校验与结果不明的处理
+6. `CRM-TASK-014` 未确认送出的重试、agent_reply 事件规则与交还 AI 的调用
+7. `CRM-TASK-015` 回复与交还接口改经 chatbot，事件接口接受 agent_reply，返回发送人与回复窗口
+8. `CRM-TASK-016` 收件箱回复改经 chatbot，显示发送人、未确认与重试、窗口关闭和交还 AI
 
 ### 已阻塞
 
 - 待登记：CRM AI 客户摘要接入 Billing Hub 的 AI 模块｜阻塞：等 acuven_ai_api 并入 ai_billing_hub 的 AI 模块上线与第 3 阶段验收
 - 待登记：收件箱 AI 会话简报、起草回复与翻译（任务八）｜阻塞：等 AI 模块上线对应的三个能力
 - 待登记：跟进记录 AI 整理成结构化记录并生成任务草稿（任务八）｜阻塞：待设计，等 AI 模块上线
+- `CRM-TASK-017` 删掉 CRM 自己的 Meta webhook、网关入口与直连发送及其配置｜阻塞：等第 2 阶段真机验收通过（chatbot 侧 C3、C4 上线并配好第二把密钥）
 
 ### 后续计划
 
-- 待登记：demo 号第 2 阶段，CRM 回复经 ai_chatbot_demo 发出、交还 AI、作废 CRM 自己的沙盒号凭据（任务七，待设计）
+- `CRM-TASK-018` 去掉 is_gateway 的全部用处，原有网关联系人回到列表与统计
+- `CRM-TASK-019` 联系人模型取消 is_gateway 映射，列先留在库里
+- `CRM-TASK-020` 删除联系人表的 is_gateway 列
 <!-- openclaw:planning-v1:end -->
 
 ---
@@ -1026,7 +1034,7 @@ Q3：**选 1**（`E,F,W,I`，忽略 E501、E712）。
 待决问题 Q1–Q7 Kelvin 2026-10-13 全部按建议定（设计第十二节）。
 
 - [x] 设计 PR 获 Kelvin 批准（kelvinpang90/acuven_crm_demo#28，原话「Q1–Q7 都按建议，批准，开 PR 登记 012 到 019」）
-- [ ] 登记第 2 阶段任务（设计第十节，暂编 012–019），附设计预审输出
+- [x] 登记第 2 阶段任务 CRM-TASK-012 至 020（设计第十节；原 019 按预审拆成 019、020），附设计预审输出（见下「登记 CRM-TASK-012 至 020」）
 - [ ] `ai_chatbot_demo`：C3 发送接口、C4 交还接口与接管时长 24 小时
 
 ## 登记 CRM-TASK-006 至 011（2026-10-12）
@@ -1209,6 +1217,251 @@ PRECHECK_RESULT: READY
 session verdict: READY
 PRECHECK_RESULT: READY
 用量：Claude 会话 1 次，共 38.3 万 token（其中缓存读取 31.5 万），折合 API 价约 $0.68；周额度读数 14%。
+退出码 0
+```
+
+## 登记 CRM-TASK-012 至 020（2026-10-13）
+
+Kelvin 2026-10-13 批准第 2 阶段设计（kelvinpang90/acuven_crm_demo#28），原话「Q1–Q7 都按建议，批准，开 PR 登记 012 到 019」。本段是登记 PR 的记录。
+
+### 做了什么
+
+- `.platform/tasks.yaml`：登记 012–020，全部 `ready`，依赖照设计第十节（012 依赖 009，因为迁移 014 接在 009 的迁移 013 之后；013 依赖 012、011、008；
+  014 依赖 013；015 依赖 014；016 依赖 015、010；017 依赖 015；018 依赖 017；019 依赖 018；020 依赖 019）。
+- **比 Kelvin 说的多一个 020**：第 2 轮预审指出原 019 在同一次部署里删模型字段与删列，而 `deploy.sh` 先迁移再换容器、失败回滚到上一版，
+  删列那一刻在跑的 018 与回滚目标都还映射这一列。拆成 019（模型取消映射，列有数据库默认值 false）与 020（迁移删列），见设计第十四节第 12 条。
+- planning-v1：「当前计划」在 010 之后接 012–016；017 放「已阻塞」（等第 2 阶段真机验收，chatbot 侧 C3、C4 上线并配好第二把密钥）；
+  018、019、020 放「后续计划」。原「待登记：demo 号第 2 阶段」一行删掉。
+- `docs/chatbot-replies.md`：文件头改为已批准（#28 已合并）；加第十四节「登记预审后的补充」（22 条），第八至十节随 019/020 的拆分同步改了。
+  第十四节与 020 拆分 Kelvin 2026-10-13 在本 PR（kelvinpang90/acuven_crm_demo#31）上批准，原话「继续」（回复的是请他批准这两处的消息）。
+
+### 设计闸门与预审
+
+- 设计闸门：九个都适用，都引用 #28（012/019/020 改表结构与模型映射；013/014 是发送结果、重试、接管写入与送达回填的状态规则；
+  015 是收发个人数据的接口；016 展示客服回复与接管；017 删掉个人数据的旧入站入口；018 改变哪些联系人出现在列表与统计里）。
+- 预审：按控制面 `docs/ONBOARD-PROJECT.md`「登记任务之前」，九个都跑了（`python -m worker.design_precheck`，对本分支的干净克隆，
+  设计文件 `docs/chatbot-replies.md`）。第 1 轮 012–019 全跑；之后每轮只复跑改过的任务。最终：012、013、014、016、017、018、019、020 READY，
+  015 第 5 轮 READY。第 4 轮报的 014、016 的 UNDECIDED 已写进验收标准与第十四节第 22 条，之后没有再对 014、016 跑预审。
+
+逐条处理（全部成立，已改；编号指设计第十四节）：
+
+| 轮次 / 任务 | 发现 | 处理 |
+|---|---|---|
+| 1 / 013 | 连接、写、连接池超时与 30 秒总时限算哪类；其他 4xx、3xx、不带 rejected 的 502、字段不对的 200 怎么算 | 第 3 条：请求没送出去才算明确没发出，其余一切算结果不明 |
+| 1 / 013 | 没有入站时 `WINDOW_CLOSED` 的关闭时间；恰好 24 小时算不算 | 第 2 条 |
+| 1 / 014 | `CHATBOT_SEND_URL` 是基地址还是完整地址 | 第 1 条：基地址 |
+| 1 / 014 | 重试发给存的收件人还是联系人现在的号码 | 第 6 条：存的收件人 |
+| 1 / 015 | 正文 422 与其他校验的先后 | 第 4 条 |
+| 1 / 016 | **设计缺陷**：前端 15 秒超时短于后端 30 秒，客服重发会换幂等键、访客收到两条 | 第 8 条：发送与重试请求 45 秒超时，收不到响应时提示先看有没有未确认的消息 |
+| 1 / 016 | 窗口关闭时间、Meta 错误放在错误外壳哪里 | 第 5 条：`fields` |
+| 1 / 016 | 已确认的消息重试返回「无权」会误导 | 第 7 条：返回 200 与这条消息 |
+| 1 / 017 | **范围缺口**：`test_contact_phone.py` 用到要删的旧入口 | 第 11 条，017 加这个路径 |
+| 1 / 017 | 删配置后本地环境文件多出的键让启动失败 | 第 9 条：配置忽略多出的键 |
+| 1 / 017 | `DEPLOY.md` 补哪几项，设计与验收不一致 | 第 10 条：四项 |
+| 1 / 019 | **范围缺口**：018 新增的 `test_gateway_contacts_visible.py` 用到 `is_gateway` | 第 11 条，归 019 删 |
+| 1 / 019 | **契约自相矛盾**：「测试里不再出现 `is_gateway`」与迁移 015 的测试冲突 | 第 11 条：不含迁移文件与 `test_migration_015` |
+| 1 / 019 | `test_chatbot_event_service` 里关于 `is_gateway` 的断言要删，与「原有断言不变」冲突 | 019 验收改为删掉只针对 `is_gateway` 的断言 |
+| 2 / 014 | `WINDOW_CLOSED` 与 `RETRY_EXPIRED` 谁先；`visitor.bsuid` 从哪来；原发送人已删时 `agent.name` | 第 13 条 |
+| 2 / 014 | 交还的时限；`ended` 但 `handover` 不合法 | 第 14 条 |
+| 2 / 015 | 202 用哪个外壳；交还失败的错误码 | 第 15 条、第 14 条 |
+| 2 / 016 | 超过 4096 字符；不带 Meta 字段的 `SEND_FAILED` 显示什么 | 第 16 条 |
+| 2 / 019 | **设计缺陷**：删列时运行版本与回滚目标仍映射这一列 | 第 12 条：拆成 019 与 020 |
+| 3 / 014 | 号码无法规范化时交还带什么 | 第 20 条 |
+| 3 / 015 | 管理员对不存在的联系人交还返回什么 | 第 20 条：同一个 403 |
+| 3 / 016 | **设计缺陷**：发送途中就能重试，可能与「明确没发出、删行」赛跑，重发一条已删的消息 | 第 17 条：创建不足 45 秒不能重试（`IN_PROGRESS`） |
+| 3 / 016 | **设计缺陷**：重试成功会清掉回复框里不相干的草稿 | 第 18 条 |
+| 3 / 016 | 交还后仍显示接管中怎么办 | 第 19 条 |
+| 4 / 014 | 重试时联系人已软删除 | 第 22 条：`NOT_FOUND`，不调用 chatbot |
+| 4 / 015 | **范围缺口**：`test_whatsapp_service_send.py` 里经发送接口的用例在改路由后会失败 | 第 21 条，015 加这个路径 |
+| 4 / 015 | 发送与重试返回的消息带不带发送人 | 第 22 条：带 |
+| 4 / 016 | 「发送中」到 45 秒怎么切；交还后的「稍后刷新」怎么刷 | 第 22 条 |
+| 5 / 015 | 管理员给已删除的联系人发送返回什么 | 第 22 条：`NOT_FOUND`，接口同一个 403；第 5 轮之后改的，没有再跑预审 |
+
+### 验证到什么程度
+
+- 契约自检：控制面 `python -m worker.contract_check --repo <本分支干净克隆> --project-id crm_os --task-id-pattern '^CRM-TASK-[0-9]{3}$' --planning tasks/todo.md`，
+  `result: ready to register`，退出码 0；planning-v1 `ok, next: CRM-TASK-011`。WARN 只有原有的三条（Worker 主机固定 python、ruff 的 `check_win32k`），与本次无关。
+- 预审：上面所述。它调模型、不是确定性的，READY 不保证没有缺陷。
+- 没验：Worker 主机上的就绪上报与 Telegram 推荐行（合并后 Worker 空闲刷新时上报）；chatbot 侧 C3、C4 尚未开始。
+
+### 预审完整输出
+
+```text
+第 1 轮 CRM-TASK-012:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 11.8 万 token（其中缓存读取 9.1 万），折合 API 价约 $0.26；周额度读数 20%。
+退出码 0
+
+第 1 轮 CRM-TASK-013:
+PRECHECK_FINDING: UNDECIDED 六.发送.8 :: Design does not classify connect timeout, write timeout, pool timeout, or the overall 30s deadline firing (httpx has no total timeout), so the implementer decides whether the message is deleted or kept.
+PRECHECK_FINDING: UNDECIDED 五./internal/crm/send :: Other 4xx (400/403/404), 3xx, a 502 without result=rejected, and a 200 with unknown result or missing wa_message_id are unclassified; treating them as result-unknown and keeping the message seems the safe default.
+PRECHECK_FINDING: UNDECIDED 六.发送.3 :: WINDOW_CLOSED must carry a close time, but none exists when the contact has no inbound message, and the design does not say whether exactly 24 hours counts as inside the window.
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 13 万 token（其中缓存读取 9.8 万），折合 API 价约 $0.34；周额度读数 20%。
+退出码 0
+
+第 1 轮 CRM-TASK-014:
+PRECHECK_FINDING: UNDECIDED 第五节 :: Only CHATBOT_SEND_URL is configured and config.py is outside this task's paths; nothing says whether it is a base URL or the full /internal/crm/send URL, so how to build the /internal/crm/handback URL is left to guess.
+PRECHECK_FINDING: UNDECIDED 第六节 :: A retry re-checks the contact's current number, but the stored message keeps the original recipient; if the number changed since the first attempt, the design doesn't say whether to send to the current or the stored number.
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 22.4 万 token（其中缓存读取 18.1 万），折合 API 价约 $0.45；周额度读数 20%。
+退出码 0
+
+第 1 轮 CRM-TASK-015:
+PRECHECK_FINDING: UNDECIDED §6 :: Design §6 orders body check (4) between window (3) and config (5), but 013's service does 2/3/5 together, so the API must choose whether 422 for a bad body comes before or after 403, NO_PHONE and WINDOW_CLOSED.
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 28.8 万 token（其中缓存读取 23.6 万），折合 API 价约 $0.53；周额度读数 20%。
+退出码 0
+
+第 1 轮 CRM-TASK-016:
+PRECHECK_FINDING: DESIGN_DEFECT §6 :: The frontend axios timeout is 15 s but the backend chatbot call may take 30 s, so a slow send counts as an error, the text stays, and resending creates a new request_id that chatbot cannot dedupe, so the customer gets it twice.
+PRECHECK_FINDING: UNDECIDED §6 :: Neither the design nor CRM-TASK-015 says where the SEND_FAILED error_code and error_title or the WINDOW_CLOSED close time go in the {code,message,fields} error envelope, which the frontend must display.
+PRECHECK_FINDING: UNDECIDED §6 :: How retry should show RETRY_EXPIRED and 422 is unspecified, and a message confirmed meanwhile returns 403 NOT_ASSIGNED, which would show a misleading no-permission reason.
+session verdict: NOT_READY
+PRECHECK_RESULT: NOT_READY
+用量：Claude 会话 1 次，共 29.2 万 token（其中缓存读取 23.9 万），折合 API 价约 $0.53；周额度读数 20%。
+退出码 1
+
+第 1 轮 CRM-TASK-017:
+PRECHECK_FINDING: SCOPE_GAP backend/tests/test_contact_phone.py :: The file imports whatsapp_service, calls process_inbound, sets settings.internal_shared_secret and posts to /internal/whatsapp/inbound, so the deletions break it, yet it is outside allowed_change_paths.
+PRECHECK_FINDING: UNDECIDED backend/app/config.py :: Settings reads .env with pydantic's default extra=forbid, so a leftover WHATSAPP_* or INTERNAL_SHARED_SECRET key fails startup; the design does not say whether to add extra=ignore or rely on cleanup.
+PRECHECK_FINDING: UNDECIDED §7 :: The design says DEPLOY.md gets only CHATBOT_SEND_URL and CHATBOT_SEND_SECRET (phase-1 items added by hand), but the criteria also add CHATBOT_EVENTS_SECRET and not the phase-1 events switch; which list wins is open.
+session verdict: NOT_READY
+PRECHECK_RESULT: NOT_READY
+用量：Claude 会话 1 次，共 20 万 token（其中缓存读取 16 万），折合 API 价约 $0.40；周额度读数 20%。
+退出码 1
+
+第 1 轮 CRM-TASK-018:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 20.1 万 token（其中缓存读取 15.8 万），折合 API 价约 $0.43；周额度读数 20%。
+退出码 0
+
+第 1 轮 CRM-TASK-019:
+PRECHECK_FINDING: SCOPE_GAP backend/tests/test_gateway_contacts_visible.py :: CRM-TASK-018 creates this test with Contact(is_gateway=True); removing the model field breaks it and violates criterion 2, but the file is not in allowed_change_paths.
+PRECHECK_FINDING: DESIGN_DEFECT .platform/tasks.yaml :: Criterion 2 bans is_gateway from tests except historical migrations, yet criterion 4 requires test_migration_015 (and migration 015 itself) to create and assert the is_gateway column.
+PRECHECK_FINDING: UNDECIDED backend/tests/test_chatbot_event_service.py :: CRM-TASK-011 tests likely assert is_gateway is False for new contacts; after the field is removed that assertion must change, which "原有断言不变" forbids, and the replacement is not decided.
+session verdict: NOT_READY
+PRECHECK_RESULT: NOT_READY
+用量：Claude 会话 1 次，共 12.6 万 token（其中缓存读取 7.7 万），折合 API 价约 $0.45；周额度读数 20%。
+退出码 1
+
+第 2 轮 CRM-TASK-013:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 28.8 万 token（其中缓存读取 24.5 万），折合 API 价约 $0.49；周额度读数 21%。
+退出码 0
+
+第 2 轮 CRM-TASK-014:
+PRECHECK_FINDING: UNDECIDED 六 :: Retry does not fix which of WINDOW_CLOSED and RETRY_EXPIRED wins when both fail, nor whether exactly 24 hours after creation counts as expired.
+PRECHECK_FINDING: UNDECIDED 六 :: Retry does not say where visitor.bsuid comes from or what agent.name to send when the sent_by user has been deleted.
+PRECHECK_FINDING: UNDECIDED 五 :: Handback timeout is unspecified, and so is the outcome of a 200 ended response whose handover is null or malformed; §14.3 classifies only send results.
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 18.6 万 token（其中缓存读取 14.5 万），折合 API 价约 $0.43；周额度读数 21%。
+退出码 0
+
+第 2 轮 CRM-TASK-015:
+PRECHECK_FINDING: UNDECIDED 六 :: The result-unknown 202 response must carry both code UNCONFIRMED and the message, but fail() has no data and ok() has no code; the envelope CRM-TASK-016 reads is not specified.
+PRECHECK_FINDING: UNDECIDED 六 :: The handback endpoint's 502 for chatbot failure or timeout has no error code name, unlike the send endpoint's SEND_FAILED.
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 35.4 万 token（其中缓存读取 30.8 万），折合 API 价约 $0.50；周额度读数 21%。
+退出码 0
+
+第 2 轮 CRM-TASK-016:
+PRECHECK_FINDING: UNDECIDED frontend/src/pages/Inbox/ReplyBox.tsx :: A body over 4096 characters gets FastAPI's default 422 without error.code; the design says neither whether to cap input nor what to show, nor what to show for SEND_FAILED without Meta fields.
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 35.8 万 token（其中缓存读取 30.5 万），折合 API 价约 $0.55；周额度读数 21%。
+退出码 0
+
+第 2 轮 CRM-TASK-017:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 19.3 万 token（其中缓存读取 15.5 万），折合 API 价约 $0.38；周额度读数 21%。
+退出码 0
+
+第 2 轮 CRM-TASK-019:
+PRECHECK_FINDING: DESIGN_DEFECT §8 :: CRM-TASK-018 keeps is_gateway mapped in the Contact model, so the 018 container still selects/inserts it; deploy.sh migrates before swapping and rolls back to that image, so dropping the column in 015 breaks the running and rollback version.
+session verdict: NOT_READY
+PRECHECK_RESULT: NOT_READY
+用量：Claude 会话 1 次，共 24.6 万 token（其中缓存读取 18.8 万），折合 API 价约 $0.55；周额度读数 21%。
+退出码 1
+
+第 3 轮 CRM-TASK-014:
+PRECHECK_FINDING: UNDECIDED 六 :: Hand back says to send the contact's normalized phone but not what to do when the stored phone can't be normalized: send phone null (and NO_IDENTITY if there's no BSUID either), or send it raw.
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 18.1 万 token（其中缓存读取 14.4 万），折合 API 价约 $0.39；周额度读数 22%。
+退出码 0
+
+第 3 轮 CRM-TASK-015:
+PRECHECK_FINDING: UNDECIDED backend/app/routers/contacts.py :: Handback by an admin for a nonexistent contact passes may_access_contact; neither this task nor CRM-TASK-014 says whether that is 400 NO_IDENTITY, 404, or 403.
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 47.9 万 token（其中缓存读取 41.9 万），折合 API 价约 $0.64；周额度读数 22%。
+退出码 0
+
+第 3 轮 CRM-TASK-016:
+PRECHECK_FINDING: DESIGN_DEFECT §六 :: A message saved before the chatbot call shows as unconfirmed with a retry button while still sending. A retry then can race a 4xx delete and resend a message that CRM has deleted.
+PRECHECK_FINDING: DESIGN_DEFECT .platform/tasks.yaml :: Criterion 3 says retry results follow the send rule, so a retry that returns 200 or 202 would clear an unrelated draft in the reply box.
+PRECHECK_FINDING: UNDECIDED §六 :: When hand-back returns not_active, or ended in the same second so nothing is written, the header still shows in handover; no text or behaviour is set for that case.
+session verdict: NOT_READY
+PRECHECK_RESULT: NOT_READY
+用量：Claude 会话 1 次，共 45 万 token（其中缓存读取 39.7 万），折合 API 价约 $0.60；周额度读数 22%。
+退出码 1
+
+第 3 轮 CRM-TASK-019:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 19 万 token（其中缓存读取 13.6 万），折合 API 价约 $0.51；周额度读数 22%。
+退出码 0
+
+第 3 轮 CRM-TASK-020:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 20.2 万 token（其中缓存读取 16.1 万），折合 API 价约 $0.40；周额度读数 21%。
+退出码 0
+
+第 4 轮 CRM-TASK-014:
+PRECHECK_FINDING: UNDECIDED docs/chatbot-replies.md#6 :: Retry does not say what happens when the message's contact is soft-deleted (admins pass may_access_contact); handback returns NOT_FOUND for this case, but retry could send a real message to a deleted contact.
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 28.9 万 token（其中缓存读取 24.1 万），折合 API 价约 $0.51；周额度读数 22%。
+退出码 0
+
+第 4 轮 CRM-TASK-015:
+PRECHECK_FINDING: SCOPE_GAP backend/tests/test_whatsapp_service_send.py :: Three tests post to /api/messages/whatsapp/send expecting old whatsapp_service behaviour (503 without inbound, Graph call, 502 API_ERROR); they fail once the route uses the new service, but the file is only removable in CRM-TASK-017.
+PRECHECK_FINDING: UNDECIDED §6 :: The acceptance criteria require sent_by_name only on list, contact-messages and mark-read; whether the message returned by send and retry (200 and 202 UNCONFIRMED) also carries sent_by and sent_by_name is not stated.
+session verdict: NOT_READY
+PRECHECK_RESULT: NOT_READY
+用量：Claude 会话 1 次，共 55.2 万 token（其中缓存读取 48.9 万），折合 API 价约 $0.68；周额度读数 22%。
+退出码 1
+
+第 4 轮 CRM-TASK-016:
+PRECHECK_FINDING: UNDECIDED §14 :: Inbox has no auto-refresh and 202 messages are under 45 s old, so the design does not say whether a timer flips "sending" to "unconfirmed + retry" at 45 s or it waits for a manual refresh.
+PRECHECK_FINDING: UNDECIDED §14 :: Item 19's "refresh later" after a hand-back that still shows handover gives no delay, attempt count, or whether to reload only the contact header or the whole conversation.
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 32.9 万 token（其中缓存读取 27.9 万），折合 API 价约 $0.53；周额度读数 22%。
+退出码 0
+
+第 5 轮 CRM-TASK-015:
+PRECHECK_FINDING: UNDECIDED docs/chatbot-replies.md#6 :: Send never says what an admin gets for a missing or soft-deleted contact (403 like retry/handback, or NO_PHONE, or allowed); may_access_contact lets admins through, so they could send to and store a message on a deleted contact.
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 35.8 万 token（其中缓存读取 30 万），折合 API 价约 $0.63；周额度读数 23%。
 退出码 0
 ```
 
