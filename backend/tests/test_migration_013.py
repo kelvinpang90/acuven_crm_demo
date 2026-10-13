@@ -42,9 +42,9 @@ def _rows(conn):
 
 
 def test_upgrade_normalizes_only_phone_and_is_idempotent():
-    """AC1/AC2: all stored forms, including a soft-deleted contact, use the
-    shared normalizer; invalid and empty values stay as-is, no contacts merge,
-    no non-phone column changes, and a second upgrade makes no changes."""
+    """AC1/AC2/AC3: all stored forms, including a soft-deleted contact, use
+    the shared normalizer; invalid and empty values stay as-is, no contacts
+    merge, no non-phone column or schema changes, and reruns stay no-ops."""
     migration = _load_migration()
     assert migration.revision == "013"
     assert migration.down_revision == "012"
@@ -68,6 +68,7 @@ def test_upgrade_normalizes_only_phone_and_is_idempotent():
                         "id": "formatted",
                         "name": "Formatted",
                         "phone": "+60 12-345 6789",
+                        "deleted_at": None,
                         "created_at": saved_at,
                         "updated_at": saved_at,
                     },
@@ -75,6 +76,7 @@ def test_upgrade_normalizes_only_phone_and_is_idempotent():
                         "id": "local",
                         "name": "Local",
                         "phone": "012-345 6789",
+                        "deleted_at": None,
                         "created_at": saved_at,
                         "updated_at": saved_at,
                     },
@@ -82,6 +84,7 @@ def test_upgrade_normalizes_only_phone_and_is_idempotent():
                         "id": "international",
                         "name": "International",
                         "phone": "0060123456789",
+                        "deleted_at": None,
                         "created_at": saved_at,
                         "updated_at": saved_at,
                     },
@@ -89,6 +92,7 @@ def test_upgrade_normalizes_only_phone_and_is_idempotent():
                         "id": "normalized",
                         "name": "Normalized",
                         "phone": "60123456789",
+                        "deleted_at": None,
                         "created_at": saved_at,
                         "updated_at": saved_at,
                     },
@@ -96,6 +100,7 @@ def test_upgrade_normalizes_only_phone_and_is_idempotent():
                         "id": "invalid",
                         "name": "Invalid",
                         "phone": "03-1234",
+                        "deleted_at": None,
                         "created_at": saved_at,
                         "updated_at": saved_at,
                     },
@@ -103,6 +108,7 @@ def test_upgrade_normalizes_only_phone_and_is_idempotent():
                         "id": "empty",
                         "name": "Empty",
                         "phone": None,
+                        "deleted_at": None,
                         "created_at": saved_at,
                         "updated_at": saved_at,
                     },
@@ -118,6 +124,7 @@ def test_upgrade_normalizes_only_phone_and_is_idempotent():
             )
 
             before = _rows(conn)
+            assert before["deleted"]["deleted_at"] == deleted_at
             _run(conn, migration.upgrade)
             once = _rows(conn)
             _run(conn, migration.upgrade)
