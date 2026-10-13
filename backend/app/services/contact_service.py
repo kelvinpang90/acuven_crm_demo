@@ -91,12 +91,14 @@ async def list_contacts(
     # Bulk fetch deal summaries
     contact_ids = [c.id for c in contacts]
     deal_summary = await _bulk_deal_summary(db, contact_ids)
+    conflicts = await _phone_conflicts_for(db, current_user, contacts)
 
     # Enrich with assigned_to_name
     data = []
     user_cache: dict[str, str] = {}
     for c in contacts:
         d = _contact_to_dict(c)
+        d["phone_conflict"] = c.phone in conflicts
         if c.assigned_to:
             if c.assigned_to not in user_cache:
                 u = await db.execute(select(User.name).where(User.id == c.assigned_to))
@@ -109,7 +111,9 @@ async def list_contacts(
     return {"data": data, "total": total, "page": page, "page_size": page_size}
 
 
-async def get_contact(db: AsyncSession, contact_id: str) -> Optional[dict]:
+async def get_contact(
+    db: AsyncSession, contact_id: str, current_user: Optional[User] = None
+) -> Optional[dict]:
     result = await db.execute(
         select(Contact).where(Contact.id == contact_id, Contact.deleted_at.is_(None))
     )
@@ -118,6 +122,8 @@ async def get_contact(db: AsyncSession, contact_id: str) -> Optional[dict]:
         return None
 
     d = _contact_to_dict(contact)
+    conflicts = await _phone_conflicts_for(db, current_user, [contact])
+    d["phone_conflict"] = contact.phone in conflicts
     if contact.assigned_to:
         u = await db.execute(select(User.name).where(User.id == contact.assigned_to))
         d["assigned_to_name"] = u.scalar() or ""
@@ -279,6 +285,17 @@ async def find_phone_conflicts(db: AsyncSession, phones: Iterable[Optional[str]]
         .having(func.count(Contact.id) > 1)
     )
     return set(result.scalars().all())
+
+
+async def _phone_conflicts_for(
+    db: AsyncSession, current_user: Optional[User], contacts: Iterable[Contact]
+) -> set[str]:
+    """Stored numbers among `contacts` that are in conflict, in one query.
+    Only admins resolve conflicts, so for everyone else nothing is looked up
+    and the set is empty."""
+    if current_user is None or current_user.role != "admin":
+        return set()
+    return await find_phone_conflicts(db, [c.phone for c in contacts])
 
 
 async def import_contacts(
@@ -487,6 +504,19 @@ async def _bulk_deal_summary(db: AsyncSession, contact_ids: list[str]) -> dict:
     return {row.contact_id: {"count": row.cnt, "total": float(row.total)} for row in r.all()}
 
 
+def _handover_in_effect(contact: Contact) -> bool:
+    """Marked as taken over but past (or without) its expiry reads as the AI
+    answering again; the chatbot does not push an event when it expires."""
+    expires_at = contact.wa_handover_expires_at
+    if not contact.wa_handover_active or expires_at is None:
+        return False
+    return expires_at > datetime.utcnow()
+
+
+def _isoformat(value: Optional[datetime]) -> Optional[str]:
+    return value.isoformat() if value else None
+
+
 def _contact_to_dict(contact: Contact) -> dict:
     return {
         "id": contact.id,
@@ -505,6 +535,10 @@ def _contact_to_dict(contact: Contact) -> dict:
         "autocount_customer_code": contact.autocount_customer_code,
         "total_deal_amount": 0.0,
         "deal_count": 0,
+        "wa_handover_active": _handover_in_effect(contact),
+        # Naive UTC like created_at; ok() marks them with Z on the way out.
+        "wa_handover_expires_at": _isoformat(contact.wa_handover_expires_at),
+        "wa_handover_updated_at": _isoformat(contact.wa_handover_updated_at),
         "created_at": contact.created_at.isoformat() if contact.created_at else None,
         "updated_at": contact.updated_at.isoformat() if contact.updated_at else None,
     }

@@ -1683,6 +1683,59 @@ PRECHECK_RESULT: READY
 
 ---
 
+# CRM-TASK-008：会话事件接收接口与验签，消息和联系人接口返回新字段
+
+来源：`docs/chatbot-events.md` 第四节、第九节第 5 条；与 ai_chatbot_demo 任务 40.1、40.2 的对齐见上「登记 CRM-TASK-006 至 011」。
+设计闸门：kelvinpang90/acuven_crm_demo#17。
+
+## 做了什么
+
+- [x] `backend/app/config.py`：新增 `chatbot_events_secret`、`chatbot_events_secret_previous`，默认空串；注释写明与 chatbot 一侧的
+      `CRM_EVENTS_SECRET` 同值。`backend/.env.example` 没改（凭据形状的文件名，Worker 改不了），两项示例要人另补。
+- [x] 新增 `backend/app/routers/internal_chatbot.py`，`backend/app/main.py` 以 `/internal/chatbot` 前缀挂上（不带 `/api`），
+      接口 `POST /internal/chatbot/events`。顺序：两把密钥都没配 → 503；读原始请求体验签 → 不过 401；再解析请求体 → 不合法 422；
+      合法则调 `chatbot_event_service.process_event`，提交后返回 200 `{"result": ...}`（`JSONResponse`，不经 `ok()` 外壳）。
+      验签：`X-Acuven-Timestamp` 必须是纯数字的 Unix 秒、与当前相差不超过 300 秒；`X-Acuven-Signature` 必须是 `sha256=` 接 64 位十六进制；
+      HMAC-SHA256，密钥是配置字符串的 UTF-8 字节，被签内容是时间戳、一个点、原始请求体字节；`hmac.compare_digest` 比较，
+      当前与旧密钥都比一遍，任一把过即可。处理中抛出的异常不捕获，由 `get_db` 回滚后照常 5xx。`event_id` 只写进日志。
+      现有 `/internal/whatsapp` 与 `X-Internal-Secret` 没动。
+- [x] 新增 `backend/app/schemas/chatbot_event.py`：type 五选一；`occurred_at` 必须是带时区的 ISO 字符串；visitor 的 phone 与 bsuid
+      至少一个非空，phone 非空时必须能被 `normalize_phone` 规范化；三种消息事件必须带 `message.wa_message_id`（非空）与 `message.body`；
+      `ai_reply` 的 `bot_id` 可为空或缺省；`handover_changed` 带 `handover.active`（布尔）与 `handover.expires_at`（键必须在），
+      active 为真时 expires_at 必须非空、为假时必须为空；`delivery_status` 带 `status.wa_message_id`、四种之一的 `status.status`、
+      可空的 `error_code`（整数或字符串）与 `error_title`。`service_kwargs()` 把它转成 `process_event` 的普通参数（错误码转成字符串）。
+- [x] `backend/app/routers/messages.py`、`backend/app/schemas/message.py`：消息列表、联系人消息与标记已读返回的每条消息多出
+      `author_kind`、`bot_id`、`delivery_status`、`delivery_error`。
+- [x] `backend/app/services/contact_service.py`、`backend/app/routers/contacts.py`、`backend/app/schemas/contact.py`：联系人字典多出
+      `wa_handover_active`（标着接管中但到期时间已过或为空的按 false）、`wa_handover_expires_at`、`wa_handover_updated_at`
+      （与 `created_at` 一样 `isoformat()`，经 `ok()` 统一补 `Z`）。列表与详情另加 `phone_conflict`：只对管理员调 CRM-TASK-007 的
+      `find_phone_conflicts`，列表整页一次批量查询，按库里存的号码判断；其他角色不查、恒为 false。详情路由把当前用户传给
+      `get_contact`（新参数可选，原有调用不受影响）。不返回 `whatsapp_bsuid`。
+- [x] 新增测试 `backend/tests/test_chatbot_events_api.py` 与 `backend/tests/test_chatbot_fields_api.py`，每条 docstring 写明守住哪条验收标准：
+      测试里按契约独立重算签名、时钟固定；五种事件各一条合法请求入库并返回 stored，另有 duplicate 与 ignored；响应体只有 `result`；
+      改一个字节、换错密钥、时间戳前后差 301 秒、缺任一或两个头、签名或时间戳格式不对都是 401（差 300 秒仍通过）；旧密钥验得过；
+      未配置 503；未签名或签错的坏请求是 401；签名正确的各类坏请求（含第九节第 5 条两种）与非 JSON 对象都是 422 且不写库；
+      `bot_id` 为空或缺省、错误码为整数或字符串可以通过；处理出错是 5xx；`event_id` 不落库。消息三个接口的新字段；
+      接管中、过期、到期为空、未接管的 `wa_handover_active` 与带 `Z` 的时间；不返回 BSUID；管理员看得到冲突、销售与经理恒为 false、
+      删掉重复后冲突消失；列表只调一次冲突查询、非管理员不调。
+
+## 偏离
+
+- 401、503、422 的响应体用现有 `fail()` 的错误格式（chatbot 只看状态码）；只有 200 不套外壳。422 的 `fields` 只列字段路径与原因，不回显请求里的值。
+- 比验收标准多收紧的几处：`bot_id` 超过 50 字符、BSUID 超过 128 字符、`wa_message_id` 超过 200 字符（各自列宽）按 422 拒收，
+  免得写库时报错变成 5xx 卡住队列；时间字段只收字符串，不把数字当 Unix 时间；签名的十六进制大小写都收。
+- `phone_conflict` 只加在列表与详情上；新建、编辑、归档接口返回的联系人字典里没有这个键（验收标准只要求列表与详情）。
+  接管三项在所有返回联系人字典的接口里都有。
+- 没有改处理规则、表结构、迁移、前端、nginx 与部署配置，没有改 `.platform/` 与 CI，没有写任何真实密钥（测试里的密钥是明显的假值）。
+
+## 验证到什么程度
+
+- 验证依据是上面两份新测试加已有后端测试，由 PR 的必需检查 `backend` 执行；检查结果由 Worker 和 CI 记录，不写在这里。
+- 没有和 ai_chatbot_demo 的真实推送联调；签名与请求体形状按设计第四节与登记时读到的 chatbot 任务 40.1、40.2 记录对齐。
+- 冲突查询与接口只在 SQLite 上由测试覆盖，没有在 MySQL 上实际跑过；nginx 不转发 `/internal/` 沿用登记时读仓库配置的结论，本任务没有再核对线上。
+
+---
+
 # 任务八：CRM 里可以加 AI 辅助的地方（盘点，2026-10-13）
 
 > 来源：人工会话里盘点了 CRM 各模块，可以做的 AI 辅助列在下面。都按员工侧 AI API 的规则做：只生成文字，员工确认后由 CRM 自己保存，

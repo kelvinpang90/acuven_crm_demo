@@ -13,6 +13,7 @@ from app.routers import (
     contacts,
     dashboard,
     deals,
+    internal_chatbot,
     internal_whatsapp,
     messages,
     pipeline,
@@ -76,6 +77,8 @@ app.include_router(projects.router, prefix="/api/projects", tags=["projects"])
 app.include_router(autocount.router, prefix="/api/autocount", tags=["autocount"])
 # No /api prefix: path must match whatsapp_gateway's demos_registry internal_base_url exactly.
 app.include_router(internal_whatsapp.router, prefix="/internal/whatsapp", tags=["internal"])
+# No /api prefix either: the path ai_chatbot_demo pushes to (docs/chatbot-events.md section 4).
+app.include_router(internal_chatbot.router, prefix="/internal/chatbot", tags=["internal"])
 
 
 @app.get("/api/health")

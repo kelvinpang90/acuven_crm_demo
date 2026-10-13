@@ -67,6 +67,12 @@ class ContactResponse(BaseModel):
     autocount_customer_code: Optional[str] = None
     total_deal_amount: float = 0.0
     deal_count: int = 0
+    # False once expires_at has passed, whatever is stored (docs/chatbot-events.md section 5).
+    wa_handover_active: bool = False
+    wa_handover_expires_at: Optional[datetime] = None
+    wa_handover_updated_at: Optional[datetime] = None
+    # List and detail only; computed for admins, always False for other roles.
+    phone_conflict: bool = False
     created_at: datetime
     updated_at: datetime
 

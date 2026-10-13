@@ -213,7 +213,8 @@ async def get_contact(
 ):
     if not await access_service.may_access_contact(db, current_user, contact_id):
         return _not_found()
-    contact = await contact_service.get_contact(db, contact_id)
+    # The user decides whether phone_conflict is worked out (admins only).
+    contact = await contact_service.get_contact(db, contact_id, current_user)
     if not contact:
         return _not_found()
     return ok(data=contact)

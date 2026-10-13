@@ -55,6 +55,12 @@ class Settings(BaseSettings):
     internal_shared_secret: str = ""
     whatsapp_gateway_base_url: str = ""
 
+    # ai_chatbot_demo -> CRM conversation events (docs/chatbot-events.md section 4).
+    # Same value as CRM_EVENTS_SECRET on the chatbot side; _previous holds the old
+    # key while rotating. Both empty: POST /internal/chatbot/events answers 503.
+    chatbot_events_secret: str = ""
+    chatbot_events_secret_previous: str = ""
+
     @property
     def database_url(self) -> str:
         return (
