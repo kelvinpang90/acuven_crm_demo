@@ -1,0 +1,4 @@
+# Check text files out with LF on every machine, regardless of core.autocrlf.
+# Without this, a Windows checkout gets CRLF files; an editor or agent that writes
+# LF lines into them leaves mixed line endings, which `ruff format --check` rejects.
+* text=auto eol=lf
