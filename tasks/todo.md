@@ -1598,6 +1598,26 @@ PRECHECK_RESULT: READY
 
 ---
 
+# CRM-TASK-009：存量联系人号码按统一规则规范化的数据迁移
+
+来源：`docs/chatbot-events.md` 第六节末尾。设计闸门：kelvinpang90/acuven_crm_demo#17。
+
+## 做了什么
+
+- [x] 新增 013 数据迁移，逐行用 CRM-TASK-007 的 `normalize_phone` 改写可规范化的 `contacts.phone`，包含已软删除联系人；只写入实际变化的号码。
+- [x] 迁移不合并或删除规范化后撞号的联系人，不建表、不改表结构；downgrade 保持数据不变，因为原始号码写法无法恢复。
+- [x] 新增 SQLite 模型建表测试，覆盖带格式号码、本地和国际拨号前缀、已规范化与不可规范化号码、空号码及已软删除联系人，并断言 `updated_at`、幂等性和 downgrade 均不变。
+
+## 偏离
+
+- [x] 无。
+
+## 验证范围
+
+- [x] 测试定义覆盖迁移的号码改写范围、非号码列不变、重复执行不变、无结构改动及不可逆 downgrade；由必需的 `backend` CI 检查执行。
+
+---
+
 # CRM-TASK-007：号码规范化、各保存入口统一规范化与号码冲突查询
 
 来源：`docs/chatbot-events.md` 第三节、第九节第 2、3 条与 P2。设计闸门：kelvinpang90/acuven_crm_demo#17。
