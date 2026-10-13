@@ -267,7 +267,7 @@ tasks:
       验签后交给 CRM-TASK-011 的处理规则；消息与联系人接口返回新字段和 phone_conflict，供 CRM-TASK-010 显示。
       验签与响应形状要和 ai_chatbot_demo 已实现的推送（其任务 40.1、40.2）一致。只做接口层：不改处理规则、
       不改表结构、不改前端、不改 nginx 与部署配置、不动现有 X-Internal-Secret 的网关入口；不写任何真实密钥。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-011
     acceptance_criteria:
