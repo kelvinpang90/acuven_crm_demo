@@ -33,6 +33,10 @@ export interface Contact {
   autocount_customer_code: string | null;
   total_deal_amount: number;
   deal_count: number;
+  wa_handover_active: boolean;
+  wa_handover_expires_at: string | null;
+  wa_handover_updated_at: string | null;
+  phone_conflict: boolean;
   deleted_at: string | null;
   created_at: string;
   updated_at: string;
@@ -128,6 +132,8 @@ export interface Task {
 // === Message ===
 export type MessageChannel = 'whatsapp' | 'email';
 export type MessageDirection = 'inbound' | 'outbound';
+export type MessageAuthorKind = 'customer' | 'ai' | 'console' | 'agent';
+export type MessageDeliveryStatus = 'sent' | 'delivered' | 'read' | 'failed';
 
 export interface Message {
   id: string;
@@ -141,6 +147,10 @@ export interface Message {
   external_id: string | null;
   is_read: boolean;
   assigned_to: string | null;
+  author_kind: MessageAuthorKind | null;
+  bot_id: string | null;
+  delivery_status: MessageDeliveryStatus | null;
+  delivery_error: string | null;
   created_at: string;
   contact_name?: string;
 }

@@ -111,6 +111,11 @@ export default function ContactDetailPanel({ contact, onClose, onEdit, onDelete,
             </div>
             <div>
               <h4 className="font-semibold text-text-primary">{contact.name}</h4>
+              {contact.phone_conflict && (
+                <span className="inline-block mt-1 px-1.5 py-0.5 rounded-full text-[10px] bg-amber-500/15 text-amber-400">
+                  {t('phoneConflict')}
+                </span>
+              )}
               <p className="text-sm text-text-muted">{contact.company || '-'}</p>
             </div>
           </div>

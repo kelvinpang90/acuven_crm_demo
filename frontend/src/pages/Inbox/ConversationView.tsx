@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { messagesApi } from '@/services/messages';
-import type { Message } from '@/types';
+import { contactsApi } from '@/services/contacts';
+import type { Contact, Message } from '@/types';
 import dayjs from 'dayjs';
 import ReplyBox from './ReplyBox';
 
@@ -14,6 +15,7 @@ interface Props {
 export default function ConversationView({ contactId, contactName, channel }: Props) {
   const { t } = useTranslation('inbox');
   const [messages, setMessages] = useState<Message[]>([]);
+  const [contact, setContact] = useState<Contact | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = async () => {
@@ -27,13 +29,55 @@ export default function ConversationView({ contactId, contactName, channel }: Pr
 
   useEffect(() => { load(); }, [contactId]);
 
+  useEffect(() => {
+    let current = true;
+    setContact(null);
+    contactsApi.getContact(contactId)
+      .then((res) => {
+        if (current) setContact(res.data.data);
+      })
+      .catch(() => { /* ignore */ });
+    return () => { current = false; };
+  }, [contactId]);
+
   const handleSent = () => load();
+
+  const authorLabel = (message: Message) => {
+    if (message.author_kind === 'console') return t('authorConsole');
+    if (message.author_kind !== 'ai') return null;
+    if (!message.bot_id) return t('authorAi');
+
+    const industryKeys: Record<string, string> = {
+      food: 'food', hotel: 'hotel', realestate: 'realestate', retail: 'retail', saas: 'saas',
+    };
+    const industry = industryKeys[message.bot_id]
+      ? t(`botIndustries.${industryKeys[message.bot_id]}`)
+      : message.bot_id;
+    return t('authorAiWithIndustry', { industry });
+  };
+
+  const deliveryLabel = (message: Message) => {
+    if (message.direction !== 'outbound' || !message.delivery_status) return null;
+    if (message.delivery_status === 'failed') {
+      return message.delivery_error
+        ? t('deliveryFailedWithError', { error: message.delivery_error })
+        : t('deliveryFailed');
+    }
+    return t(`delivery${message.delivery_status.charAt(0).toUpperCase()}${message.delivery_status.slice(1)}`);
+  };
 
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="p-3 border-b border-dark-border">
         <h3 className="text-sm font-semibold text-text-primary">{contactName}</h3>
+        {contact?.wa_handover_updated_at && (
+          <p className="text-xs text-text-secondary mt-1">
+            {contact.wa_handover_active
+              ? t('handoverActive', { expiresAt: dayjs(contact.wa_handover_expires_at).format('YYYY-MM-DD HH:mm') })
+              : t('aiReplying')}
+          </p>
+        )}
         <p className="text-xs text-text-muted">{t('conversation')} · {channel}</p>
       </div>
 
@@ -58,9 +102,11 @@ export default function ConversationView({ contactId, contactName, channel }: Pr
                   <p className="text-xs font-medium text-text-secondary mb-1">{msg.subject}</p>
                 )}
                 <p className="text-sm whitespace-pre-wrap break-words">{msg.body}</p>
-                <p className="text-[10px] text-text-muted mt-1 text-right">
-                  {dayjs(msg.created_at).format('HH:mm')}
-                </p>
+                <div className="flex flex-wrap items-center justify-end gap-x-2 text-[10px] text-text-muted mt-1">
+                  {authorLabel(msg) && <span>{authorLabel(msg)}</span>}
+                  {deliveryLabel(msg) && <span>{deliveryLabel(msg)}</span>}
+                  <span>{dayjs(msg.created_at).format('HH:mm')}</span>
+                </div>
               </div>
             </div>
           ))
