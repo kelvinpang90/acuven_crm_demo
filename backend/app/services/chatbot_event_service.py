@@ -13,7 +13,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import select, update
+from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.contact import Contact
@@ -279,6 +279,43 @@ async def update_handover(
     contact.wa_handover_active = active
     contact.wa_handover_expires_at = to_naive_utc(expires_at) if active else None
     contact.wa_handover_updated_at = occurred_at
+    await db.flush()
+    return STORED
+
+
+async def write_response_handover(
+    db: AsyncSession,
+    *,
+    contact_id: str,
+    occurred_at: datetime,
+    active: bool,
+    expires_at: Optional[datetime],
+) -> str:
+    """Write a synchronous chatbot response's handover state.
+
+    Response writes do not share the event queue's arrival ordering. They only
+    win when their timestamp is strictly newer; ``update_handover`` deliberately
+    retains its existing equal-timestamp behaviour for queued events.
+    """
+    occurred_at = to_naive_utc(occurred_at)
+    result = await db.execute(
+        update(Contact)
+        .where(
+            Contact.id == contact_id,
+            or_(
+                Contact.wa_handover_updated_at.is_(None),
+                Contact.wa_handover_updated_at < occurred_at,
+            ),
+        )
+        .values(
+            wa_handover_active=active,
+            wa_handover_expires_at=to_naive_utc(expires_at) if active else None,
+            wa_handover_updated_at=occurred_at,
+        )
+        .execution_options(synchronize_session="fetch")
+    )
+    if result.rowcount != 1:
+        return IGNORED
     await db.flush()
     return STORED
 
