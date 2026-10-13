@@ -85,5 +85,6 @@
   "importStrategyRules": "按现有路由规则",
   "importStrategyWorkload": "平均工作量",
   "importStrategyWinRate": "赢率优先",
-  "importStrategyMe": "全部指派给我"
+  "importStrategyMe": "全部指派给我",
+  "phoneConflict": "号码冲突"
 }

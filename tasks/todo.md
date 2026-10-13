@@ -1754,6 +1754,28 @@ PRECHECK_RESULT: READY
 
 ---
 
+# CRM-TASK-010：收件箱显示消息来源、送达与接管状态，管理员看得到号码冲突
+
+来源：`docs/chatbot-events.md` 第七节。设计闸门：kelvinpang90/acuven_crm_demo#17。
+
+## 做了什么
+
+- [x] `frontend/src/types/index.ts`：补齐消息的来源、bot、送达状态与失败原因字段，以及联系人的接管和号码冲突字段。
+- [x] `frontend/src/pages/Inbox/ConversationView.tsx`：显示 AI 行业或控制台来源、出站送达状态及失败原因；读取联系人详情，在有接管更新时间时按浏览器本地时间显示接管到期或 AI 回复状态。
+- [x] `frontend/src/pages/Contacts/index.tsx`、`frontend/src/pages/Contacts/ContactDetailPanel.tsx`：在接口返回号码冲突时显示标记。
+- [x] `frontend/src/locales/en` 与 `frontend/src/locales/zh` 的 inbox、contacts 命名空间：加入上述界面文案和五种行业名称。
+
+## 偏离
+
+- 无。
+
+## 验证到什么程度
+
+- 前端类型与构建的交付依据为 PR 的必需 `frontend` CI；结果由 Worker 和 CI 记录。
+- 展示逻辑只消费 CRM-TASK-008 已返回的消息与联系人字段，未改变接口、路由或后端行为。
+
+---
+
 # 任务八：CRM 里可以加 AI 辅助的地方（盘点，2026-10-13）
 
 > 来源：人工会话里盘点了 CRM 各模块，可以做的 AI 辅助列在下面。都按员工侧 AI API 的规则做：只生成文字，员工确认后由 CRM 自己保存，

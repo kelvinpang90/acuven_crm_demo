@@ -15,5 +15,22 @@
   "replyPlaceholder": "输入回复内容...",
   "inbound": "收到",
   "outbound": "发送",
-  "sendFailed": "发送失败"
+  "sendFailed": "发送失败",
+  "authorAi": "AI",
+  "authorAiWithIndustry": "AI · {{industry}}",
+  "authorConsole": "控制台",
+  "botIndustries": {
+    "food": "餐饮",
+    "hotel": "酒店",
+    "realestate": "房地产",
+    "retail": "零售",
+    "saas": "软件服务"
+  },
+  "deliverySent": "已发出",
+  "deliveryDelivered": "已送达",
+  "deliveryRead": "已读",
+  "deliveryFailed": "未送达",
+  "deliveryFailedWithError": "未送达：{{error}}",
+  "handoverActive": "接管中，至 {{expiresAt}}",
+  "aiReplying": "AI 在回复"
 }

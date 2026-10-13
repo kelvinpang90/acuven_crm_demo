@@ -219,6 +219,11 @@ export default function ContactsPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-text-primary truncate">{c.name}</span>
+                    {c.phone_conflict && (
+                      <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-amber-500/15 text-amber-400 shrink-0">
+                        {t('phoneConflict')}
+                      </span>
+                    )}
                     <span className="text-xs text-text-muted">{c.deal_count} {t('deals')}</span>
                   </div>
                   <p className="text-xs text-text-muted truncate">{c.company || '-'} · {formatMYR(c.total_deal_amount)}</p>
@@ -264,6 +269,11 @@ export default function ContactsPage() {
                         {c.name.charAt(0)}
                       </div>
                       <span className="font-medium text-text-primary">{c.name}</span>
+                      {c.phone_conflict && (
+                        <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-amber-500/15 text-amber-400">
+                          {t('phoneConflict')}
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td className="py-3 text-text-secondary">{c.company || '-'}</td>

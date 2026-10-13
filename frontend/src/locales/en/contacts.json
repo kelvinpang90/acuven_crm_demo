@@ -85,5 +85,6 @@
   "importStrategyRules": "Use the configured routing rules",
   "importStrategyWorkload": "Balance workload",
   "importStrategyWinRate": "Highest win rate",
-  "importStrategyMe": "Assign them all to me"
+  "importStrategyMe": "Assign them all to me",
+  "phoneConflict": "Phone conflict"
 }

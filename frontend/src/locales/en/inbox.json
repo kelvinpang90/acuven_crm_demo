@@ -15,5 +15,22 @@
   "replyPlaceholder": "Type your reply...",
   "inbound": "Received",
   "outbound": "Sent",
-  "sendFailed": "Failed to send message"
+  "sendFailed": "Failed to send message",
+  "authorAi": "AI",
+  "authorAiWithIndustry": "AI · {{industry}}",
+  "authorConsole": "Console",
+  "botIndustries": {
+    "food": "Food",
+    "hotel": "Hotel",
+    "realestate": "Real Estate",
+    "retail": "Retail",
+    "saas": "SaaS"
+  },
+  "deliverySent": "Sent",
+  "deliveryDelivered": "Delivered",
+  "deliveryRead": "Read",
+  "deliveryFailed": "Not delivered",
+  "deliveryFailedWithError": "Not delivered: {{error}}",
+  "handoverActive": "Taken over until {{expiresAt}}",
+  "aiReplying": "AI is replying"
 }
