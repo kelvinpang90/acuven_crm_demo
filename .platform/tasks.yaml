@@ -304,7 +304,7 @@ tasks:
       按 docs/chatbot-events.md 第六节末尾，把存量联系人的号码用 CRM-TASK-007 的同一个规范化函数改写，
       让 chatbot 推来的号码能匹配上已有联系人。只改号码一列：不合并、不删除撞号的联系人（由 phone_conflict 显示），
       不改表结构、不改服务与接口、不改前端。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-007
     acceptance_criteria:
