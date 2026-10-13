@@ -370,7 +370,7 @@ tasks:
     purpose: >-
       按 docs/chatbot-replies.md 第九节给 messages 加 sent_by，记 CRM 客服回复的实际发送人（与负责人 assigned_to 分开）。
       一次 Alembic 迁移加列，模型同步。只做表结构：不改任何服务、接口、前端，不改存量数据；删 is_gateway 是 CRM-TASK-019。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-009
     acceptance_criteria:
