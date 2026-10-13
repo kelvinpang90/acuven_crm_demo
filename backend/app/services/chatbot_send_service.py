@@ -410,6 +410,10 @@ async def handback_to_ai(
     if response_result == "not_active":
         return _handover_result(HANDBACK_NOT_ACTIVE, contact)
     if response_result != "ended":
+        logger.error(
+            "chatbot handback returned an invalid result",
+            extra={"contact_id": contact.id, "result": response_result},
+        )
         return _handover_result(HANDBACK_FAILED, contact)
     handover = _handover(response_payload)
     if handover is None:

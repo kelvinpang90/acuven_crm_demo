@@ -32,8 +32,9 @@ PHONE = "60123456789"
 
 
 def _contact(**kwargs):
+    kwargs.setdefault("id", "c1")
     kwargs.setdefault("phone", PHONE)
-    return Contact(id="c1", name="Visitor", **kwargs)
+    return Contact(name="Visitor", **kwargs)
 
 
 def _message(**kwargs):
@@ -307,7 +308,7 @@ async def test_handback_validates_before_http_and_returns_current_state(
 
 
 async def test_handback_ended_writes_strictly_newer_state_and_bad_responses_do_not_change_it(
-    async_session_maker, monkeypatch
+    async_session_maker, monkeypatch, caplog
 ):
     """Guards design §11 examples 8/9: ended writes response handover; not_active and invalid ended keep state."""
     await _seed(
@@ -345,6 +346,7 @@ async def test_handback_ended_writes_strictly_newer_state_and_bad_responses_do_n
                         },
                     },
                 ),
+                _response(200, {"result": "unexpected"}),
                 _response(502, {"result": "unknown"}),
             ]
         ),
@@ -356,6 +358,9 @@ async def test_handback_ended_writes_strictly_newer_state_and_bad_responses_do_n
         equal_time = await handback_to_ai(
             session, contact_id="c1", agent_id="u1", agent_name="Agent"
         )
+        unknown_result = await handback_to_ai(
+            session, contact_id="c1", agent_id="u1", agent_name="Agent"
+        )
         failed = await handback_to_ai(session, contact_id="c1", agent_id="u1", agent_name="Agent")
     assert (
         ended.category == HANDBACK_ENDED
@@ -365,4 +370,11 @@ async def test_handback_ended_writes_strictly_newer_state_and_bad_responses_do_n
     assert inactive.category == HANDBACK_NOT_ACTIVE and inactive.updated_at == ended.updated_at
     assert invalid.category == HANDBACK_FAILED and invalid.updated_at == ended.updated_at
     assert equal_time.category == HANDBACK_ENDED and equal_time.active is False
+    assert (
+        unknown_result.category == HANDBACK_FAILED and unknown_result.updated_at == ended.updated_at
+    )
     assert failed.category == HANDBACK_FAILED and failed.updated_at == ended.updated_at
+    assert any(
+        record.levelname == "ERROR" and "invalid result" in record.message
+        for record in caplog.records
+    )
