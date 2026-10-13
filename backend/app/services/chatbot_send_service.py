@@ -180,6 +180,10 @@ async def send_agent_reply(
         explicit_failure = True
     except (asyncio.TimeoutError, httpx.HTTPError):
         pass
+    except Exception:
+        # A request that reaches an unexpected client-side failure has no
+        # delivery proof, so retain the durable row for later reconciliation.
+        pass
 
     payload_response: dict[str, Any] = {}
     if response is not None:

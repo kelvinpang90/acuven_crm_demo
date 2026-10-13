@@ -1,5 +1,6 @@
 """CRM-TASK-013 business-rule tests for CRM -> chatbot agent replies."""
 
+import asyncio
 import hashlib
 import hmac
 import json
@@ -36,11 +37,11 @@ def _contact(**kwargs):
     return Contact(id="c1", name="Visitor", **kwargs)
 
 
-def _inbound(created_at=T0):
+def _inbound(created_at=T0, *, channel="whatsapp"):
     return Message(
         id="inbound-1",
         contact_id="c1",
-        channel="whatsapp",
+        channel=channel,
         direction="inbound",
         sender_id=PHONE,
         recipient_id="ai_chatbot_demo",
@@ -58,13 +59,10 @@ async def _seed(maker, *rows):
 
 async def _outbound(maker):
     async with maker() as session:
-        return (
-            await session.execute(
-                select(Message).where(Message.direction == "outbound").order_by(Message.id)
-            )
-            .scalars()
-            .all()
+        result = await session.execute(
+            select(Message).where(Message.direction == "outbound").order_by(Message.id)
         )
+        return result.scalars().all()
 
 
 def _response(status, payload=None):
@@ -96,6 +94,13 @@ def _configured(monkeypatch):
     monkeypatch.setattr(settings, "chatbot_send_secret", "shared-send-secret")
 
 
+def _post_for(outcome):
+    """Return a stub that preserves response objects rather than calling them."""
+    if isinstance(outcome, BaseException):
+        return AsyncMock(side_effect=outcome)
+    return AsyncMock(return_value=outcome)
+
+
 async def _send(maker, **kwargs):
     async with maker() as session:
         result = await send_agent_reply(
@@ -114,6 +119,7 @@ async def _send(maker, **kwargs):
     ("rows", "contact_id", "now", "url", "secret", "expected", "window"),
     [
         ([], "missing", T0, "url", "secret", NOT_FOUND, None),
+        ([_contact(deleted_at=T0)], "c1", T0, "url", "secret", NOT_FOUND, None),
         ([_contact(phone="bad")], "c1", T0, "url", "secret", NO_PHONE, None),
         ([_contact()], "c1", T0, "url", "secret", WINDOW_CLOSED, None),
         (
@@ -140,7 +146,7 @@ async def _send(maker, **kwargs):
 async def test_pre_send_validation_does_not_persist_or_call(
     async_session_maker, monkeypatch, rows, contact_id, now, url, secret, expected, window
 ):
-    """Guards AC2: each failed contact, phone, window, or configuration check stops before storage and HTTP."""
+    """Guards AC2: validation failures stop before storage and HTTP (design §11 example 5 for the closed window)."""
     await _seed(async_session_maker, *rows)
     monkeypatch.setattr(settings, "chatbot_send_url", url)
     monkeypatch.setattr(settings, "chatbot_send_secret", secret)
@@ -156,10 +162,25 @@ async def test_pre_send_validation_does_not_persist_or_call(
     post.assert_not_awaited()
 
 
+async def test_non_whatsapp_inbound_does_not_open_reply_window(async_session_maker, monkeypatch):
+    """Guards AC2: only WhatsApp inbound messages can open the reply window."""
+    await _seed(async_session_maker, _contact(), _inbound(channel="email"))
+    _configured(monkeypatch)
+    post = AsyncMock()
+    client = _stub_http(monkeypatch, post)
+
+    result = await _send(async_session_maker)
+
+    assert result.category == WINDOW_CLOSED
+    assert result.window_until is None
+    assert await _outbound(async_session_maker) == []
+    client.assert_not_called()
+
+
 async def test_sent_commits_before_call_signs_raw_body_and_writes_message(
     async_session_maker, monkeypatch
 ):
-    """Guards AC1 and AC3: signed payload contains the prescribed fields and the unconfirmed row exists before HTTP."""
+    """Guards AC1, AC3 and AC5: design §11 example 1 signs, persists, confirms, and writes newer handover data."""
     await _seed(async_session_maker, _contact(whatsapp_bsuid="MY.visitor"), _inbound())
     _configured(monkeypatch)
 
@@ -176,7 +197,22 @@ async def test_sent_commits_before_call_signs_raw_body_and_writes_message(
             hashlib.sha256,
         ).hexdigest()
         assert headers["X-Acuven-Signature"] == "sha256=" + expected
-        return _response(200, {"result": "sent", "wa_message_id": "wamid.1", "handover": None})
+        return _response(
+            200,
+            {
+                "result": "sent",
+                "wa_message_id": "wamid.1",
+                "handover": {
+                    "active": True,
+                    "expires_at": (T0 + timedelta(hours=25))
+                    .replace(tzinfo=timezone.utc)
+                    .isoformat(),
+                    "occurred_at": (T0 + timedelta(minutes=2))
+                    .replace(tzinfo=timezone.utc)
+                    .isoformat(),
+                },
+            },
+        )
 
     _stub_http(monkeypatch, AsyncMock(side_effect=post))
     result = await _send(async_session_maker)
@@ -190,6 +226,11 @@ async def test_sent_commits_before_call_signs_raw_body_and_writes_message(
     assert result.message.sent_by == "u1"
     assert result.message.assigned_to == "owner"
     assert result.message.is_read is True
+    async with async_session_maker() as session:
+        contact = (await session.execute(select(Contact).where(Contact.id == "c1"))).scalar_one()
+    assert contact.wa_handover_active is True
+    assert contact.wa_handover_expires_at == T0 + timedelta(hours=25)
+    assert contact.wa_handover_updated_at == T0 + timedelta(minutes=2)
 
 
 @pytest.mark.parametrize(
@@ -205,15 +246,18 @@ async def test_sent_commits_before_call_signs_raw_body_and_writes_message(
     ],
 )
 async def test_explicit_failure_deletes_unconfirmed_row(async_session_maker, monkeypatch, failure):
-    """Guards AC4: rejected, listed HTTP failures, and pre-send connection failures delete the row."""
+    """Guards AC4 and design §11 example 2: explicit failures delete the persisted unconfirmed row."""
     await _seed(async_session_maker, _contact(), _inbound())
     _configured(monkeypatch)
-    _stub_http(monkeypatch, AsyncMock(side_effect=failure))
+    _stub_http(monkeypatch, _post_for(failure))
 
     result = await _send(async_session_maker)
 
     assert result.category == SEND_FAILED
     assert await _outbound(async_session_maker) == []
+    if getattr(failure, "status_code", None) == 502:
+        assert result.error_code == "131026"
+        assert result.error_title == "Rejected"
 
 
 @pytest.mark.parametrize(
@@ -223,17 +267,19 @@ async def test_explicit_failure_deletes_unconfirmed_row(async_session_maker, mon
         _response(504, {"result": "unknown"}),
         _response(500),
         _response(200, {"result": "sent"}),
+        _response(200, {"result": "failed", "wa_message_id": "wamid.wrong-result"}),
         httpx.ReadTimeout("reply unknown"),
+        httpx.WriteTimeout("write unknown"),
         httpx.ReadError("connection dropped"),
     ],
 )
 async def test_unknown_result_keeps_unconfirmed_row(
     async_session_maker, monkeypatch, response_or_error
 ):
-    """Guards AC4: every non-explicit, non-confirmed outcome remains retriable and unconfirmed."""
+    """Guards AC4 and design §11 example 3 immediate state: unknown outcomes retain an unconfirmed row."""
     await _seed(async_session_maker, _contact(), _inbound())
     _configured(monkeypatch)
-    _stub_http(monkeypatch, AsyncMock(side_effect=response_or_error))
+    _stub_http(monkeypatch, _post_for(response_or_error))
 
     result = await _send(async_session_maker)
 
@@ -243,10 +289,32 @@ async def test_unknown_result_keeps_unconfirmed_row(
     assert len(await _outbound(async_session_maker)) == 1
 
 
+async def test_total_deadline_keeps_unconfirmed_row(async_session_maker, monkeypatch):
+    """Guards AC1 and AC4: the design §11 example 3 thirty-second deadline leaves the row unconfirmed."""
+    await _seed(async_session_maker, _contact(), _inbound())
+    _configured(monkeypatch)
+
+    class TotalDeadline:
+        async def __aenter__(self):
+            raise asyncio.TimeoutError
+
+        async def __aexit__(self, exc_type, exc, traceback):
+            return False
+
+    monkeypatch.setattr(chatbot_send_service.asyncio, "timeout", lambda seconds: TotalDeadline())
+    client = _stub_http(monkeypatch, AsyncMock())
+
+    result = await _send(async_session_maker)
+
+    assert result.category == UNCONFIRMED
+    assert len(await _outbound(async_session_maker)) == 1
+    client.assert_not_called()
+
+
 async def test_conditional_updates_do_not_downgrade_delivery_and_response_handover_is_strict(
     async_session_maker, monkeypatch
 ):
-    """Guards AC5: callback-written delivery survives the response, while a same-second response handover loses to an event."""
+    """Guards AC5 and design §11 example 7: callback delivery wins and same-second response handover loses."""
     await _seed(
         async_session_maker,
         _contact(
