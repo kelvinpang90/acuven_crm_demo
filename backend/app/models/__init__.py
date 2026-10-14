@@ -1,5 +1,6 @@
 from app.database import Base
 from app.models.activity import Activity
+from app.models.ai_request import AiRequest
 from app.models.autocount_document import AutocountDocument
 from app.models.contact import Contact
 from app.models.deal import Deal
@@ -13,6 +14,7 @@ from app.models.user import User
 
 __all__ = [
     "Base",
+    "AiRequest",
     "User",
     "Contact",
     "Deal",
