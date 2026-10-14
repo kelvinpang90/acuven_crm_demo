@@ -673,7 +673,7 @@ tasks:
     purpose: >-
       按 docs/inbox-ai-assist.md 第 4.2 节新建 ai_requests 审计表，记录谁在什么时候对哪个客户用了哪个 AI 功能、结果如何，
       不存快照、提示词、员工附的要求与 AI 输出。一次 Alembic 迁移建表，模型同步。只做表结构：不改服务、接口、前端。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-012
     acceptance_criteria:
