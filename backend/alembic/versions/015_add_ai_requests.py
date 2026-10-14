@@ -45,3 +45,4 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_table("ai_requests")
+    sa.Enum(name="ai_request_outcome").drop(op.get_bind(), checkfirst=True)
