@@ -28,6 +28,7 @@ export default function ConversationView({ contactId, contactName, channel }: Pr
     setLoading(true);
     try {
       const res = await messagesApi.getContactMessages(contactId);
+      setNow(Date.now());
       setMessages(res.data.data);
     } catch { /* ignore */ }
     setLoading(false);
@@ -40,10 +41,11 @@ export default function ConversationView({ contactId, contactName, channel }: Pr
   }, [contactId]);
 
   useEffect(() => {
+    const currentTime = Date.now();
     const pendingTimes = messages.filter((message) => message.channel === 'whatsapp' && message.author_kind === 'agent' && !message.external_id)
-      .map((message) => new Date(message.created_at).getTime() + 45000).filter((time) => time > now);
+      .map((message) => new Date(message.created_at).getTime() + 45000).filter((time) => time > currentTime);
     if (!pendingTimes.length) return undefined;
-    const timer = window.setTimeout(() => setNow(Date.now()), Math.min(...pendingTimes) - now);
+    const timer = window.setTimeout(() => setNow(Date.now()), Math.min(...pendingTimes) - currentTime);
     return () => window.clearTimeout(timer);
   }, [messages, now]);
 
