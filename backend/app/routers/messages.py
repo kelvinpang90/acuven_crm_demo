@@ -138,10 +138,21 @@ async def retry_whatsapp(
     message = (
         await db.execute(select(Message).where(Message.id == message_id))
     ).scalar_one_or_none()
+    contact_is_live = (
+        message is not None
+        and (
+            await db.execute(
+                select(Contact.id).where(
+                    Contact.id == message.contact_id, Contact.deleted_at.is_(None)
+                )
+            )
+        ).scalar_one_or_none()
+    )
     if (
         message is None
         or message.author_kind != "agent"
         or not await access_service.may_access_contact(db, current_user, message.contact_id)
+        or contact_is_live is None
     ):
         return fail(message=NOT_YOURS, code="NOT_ASSIGNED", status_code=403)
     result = await chatbot_send_service.retry_agent_reply(db, message_id=message_id)
