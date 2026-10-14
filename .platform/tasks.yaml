@@ -499,7 +499,7 @@ tasks:
       在 CRM-TASK-015 的接口之上，按 docs/chatbot-replies.md 第一节与第六节让客服在收件箱里经 chatbot 回复：窗口关闭时禁用并说明，
       发送失败显示原因，未确认送出的消息可重试，看得到是哪位客服回的，接管中可以交还 AI。
       只改前端：不改后端、不加页面或路由、不做模板与媒体（第 3 阶段）。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-015
       - CRM-TASK-010
