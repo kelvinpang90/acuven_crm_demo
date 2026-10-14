@@ -7,6 +7,7 @@ from app.config import settings
 from app.database import engine
 from app.middleware.logging import AccessLogMiddleware
 from app.routers import (
+    ai,
     analytics,
     auth,
     autocount,
@@ -71,6 +72,7 @@ app.include_router(routing.router, prefix="/api/routing/rules", tags=["routing"]
 app.include_router(webhooks.router, prefix="/api/webhooks", tags=["Webhooks"])
 app.include_router(messages.router, prefix="/api/messages", tags=["messages"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["analytics"])
+app.include_router(ai.router, prefix="/api/ai", tags=["ai"])
 app.include_router(sales_targets.router, prefix="/api/sales-targets", tags=["sales_targets"])
 app.include_router(deals.router, prefix="/api/deals", tags=["deals"])
 app.include_router(projects.router, prefix="/api/projects", tags=["projects"])
