@@ -231,7 +231,7 @@ async def test_retry_failures_keep_the_original_message(async_session_maker, mon
     """Guards retry acceptance rule (8): every unsuccessful retry retains the original state."""
     await _seed(async_session_maker, _contact(), _agent_message(), _inbound())
     _configured(monkeypatch)
-    _stub_http(monkeypatch, AsyncMock(side_effect=outcome))
+    _stub_http(monkeypatch, AsyncMock(side_effect=[outcome]))
     await _retry(async_session_maker)
     async with async_session_maker() as session:
         message = (await session.execute(select(Message).where(Message.id == "m1"))).scalar_one()
@@ -463,7 +463,7 @@ async def test_handback_bad_or_failed_response_does_not_mutate(
     """Guards handback acceptance rules (6)--(7): failures leave stored takeover unchanged."""
     await _seed(async_session_maker, _contact(wa_handover_active=True, wa_handover_updated_at=T0))
     _configured(monkeypatch)
-    _stub_http(monkeypatch, AsyncMock(side_effect=outcome))
+    _stub_http(monkeypatch, AsyncMock(side_effect=[outcome]))
     assert (await _handback(async_session_maker)).category == HANDOFF_FAILED
     async with async_session_maker() as session:
         assert (await session.get(Contact, "c1")).wa_handover_updated_at == T0
