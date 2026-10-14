@@ -703,7 +703,7 @@ tasks:
       按 docs/inbox-ai-assist.md 第 4.1、4.4 节与第八节第 3 条，新建调用 Billing Hub AI 模块 POST /v1/messages 的客户端模块（组请求、鉴权头、超时、三类结果），
       以及从库里组装发给模型的会话快照、写 ai_requests 审计记录的业务函数。只做业务规则层：不写三个功能的提示词与 schema（CRM-TASK-023）、
       不加接口、不改前端；AI 模块尚未上线，测试一律打桩 HTTP，不写任何真实密钥与地址。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-021
       - CRM-TASK-013
