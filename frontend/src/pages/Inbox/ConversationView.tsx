@@ -90,7 +90,13 @@ export default function ConversationView({ contactId, contactName, channel }: Pr
   const [translatingId, setTranslatingId] = useState<string | null>(null);
   const [clock, setClock] = useState(Date.now());
   const activeContactId = useRef(contactId);
+  const previousContactId = useRef(contactId);
+  const messageTranslationRequestVersion = useRef(0);
   const handbackRefreshTimer = useRef<number | null>(null);
+  if (previousContactId.current !== contactId) {
+    previousContactId.current = contactId;
+    messageTranslationRequestVersion.current += 1;
+  }
   activeContactId.current = contactId;
 
   const load = useCallback(async () => {
@@ -247,16 +253,17 @@ export default function ConversationView({ contactId, contactName, channel }: Pr
     const text = message.body.trim();
     if (!text || Array.from(text).length > 2000 || translatingId) return;
     const requestedContactId = contactId;
+    const requestVersion = ++messageTranslationRequestVersion.current;
     setTranslatingId(message.id);
     try {
       const response = await aiApi.translate(requestedContactId, text, bubbleLanguage(i18n.language));
-      if (activeContactId.current === requestedContactId) {
+      if (activeContactId.current === requestedContactId && messageTranslationRequestVersion.current === requestVersion) {
         setMessageTranslations((current) => ({ ...current, [message.id]: response.data.data.translation }));
       }
     } catch (error: unknown) {
-      if (activeContactId.current === requestedContactId) toast.error(briefErrorMessage(error, t));
+      if (activeContactId.current === requestedContactId && messageTranslationRequestVersion.current === requestVersion) toast.error(briefErrorMessage(error, t));
     } finally {
-      if (activeContactId.current === requestedContactId) setTranslatingId(null);
+      if (activeContactId.current === requestedContactId && messageTranslationRequestVersion.current === requestVersion) setTranslatingId(null);
     }
   };
 

@@ -63,6 +63,12 @@ export default function ReplyBox({ contactId, channel, waReplyWindowUntil, conta
   const [translating, setTranslating] = useState(false);
   const [now, setNow] = useState(Date.now());
   const activeContactId = useRef(contactId);
+  const previousContactId = useRef(contactId);
+  const aiRequestVersion = useRef(0);
+  if (previousContactId.current !== contactId) {
+    previousContactId.current = contactId;
+    aiRequestVersion.current += 1;
+  }
   activeContactId.current = contactId;
   const isWhatsApp = channel === 'whatsapp';
   const windowOpen = !isWhatsApp || waReplyWindowUntil === undefined || (!!waReplyWindowUntil && new Date(waReplyWindowUntil).getTime() > now);
@@ -121,18 +127,19 @@ export default function ReplyBox({ contactId, channel, waReplyWindowUntil, conta
     if (drafting || replyDisabled || messageCount === 0) return;
     if ((message.trim() || subject.trim()) && !window.confirm(t('aiOverwriteConfirm'))) return;
     const requestedContactId = contactId;
+    const requestVersion = ++aiRequestVersion.current;
     setNoteForAgent('');
     setDrafting(true);
     try {
       const response = await aiApi.createReplyDraft(requestedContactId, isWhatsApp ? 'whatsapp' : 'email', instruction.trim() || undefined, outputLanguage);
-      if (activeContactId.current !== requestedContactId) return;
+      if (activeContactId.current !== requestedContactId || aiRequestVersion.current !== requestVersion) return;
       setMessage(response.data.data.draft);
       if (!isWhatsApp) setSubject(response.data.data.subject || '');
       setNoteForAgent(response.data.data.note_for_agent);
     } catch (error: unknown) {
-      if (activeContactId.current === requestedContactId) toast.error(aiErrorMessage(error, t));
+      if (activeContactId.current === requestedContactId && aiRequestVersion.current === requestVersion) toast.error(aiErrorMessage(error, t));
     } finally {
-      if (activeContactId.current === requestedContactId) setDrafting(false);
+      if (activeContactId.current === requestedContactId && aiRequestVersion.current === requestVersion) setDrafting(false);
     }
   };
 
@@ -140,10 +147,11 @@ export default function ReplyBox({ contactId, channel, waReplyWindowUntil, conta
     if (translating || replyDisabled || translationInvalid) return;
     if (!window.confirm(t('aiOverwriteConfirm'))) return;
     const requestedContactId = contactId;
+    const requestVersion = ++aiRequestVersion.current;
     setTranslating(true);
     try {
       const response = await aiApi.translate(requestedContactId, normalizedMessage, translationLanguage);
-      if (activeContactId.current !== requestedContactId) return;
+      if (activeContactId.current !== requestedContactId || aiRequestVersion.current !== requestVersion) return;
       const translation = response.data.data.translation;
       if (isWhatsApp && Array.from(translation).length > 4096) {
         toast.error(t('aiTranslationTooLong'));
@@ -151,9 +159,9 @@ export default function ReplyBox({ contactId, channel, waReplyWindowUntil, conta
       }
       setMessage(translation);
     } catch (error: unknown) {
-      if (activeContactId.current === requestedContactId) toast.error(aiErrorMessage(error, t));
+      if (activeContactId.current === requestedContactId && aiRequestVersion.current === requestVersion) toast.error(aiErrorMessage(error, t));
     } finally {
-      if (activeContactId.current === requestedContactId) setTranslating(false);
+      if (activeContactId.current === requestedContactId && aiRequestVersion.current === requestVersion) setTranslating(false);
     }
   };
 
