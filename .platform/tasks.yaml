@@ -737,7 +737,7 @@ tasks:
       按 docs/inbox-ai-assist.md 第五节，在 CRM 后端定义会话简报、起草回复、翻译三个功能的系统提示、JSON schema、max_tokens 与输出校验，
       并在业务层把快照、功能定义、AI 客户端与审计写入串成三个可调用的业务函数。只做业务规则层：不加接口、不改前端；测试打桩 AI 客户端，不调真实模型。
       提示词的真实效果要等 AI 模块上线后按设计第五节做质量评测，评测不在本任务范围。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-022
     acceptance_criteria:
