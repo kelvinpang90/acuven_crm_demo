@@ -1,8 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import toast from 'react-hot-toast';
+import axios from 'axios';
+import type { TFunction } from 'i18next';
 import { messagesApi } from '@/services/messages';
-import { contactsApi } from '@/services/contacts';
-import type { Contact, Message } from '@/types';
+import { contactsApi, type WhatsAppHandover } from '@/services/contacts';
+import type { ApiError, Contact, Message } from '@/types';
 import dayjs from 'dayjs';
 import ReplyBox from './ReplyBox';
 
@@ -12,109 +15,217 @@ interface Props {
   channel: string;
 }
 
+function retryErrorMessage(error: unknown, t: TFunction<'inbox'>) {
+  if (!axios.isAxiosError<ApiError>(error) || !error.response) return t('sendUnknownResult');
+  const apiError = error.response?.data?.error;
+  if (!apiError) return t('sendFailed');
+  const fields = apiError.fields || {};
+  switch (apiError.code) {
+    case 'WINDOW_CLOSED': return t('windowClosedAt', { closedAt: fields.window_closed_at || t('unknownTime') });
+    case 'SEND_FAILED': return fields.error_code
+      ? t('metaRejected', { code: fields.error_code, title: fields.error_title || '' })
+      : t('sendNotSent');
+    case 'NOT_CONFIGURED': return t('chatbotNotConfigured');
+    case 'NOT_ASSIGNED': return t('notAssigned');
+    case 'NO_PHONE': return t('noPhone');
+    case 'RETRY_EXPIRED': return t('retryExpired');
+    case 'IN_PROGRESS': return t('sendingInProgress');
+    case 'NO_IDENTITY': return t('noWhatsAppIdentity');
+    default: return t('sendFailed');
+  }
+}
+
+function handbackErrorMessage(error: unknown, t: TFunction<'inbox'>) {
+  if (!axios.isAxiosError<ApiError>(error) || !error.response) return t('handbackFailed');
+  const apiError = error.response.data?.error;
+  if (!apiError) return t('handbackFailed');
+
+  switch (apiError.code) {
+    case 'NOT_CONFIGURED': return t('chatbotNotConfigured');
+    case 'NOT_ASSIGNED': return t('notAssigned');
+    case 'NO_IDENTITY': return t('noWhatsAppIdentity');
+    case 'CHATBOT_FAILED': return t('handbackFailed');
+    default: return apiError.message || t('handbackFailed');
+  }
+}
+
+function isHandoverActive(handover: WhatsAppHandover) {
+  return handover.wa_handover_active && !!handover.wa_handover_updated_at;
+}
+
 export default function ConversationView({ contactId, contactName, channel }: Props) {
   const { t } = useTranslation('inbox');
   const [messages, setMessages] = useState<Message[]>([]);
   const [contact, setContact] = useState<Contact | null>(null);
   const [loading, setLoading] = useState(true);
+  const [retryingId, setRetryingId] = useState<string | null>(null);
+  const [handingBack, setHandingBack] = useState(false);
+  const [clock, setClock] = useState(Date.now());
+  const activeContactId = useRef(contactId);
+  const handbackRefreshTimer = useRef<number | null>(null);
+  activeContactId.current = contactId;
 
-  const load = async () => {
+  const load = useCallback(async () => {
+    if (activeContactId.current !== contactId) return;
     setLoading(true);
     try {
       const res = await messagesApi.getContactMessages(contactId);
-      setMessages(res.data.data);
+      if (activeContactId.current === contactId) setMessages(res.data.data);
     } catch { /* ignore */ }
-    setLoading(false);
-  };
-
-  useEffect(() => { load(); }, [contactId]);
-
-  useEffect(() => {
-    let current = true;
-    setContact(null);
-    contactsApi.getContact(contactId)
-      .then((res) => {
-        if (current) setContact(res.data.data);
-      })
-      .catch(() => { /* ignore */ });
-    return () => { current = false; };
+    if (activeContactId.current === contactId) setLoading(false);
   }, [contactId]);
 
-  const handleSent = () => load();
+  const loadContact = useCallback(async () => {
+    try {
+      const res = await contactsApi.getContact(contactId);
+      if (activeContactId.current === contactId) setContact(res.data.data);
+    } catch { /* ignore */ }
+  }, [contactId]);
+
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    setContact(null);
+    setHandingBack(false);
+    loadContact();
+    return () => {
+      if (handbackRefreshTimer.current !== null) {
+        window.clearTimeout(handbackRefreshTimer.current);
+        handbackRefreshTimer.current = null;
+      }
+    };
+  }, [loadContact]);
+
+  useEffect(() => {
+    setClock(Date.now());
+  }, [channel, messages]);
+
+  useEffect(() => {
+    if (channel !== 'whatsapp') return undefined;
+    const now = Date.now();
+    const pending = messages
+      .filter((message) => message.author_kind === 'agent' && !message.external_id)
+      .map((message) => new Date(message.created_at).getTime() + 45000 - now)
+      .filter((delay) => delay > 0);
+    if (pending.length === 0) return undefined;
+    const timer = window.setTimeout(() => setClock(Date.now()), Math.min(...pending));
+    return () => window.clearTimeout(timer);
+  }, [channel, clock, messages]);
+
+  const handleSent = () => {
+    load();
+    loadContact();
+  };
 
   const authorLabel = (message: Message) => {
+    if (message.author_kind === 'agent') {
+      return message.sent_by_name
+        ? t('authorAgentWithName', { name: message.sent_by_name })
+        : t('authorAgent');
+    }
     if (message.author_kind === 'console') return t('authorConsole');
     if (message.author_kind !== 'ai') return null;
     if (!message.bot_id) return t('authorAi');
-
-    const industryKeys: Record<string, string> = {
-      food: 'food', hotel: 'hotel', realestate: 'realestate', retail: 'retail', saas: 'saas',
-    };
-    const industry = industryKeys[message.bot_id]
-      ? t(`botIndustries.${industryKeys[message.bot_id]}`)
-      : message.bot_id;
+    const industryKeys: Record<string, string> = { food: 'food', hotel: 'hotel', realestate: 'realestate', retail: 'retail', saas: 'saas' };
+    const industry = industryKeys[message.bot_id] ? t(`botIndustries.${industryKeys[message.bot_id]}`) : message.bot_id;
     return t('authorAiWithIndustry', { industry });
   };
 
   const deliveryLabel = (message: Message) => {
-    if (message.direction !== 'outbound' || !message.delivery_status) return null;
-    if (message.delivery_status === 'failed') {
-      return message.delivery_error
-        ? t('deliveryFailedWithError', { error: message.delivery_error })
-        : t('deliveryFailed');
+    if (channel === 'whatsapp' && message.author_kind === 'agent' && !message.external_id) {
+      return clock < new Date(message.created_at).getTime() + 45000 ? t('sending') : t('sentUnconfirmed');
     }
+    if (message.direction !== 'outbound' || !message.delivery_status) return null;
+    if (message.delivery_status === 'failed') return message.delivery_error ? t('deliveryFailedWithError', { error: message.delivery_error }) : t('deliveryFailed');
     return t(`delivery${message.delivery_status.charAt(0).toUpperCase()}${message.delivery_status.slice(1)}`);
+  };
+
+  const isRetryable = (message: Message) => channel === 'whatsapp'
+    && message.author_kind === 'agent'
+    && !message.external_id
+    && clock >= new Date(message.created_at).getTime() + 45000;
+
+  const retry = async (message: Message) => {
+    setRetryingId(message.id);
+    try {
+      const response = await messagesApi.retryWhatsApp(message.id);
+      toast(response.status === 202 ? t('sentUnconfirmed') : t('retrySent'));
+    } catch (error: unknown) {
+      toast.error(retryErrorMessage(error, t));
+    } finally {
+      setRetryingId(null);
+      load();
+    }
+  };
+
+  const handback = async () => {
+    if (!window.confirm(t('handbackConfirm'))) return;
+    const requestedContactId = contactId;
+    setHandingBack(true);
+    try {
+      const response = await contactsApi.handbackWhatsApp(requestedContactId);
+      const handover: WhatsAppHandover = response.data.data;
+      if (activeContactId.current !== requestedContactId) return;
+      setContact((current) => current ? { ...current, ...handover } : current);
+      if (isHandoverActive(handover)) {
+        toast(t('handbackRequested'));
+        if (handbackRefreshTimer.current !== null) window.clearTimeout(handbackRefreshTimer.current);
+        handbackRefreshTimer.current = window.setTimeout(() => {
+          handbackRefreshTimer.current = null;
+          if (activeContactId.current === requestedContactId) void loadContact();
+        }, 5000);
+      } else {
+        toast(t('handbackComplete'));
+      }
+    } catch (error: unknown) {
+      if (activeContactId.current === requestedContactId) toast.error(handbackErrorMessage(error, t));
+    } finally {
+      if (activeContactId.current === requestedContactId) setHandingBack(false);
+    }
   };
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
       <div className="p-3 border-b border-dark-border">
-        <h3 className="text-sm font-semibold text-text-primary">{contactName}</h3>
-        {contact?.wa_handover_updated_at && (
-          <p className="text-xs text-text-secondary mt-1">
-            {contact.wa_handover_active
-              ? t('handoverActive', { expiresAt: dayjs(contact.wa_handover_expires_at).format('YYYY-MM-DD HH:mm') })
-              : t('aiReplying')}
-          </p>
-        )}
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold text-text-primary">{contactName}</h3>
+            {contact?.wa_handover_updated_at && (
+              <p className="text-xs text-text-secondary mt-1">
+                {contact.wa_handover_active ? t('handoverActive', { expiresAt: dayjs(contact.wa_handover_expires_at).format('YYYY-MM-DD HH:mm') }) : t('aiReplying')}
+              </p>
+            )}
+          </div>
+          {channel === 'whatsapp' && contact && isHandoverActive(contact) && (
+            <button type="button" className="btn-secondary text-xs" disabled={handingBack} onClick={handback}>
+              {t('handbackToAi')}
+            </button>
+          )}
+        </div>
         <p className="text-xs text-text-muted">{t('conversation')} · {channel}</p>
       </div>
 
-      {/* Messages */}
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
-        {loading ? (
-          <p className="text-text-muted text-sm text-center py-4">...</p>
-        ) : messages.length === 0 ? (
-          <p className="text-text-muted text-sm text-center py-4">{t('noMessages')}</p>
-        ) : (
-          messages.map((msg) => (
-            <div
-              key={msg.id}
-              className={`flex ${msg.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}
-            >
-              <div className={`max-w-[75%] rounded-xl px-3 py-2 ${
-                msg.direction === 'outbound'
-                  ? 'bg-primary/20 text-text-primary'
-                  : 'bg-dark-hover text-text-primary'
-              }`}>
-                {msg.subject && (
-                  <p className="text-xs font-medium text-text-secondary mb-1">{msg.subject}</p>
-                )}
-                <p className="text-sm whitespace-pre-wrap break-words">{msg.body}</p>
-                <div className="flex flex-wrap items-center justify-end gap-x-2 text-[10px] text-text-muted mt-1">
-                  {authorLabel(msg) && <span>{authorLabel(msg)}</span>}
-                  {deliveryLabel(msg) && <span>{deliveryLabel(msg)}</span>}
-                  <span>{dayjs(msg.created_at).format('HH:mm')}</span>
-                </div>
+        {loading ? <p className="text-text-muted text-sm text-center py-4">...</p> : messages.length === 0 ? <p className="text-text-muted text-sm text-center py-4">{t('noMessages')}</p> : messages.map((msg) => (
+          <div key={msg.id} className={`flex ${msg.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}>
+            <div className={`max-w-[75%] rounded-xl px-3 py-2 ${msg.direction === 'outbound' ? 'bg-primary/20 text-text-primary' : 'bg-dark-hover text-text-primary'}`}>
+              {msg.subject && <p className="text-xs font-medium text-text-secondary mb-1">{msg.subject}</p>}
+              <p className="text-sm whitespace-pre-wrap break-words">{msg.body}</p>
+              <div className="flex flex-wrap items-center justify-end gap-x-2 text-[10px] text-text-muted mt-1">
+                {authorLabel(msg) && <span>{authorLabel(msg)}</span>}
+                {deliveryLabel(msg) && <span>{deliveryLabel(msg)}</span>}
+                <span>{dayjs(msg.created_at).format('HH:mm')}</span>
               </div>
+              {isRetryable(msg) && (
+                <button type="button" className="text-xs text-primary mt-1" disabled={retryingId === msg.id} onClick={() => retry(msg)}>
+                  {t('retry')}
+                </button>
+              )}
             </div>
-          ))
-        )}
+          </div>
+        ))}
       </div>
 
-      {/* Reply */}
-      <ReplyBox contactId={contactId} channel={channel} onSent={handleSent} />
+      <ReplyBox contactId={contactId} channel={channel} waReplyWindowUntil={contact?.wa_reply_window_until} onSent={handleSent} />
     </div>
   );
 }

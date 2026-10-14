@@ -36,6 +36,7 @@ export interface Contact {
   wa_handover_active: boolean;
   wa_handover_expires_at: string | null;
   wa_handover_updated_at: string | null;
+  wa_reply_window_until: string | null;
   phone_conflict: boolean;
   deleted_at: string | null;
   created_at: string;
@@ -153,6 +154,8 @@ export interface Message {
   delivery_error: string | null;
   created_at: string;
   contact_name?: string;
+  sent_by: string | null;
+  sent_by_name: string | null;
 }
 
 // === Routing Rule ===
@@ -244,6 +247,6 @@ export interface ApiError {
   error: {
     code: string;
     message: string;
-    fields?: Record<string, string>;
+    fields?: Record<string, string | null> | null;
   };
 }
