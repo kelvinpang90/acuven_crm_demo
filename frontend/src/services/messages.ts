@@ -20,7 +20,14 @@ export const messagesApi = {
     api.patch<ApiResponse<Message>>(`/messages/${id}/read`),
 
   sendWhatsApp: (contactId: string, message: string) =>
-    api.post<ApiResponse<Message>>('/messages/whatsapp/send', { contact_id: contactId, message }),
+    api.post<ApiResponse<Message>>(
+      '/messages/whatsapp/send',
+      { contact_id: contactId, message },
+      { timeout: 45000 },
+    ),
+
+  retryWhatsApp: (messageId: string) =>
+    api.post<ApiResponse<Message>>(`/messages/${messageId}/whatsapp/retry`, undefined, { timeout: 45000 }),
 
   sendEmail: (contactId: string, subject: string, body: string) =>
     api.post<ApiResponse<Message>>('/messages/email/send', { contact_id: contactId, subject, body }),

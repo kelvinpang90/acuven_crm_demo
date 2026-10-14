@@ -1,6 +1,12 @@
 import api from './api';
 import type { ApiResponse, PaginatedResponse, Contact, Activity } from '@/types';
 
+export interface WhatsAppHandover {
+  wa_handover_active: boolean;
+  wa_handover_expires_at: string | null;
+  wa_handover_updated_at: string | null;
+}
+
 export interface ContactListParams {
   search?: string;
   industry?: string;
@@ -19,6 +25,9 @@ export const contactsApi = {
 
   getContact: (id: string) =>
     api.get<ApiResponse<Contact>>(`/contacts/${id}`),
+
+  handbackWhatsApp: (id: string) =>
+    api.post<ApiResponse<WhatsAppHandover>>(`/contacts/${id}/whatsapp/handback`),
 
   createContact: (data: Partial<Contact>) =>
     api.post<ApiResponse<Contact>>('/contacts', data),
