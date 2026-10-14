@@ -504,12 +504,12 @@ tasks:
       - CRM-TASK-015
       - CRM-TASK-010
     acceptance_criteria:
-      - WhatsApp 会话的回复框限制最多 4096 字符，并在 wa_reply_window_until 为空或已过时禁用，提示窗口已关闭、要等顾客先来消息；邮件会话不受影响
+      - WhatsApp 会话的回复框限制最多 4096 字符，并在 wa_reply_window_until 为空或已过时禁用，提示窗口已关闭、要等顾客先来消息；邮件会话保持现状：仍是单行输入、回车即发送，失败时仍显示服务器返回的 error 的 message（没有才显示通用的发送失败）；本任务新加的字数限制、窗口禁用、超时、按错误码的提示与输入框形态只作用于 WhatsApp 会话
       - 发送与重试请求单独把超时设为 45 秒（长于后端调用 chatbot 的 30 秒总时限），其他请求的超时不变；发送返回 200 时清空输入并刷新会话；返回 202 时清空输入、刷新并提示未确认送出（以上是回复框的发送；重试的结果只刷新会话与提示，不碰回复框里的输入）；收不到响应（超时或网络错误）时保留输入、刷新会话，并提示先看会话里有没有出现未确认送出的消息，有就用它的重试、不要重发；其他错误保留输入，按错误码显示原因（窗口关闭带 fields 里的 window_closed_at、Meta 拒绝带 fields 里的 error_code 与 error_title、未配置、无权、无号码、重试过期；SEND_FAILED 没有 Meta 字段时显示通用的未发出，没有 code 的 422 显示通用的发送失败）
       - 会话里 author_kind 为 agent 的消息显示客服加 sent_by_name（为空只显示客服）；agent 消息 external_id 为空时：创建不足 45 秒显示发送中、不给重试，到 45 秒时由前端定时器按创建时间自行切换为未确认送出与重试按钮（不额外请求）；重试调用新接口，只刷新会话并提示结果（IN_PROGRESS、RETRY_EXPIRED 等按错误码显示原因），已确认的消息不再显示重试
       - 会话头部在接管中（判断同 CRM-TASK-010）时显示交还 AI 按钮，确认后调用交还接口，用返回的接管状态刷新头部；返回后若仍是接管中（chatbot 那边本来就没在接管，或同一秒的状态没写入），提示已请求交还、状态以 chatbot 推送为准，并在 5 秒后重新读取一次联系人、只刷新头部；失败时提示原因
       - 新文案同时加在 en 与 zh 的 inbox 命名空间，不写硬编码文字；类型定义与接口字段一致；前端类型检查与构建由 PR 的必需 CI 检查 frontend 执行并通过（Worker 沙箱不跑 npm）
-      - tasks/todo.md 新增 CRM-TASK-016 记录段（做了什么、偏离了什么、验证到什么程度）；不改 planning-v1 块；复选框只允许 [ ] / [x]
+      - tasks/todo.md 新增 CRM-TASK-016 记录段（做了什么、偏离了什么、验证到什么程度）；偏离如实列出对现有行为的改动（例如 WhatsApp 输入框改为多行）；验证段只写前端类型检查与构建由 PR 的必需检查 frontend 执行、检查结果由 Worker 和 CI 记录不写在这里、没有在浏览器里实际操作过，不写任何检查是否运行或通过；不改 planning-v1 块；复选框只允许 [ ] / [x]
       - 改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不改后端
       - allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#28），不合并、不直推
     allowed_change_paths:
