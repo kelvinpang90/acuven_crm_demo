@@ -795,7 +795,7 @@ tasks:
     purpose: >-
       按 docs/inbox-ai-assist.md 第 4.5 节第一条，在 CRM-TASK-016 之后的会话视图顶部加会话简报按钮与卡片。
       AI 未配置时整体不显示。只改前端：不改后端、不加页面或路由、不做起草与翻译（CRM-TASK-026）。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-024
       - CRM-TASK-016
