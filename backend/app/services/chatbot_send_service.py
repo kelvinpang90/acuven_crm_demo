@@ -94,7 +94,9 @@ async def _message(db: AsyncSession, message_id: str) -> Message:
 
 async def _live_contact(db: AsyncSession, contact_id: str) -> Optional[Contact]:
     result = await db.execute(
-        select(Contact).where(Contact.id == contact_id, Contact.deleted_at.is_(None))
+        select(Contact)
+        .where(Contact.id == contact_id, Contact.deleted_at.is_(None))
+        .execution_options(populate_existing=True)
     )
     return result.scalar_one_or_none()
 
@@ -313,6 +315,9 @@ async def retry_agent_reply(
         "text": message.body,
         "agent": {"id": message.sent_by, "name": agent_name},
     }
+    # End the read-only transaction so the slow call holds no snapshot and the
+    # re-read below sees rows an event may have changed in the meantime.
+    await db.commit()
     response, response_payload, connection_failure = await _post_chatbot(
         "/internal/crm/send", payload
     )
@@ -355,11 +360,14 @@ async def handback_to_ai(
         "visitor": {"phone": phone, "bsuid": contact.whatsapp_bsuid},
         "agent": {"id": agent_id, "name": agent_name},
     }
+    # As in retry: no open snapshot during the call, and every result re-reads
+    # the contact because a handover event may arrive before the response.
+    await db.commit()
     response, response_payload, _ = await _post_chatbot("/internal/crm/handback", payload)
     if response is None or response.status_code != 200:
-        return HandbackResult(HANDOFF_FAILED, contact=contact)
+        return HandbackResult(HANDOFF_FAILED, contact=await _live_contact(db, contact.id))
     if response_payload.get("result") == "not_active":
-        return HandbackResult(NOT_ACTIVE, contact=contact)
+        return HandbackResult(NOT_ACTIVE, contact=await _live_contact(db, contact.id))
     handover = _handover(response_payload)
     if (
         response_payload.get("result") != "ended"
@@ -368,7 +376,7 @@ async def handback_to_ai(
         or handover["expires_at"] is not None
     ):
         logger.error("invalid chatbot handback response", extra={"contact_id": contact_id})
-        return HandbackResult(HANDOFF_FAILED, contact=contact)
+        return HandbackResult(HANDOFF_FAILED, contact=await _live_contact(db, contact.id))
     await chatbot_event_service.write_response_handover(db, contact_id=contact.id, **handover)
     await db.commit()
     return HandbackResult(ENDED, contact=await _live_contact(db, contact.id))

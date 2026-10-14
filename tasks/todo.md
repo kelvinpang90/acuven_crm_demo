@@ -2039,6 +2039,8 @@ PRECHECK_RESULT: NOT_READY
   45 秒内 `IN_PROGRESS`、满 24 小时 `RETRY_EXPIRED`，先于联系人与窗口检查；任何失败都不删消息）与 `handback_to_ai`（签名调用交还接口，
   只有 `ended` 且 handover 合法时经 `write_response_handover` 严格晚于写入；200 不合契约打 ERROR）。
   签名请求、已发出的条件更新与「明确没发出」的判定从 `send_agent_reply` 提成共用函数，CRM-TASK-013 的行为不变。
+  重试与交还在调用 chatbot 前先提交（只结束只读事务，不写任何东西），调用后重新读取（`populate_existing`），
+  所以调用期间事件写入的状态会如实返回（例：交还时 handover_changed 先到、响应同一秒不写，返回的仍是事件写入后的接管状态）。
 - `chatbot_event_service`：新增 `store_agent_reply`，按设计第六节回填 `external_id`，只 flush、由事件接口提交（与其他事件处理函数一致）。
 - 新增 `backend/tests/test_chatbot_reply_rules.py`，按验收标准列出的重试（1）–（8）、agent_reply（9）–（12）与交还（1）–（7）用例逐条覆盖，
   docstring 写明对应的验收用例与设计第十一节例 3（事件部分）、例 4、例 8、例 9。

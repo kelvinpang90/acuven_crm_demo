@@ -392,6 +392,46 @@ async def test_handback_uses_normalized_identity_and_writes_newer_state(
         assert contact.wa_handover_active is False
 
 
+async def test_handback_returns_state_written_by_an_earlier_event(async_session_maker, monkeypatch):
+    """Guards the handback criterion "returns the contact's current takeover state".
+
+    Design section 6: the handover_changed event may be stored before the
+    response arrives with the same occurred_at; the response then does not
+    write, and the returned contact must still show the event's state.
+    """
+    await _seed(async_session_maker, _contact(wa_handover_active=True, wa_handover_updated_at=T0))
+    _configured(monkeypatch)
+
+    async def post(url, *, content, headers):
+        async with async_session_maker() as other:
+            await chatbot_event_service.update_handover(
+                other,
+                phone=PHONE,
+                bsuid=None,
+                active=False,
+                expires_at=None,
+                occurred_at=T0 + timedelta(minutes=30),
+            )
+            await other.commit()
+        return _response(
+            200,
+            {
+                "result": "ended",
+                "handover": {
+                    "active": False,
+                    "expires_at": None,
+                    "occurred_at": "2026-10-14T08:30:00Z",
+                },
+            },
+        )
+
+    _stub_http(monkeypatch, AsyncMock(side_effect=post))
+    result = await _handback(async_session_maker)
+    assert result.category == ENDED
+    assert result.contact.wa_handover_active is False
+    assert result.contact.wa_handover_updated_at == T0 + timedelta(minutes=30)
+
+
 @pytest.mark.parametrize(
     "contact, configured, expected",
     [
