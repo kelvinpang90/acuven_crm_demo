@@ -765,7 +765,7 @@ tasks:
     purpose: >-
       按 docs/inbox-ai-assist.md 第 4.3 节，把 CRM-TASK-023 的三个业务函数接成会话简报、起草回复、翻译三个接口，
       并加一个查询 AI 是否已配置的接口，让前端在未配置时隐藏按钮。只做接口层：不改业务规则、不改表结构、不改前端。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-023
     acceptance_criteria:
