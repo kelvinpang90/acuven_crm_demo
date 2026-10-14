@@ -195,6 +195,16 @@ async def test_each_feature_sends_its_contract_and_audits_success(async_session_
             {
                 "customer_need": "n",
                 "conversation_state": "s",
+                "customer_mood": [],
+                "open_questions": [],
+                "suggested_next_step": "",
+            },
+            validate_brief,
+        ),
+        (
+            {
+                "customer_need": "n",
+                "conversation_state": "s",
                 "customer_mood": "calm",
                 "open_questions": ["a"] * 4,
                 "suggested_next_step": "",
@@ -232,6 +242,10 @@ async def test_each_feature_sends_its_contract_and_audits_success(async_session_
             validate_brief,
         ),
         (
+            {"draft": "", "note_for_agent": ""},
+            lambda value: validate_reply_draft(value, "whatsapp"),
+        ),
+        (
             {"draft": "x" * 1001, "note_for_agent": ""},
             lambda value: validate_reply_draft(value, "whatsapp"),
         ),
@@ -254,6 +268,7 @@ async def test_each_feature_sends_its_contract_and_audits_success(async_session_
         ({"translation": "", "detected_language": "en"}, validate_translation),
         ({"translation": "t" * 8001, "detected_language": "en"}, validate_translation),
         ({"translation": "ok", "detected_language": "fr"}, validate_translation),
+        ({"translation": "ok", "detected_language": []}, validate_translation),
     ],
 )
 def test_every_output_field_limit_count_and_enum_is_rejected(output, validator):
@@ -283,6 +298,63 @@ async def test_invalid_success_output_becomes_error_and_keeps_request_id(
 
     assert result.category == audit.outcome == "error"
     assert result.request_id == audit.request_id == "billed"
+
+
+@pytest.mark.asyncio
+async def test_brief_and_draft_invalid_success_outputs_become_audited_errors(
+    async_session_maker, monkeypatch
+):
+    """Guards invalid successful brief and draft output reclassification and audit outcomes."""
+    await _seed(async_session_maker)
+    _configured(monkeypatch)
+    calls = []
+    results = iter(
+        [
+            ai_api_client.AiApiResult(
+                "ok",
+                {
+                    "customer_need": "Need",
+                    "conversation_state": "Open",
+                    "customer_mood": [],
+                    "open_questions": [],
+                    "suggested_next_step": "Reply",
+                },
+                "brief-invalid",
+            ),
+            ai_api_client.AiApiResult("ok", {"draft": "", "note_for_agent": ""}, "draft-invalid"),
+        ]
+    )
+
+    async def send_message(**kwargs):
+        calls.append(kwargs)
+        return next(results)
+
+    monkeypatch.setattr(ai_assist_service.ai_api_client, "send_message", send_message)
+    async with async_session_maker() as session:
+        brief = await ai_assist_service.generate_conversation_brief(
+            session, user_id="user-1", contact_id="contact-1", output_language="en"
+        )
+        draft = await ai_assist_service.generate_reply_draft(
+            session,
+            user_id="user-1",
+            contact_id="contact-1",
+            channel="whatsapp",
+            output_language="en",
+        )
+        await session.commit()
+        audits = (
+            (await session.execute(select(AiRequest).order_by(AiRequest.feature))).scalars().all()
+        )
+
+    assert [(result.category, result.request_id) for result in (brief, draft)] == [
+        ("error", "brief-invalid"),
+        ("error", "draft-invalid"),
+    ]
+    assert [(audit.feature, audit.outcome, audit.request_id) for audit in audits] == [
+        (BRIEF_FEATURE, "error", "brief-invalid"),
+        (REPLY_DRAFT_FEATURE, "error", "draft-invalid"),
+    ]
+    assert [call["feature"] for call in calls] == [BRIEF_FEATURE, REPLY_DRAFT_FEATURE]
 
 
 @pytest.mark.asyncio

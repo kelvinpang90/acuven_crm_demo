@@ -108,6 +108,7 @@ def validate_brief(output: Any) -> dict[str, Any] | None:
         need is None
         or state is None
         or next_step is None
+        or not isinstance(output["customer_mood"], str)
         or output["customer_mood"] not in {"calm", "neutral", "frustrated", "urgent"}
         or len(questions) > 3
         or any(question is None for question in questions)
@@ -147,6 +148,10 @@ def validate_translation(output: Any) -> dict[str, str] | None:
     if not _shape(output, {"translation", "detected_language"}):
         return None
     translation = _text(output["translation"], 1, 8000)
-    if translation is None or output["detected_language"] not in {"zh-CN", "en", "ms", "other"}:
+    if (
+        translation is None
+        or not isinstance(output["detected_language"], str)
+        or output["detected_language"] not in {"zh-CN", "en", "ms", "other"}
+    ):
         return None
     return {"translation": translation, "detected_language": output["detected_language"]}
