@@ -24,7 +24,9 @@ from app.services.chatbot_send_service import (
     NOT_FOUND,
     NOT_RETRYABLE,
     RETRY_EXPIRED,
+    SEND_FAILED,
     SENT,
+    UNCONFIRMED,
     WINDOW_CLOSED,
     handback_to_ai,
     retry_agent_reply,
@@ -81,6 +83,11 @@ async def _seed(maker, *rows):
 def _configured(monkeypatch):
     monkeypatch.setattr(settings, "chatbot_send_url", "http://chatbot.internal:8000")
     monkeypatch.setattr(settings, "chatbot_send_secret", "secret")
+
+
+def _unconfigured(monkeypatch):
+    monkeypatch.setattr(settings, "chatbot_send_url", "")
+    monkeypatch.setattr(settings, "chatbot_send_secret", "")
 
 
 def _response(status, payload=None):
@@ -171,13 +178,18 @@ async def test_retry_window_and_configuration_do_not_call(
         await session.commit()
     if configured:
         _configured(monkeypatch)
+    else:
+        _unconfigured(monkeypatch)
     post = _stub_http(monkeypatch, AsyncMock())
     assert (await _retry(async_session_maker)).category == expected
     post.assert_not_awaited()
 
 
 async def test_retry_reuses_durable_request_details_and_confirms(async_session_maker, monkeypatch):
-    """Guards retry acceptance rules (6)--(7): original recipient and idempotency key survive changes."""
+    """Guards retry acceptance rules (6)--(7); design section 11 example 4 (duplicate confirms).
+
+    The original recipient and idempotency key survive later contact changes.
+    """
     await _seed(
         async_session_maker,
         _contact(phone="60111111111", whatsapp_bsuid="new.bsuid"),
@@ -218,21 +230,30 @@ async def test_retry_sends_null_bsuid_when_contact_has_none(async_session_maker,
 
 
 @pytest.mark.parametrize(
-    "outcome",
+    ("outcome", "category"),
     [
-        _response(502, {"result": "rejected"}),
-        _response(401),
-        httpx.ReadTimeout("late"),
-        httpx.ConnectError("offline"),
-        _response(200, {"result": "mystery"}),
+        (_response(502, {"result": "rejected", "error_code": 131026}), SEND_FAILED),
+        (_response(401), SEND_FAILED),
+        (httpx.ReadTimeout("late"), UNCONFIRMED),
+        (httpx.ConnectError("offline"), SEND_FAILED),
+        (_response(200, {"result": "mystery"}), UNCONFIRMED),
     ],
 )
-async def test_retry_failures_keep_the_original_message(async_session_maker, monkeypatch, outcome):
-    """Guards retry acceptance rule (8): every unsuccessful retry retains the original state."""
+async def test_retry_failures_keep_the_original_message(
+    async_session_maker, monkeypatch, outcome, category
+):
+    """Guards retry acceptance rule (8); design section 11 example 4 (rejected or 401 retry).
+
+    Every unsuccessful retry keeps the message unchanged and reports the same
+    category CRM-TASK-013 would: explicit failures as send_failed, the rest as
+    unconfirmed.
+    """
     await _seed(async_session_maker, _contact(), _agent_message(), _inbound())
     _configured(monkeypatch)
     _stub_http(monkeypatch, AsyncMock(side_effect=[outcome]))
-    await _retry(async_session_maker)
+    result = await _retry(async_session_maker)
+    assert result.category == category
+    assert result.message.id == "m1"
     async with async_session_maker() as session:
         message = (await session.execute(select(Message).where(Message.id == "m1"))).scalar_one()
     assert message.external_id is None and message.delivery_status is None
@@ -249,7 +270,11 @@ async def test_retry_failures_keep_the_original_message(async_session_maker, mon
 async def test_agent_reply_ignores_non_agent_and_deduplicates(
     async_session_maker, message, wa_id, expected
 ):
-    """Guards agent_reply acceptance rules (9)--(10)."""
+    """Guards agent_reply acceptance rules (9)--(10); design section 11 examples 9 and 4.
+
+    A missing message is ignored (example 9); a callback after the retry already
+    confirmed the same id is a duplicate (example 4).
+    """
     await _seed(async_session_maker, *([message] if message else []))
     async with async_session_maker() as session:
         assert (
@@ -267,7 +292,10 @@ async def test_agent_reply_ignores_non_agent_and_deduplicates(
 async def test_agent_reply_stores_without_overwriting_status(
     async_session_maker, delivery_status, expected_status
 ):
-    """Guards agent_reply acceptance rule (11): confirmation fills only empty fields."""
+    """Guards agent_reply acceptance rule (11); design section 11 example 3 (event part).
+
+    Confirmation fills only empty fields and never rewrites the body.
+    """
     await _seed(async_session_maker, _agent_message(delivery_status=delivery_status))
     async with async_session_maker() as session:
         assert (
@@ -279,6 +307,7 @@ async def test_agent_reply_stores_without_overwriting_status(
         message = (await session.execute(select(Message).where(Message.id == "m1"))).scalar_one()
         assert message.external_id == "wamid.1"
         assert message.delivery_status == expected_status
+        assert message.body == "original reply"
 
 
 async def test_agent_reply_duplicate_external_id_belongs_to_another_message(async_session_maker):
@@ -323,11 +352,15 @@ async def _handback(maker, **kwargs):
 async def test_handback_uses_normalized_identity_and_writes_newer_state(
     async_session_maker, monkeypatch
 ):
-    """Guards handback acceptance rules (1) and (4): valid ended response writes strictly newer state."""
+    """Guards handback acceptance rules (1) and (4); design section 11 example 8.
+
+    A valid ended response with a strictly newer time ends the takeover.
+    """
     await _seed(
         async_session_maker,
         _contact(
             phone="012-345 6789",
+            whatsapp_bsuid="visitor.bsuid",
             wa_handover_active=True,
             wa_handover_updated_at=T0,
         ),
@@ -336,7 +369,7 @@ async def test_handback_uses_normalized_identity_and_writes_newer_state(
 
     async def post(url, *, content, headers):
         assert url.endswith("/internal/crm/handback")
-        assert json.loads(content)["visitor"] == {"phone": PHONE, "bsuid": None}
+        assert json.loads(content)["visitor"] == {"phone": PHONE, "bsuid": "visitor.bsuid"}
         return _response(
             200,
             {
@@ -350,7 +383,9 @@ async def test_handback_uses_normalized_identity_and_writes_newer_state(
         )
 
     _stub_http(monkeypatch, AsyncMock(side_effect=post))
-    assert (await _handback(async_session_maker)).category == ENDED
+    result = await _handback(async_session_maker)
+    assert result.category == ENDED
+    assert result.contact.wa_handover_active is False
     async with async_session_maker() as session:
         contact = await session.get(Contact, "c1")
         assert contact.wa_handover_updated_at == T0 + timedelta(minutes=1)
@@ -373,6 +408,8 @@ async def test_handback_local_failures_do_not_call(
         await _seed(async_session_maker, contact)
     if configured:
         _configured(monkeypatch)
+    else:
+        _unconfigured(monkeypatch)
     post = _stub_http(monkeypatch, AsyncMock())
     assert (await _handback(async_session_maker)).category == expected
     post.assert_not_awaited()
@@ -394,7 +431,10 @@ async def test_handback_uses_bsuid_when_phone_is_not_normalizable(async_session_
 async def test_handback_same_second_and_not_active_do_not_change_state(
     async_session_maker, monkeypatch
 ):
-    """Guards handback acceptance rules (4)--(5): equal timestamps and not_active do not write."""
+    """Guards handback acceptance rules (4)--(5); design section 11 example 8 (second click).
+
+    An ended response in the same second as the stored time and not_active do not write.
+    """
     await _seed(async_session_maker, _contact(wa_handover_active=True, wa_handover_updated_at=T0))
     _configured(monkeypatch)
     _stub_http(

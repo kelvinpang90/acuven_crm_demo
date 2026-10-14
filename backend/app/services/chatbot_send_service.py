@@ -156,6 +156,17 @@ async def _apply_sent_response(
     return SendReplyResult(SENT, message=await _message(db, message.id))
 
 
+def _explicit_failure(response, payload: dict[str, Any], connection_failure: bool) -> bool:
+    """Design section 6 rule 8: only these outcomes prove chatbot did not send."""
+    return connection_failure or (
+        response is not None
+        and (
+            response.status_code in (401, 422, 503)
+            or (response.status_code == 502 and payload.get("result") == "rejected")
+        )
+    )
+
+
 def _sent(response, payload: dict[str, Any]) -> bool:
     return (
         response is not None
@@ -249,13 +260,7 @@ async def send_agent_reply(
     error_code = payload_response.get("error_code")
     title = payload_response.get("error_title")
     error_title = title if isinstance(title, str) else None
-    explicit_failure = connection_failure or (
-        response is not None
-        and (
-            response.status_code in (401, 422, 503)
-            or (response.status_code == 502 and payload_response.get("result") == "rejected")
-        )
-    )
+    explicit_failure = _explicit_failure(response, payload_response, connection_failure)
     if _sent(response, payload_response):
         return await _apply_sent_response(db, message, contact, payload_response)
 
@@ -308,13 +313,22 @@ async def retry_agent_reply(
         "text": message.body,
         "agent": {"id": message.sent_by, "name": agent_name},
     }
-    response, response_payload, _ = await _post_chatbot("/internal/crm/send", payload)
+    response, response_payload, connection_failure = await _post_chatbot(
+        "/internal/crm/send", payload
+    )
     if _sent(response, response_payload):
         return await _apply_sent_response(db, message, contact, response_payload)
+    # A failed retry only says this attempt did not send; the first attempt's
+    # outcome is still unknown, so the row is kept whatever the category.
+    category = (
+        SEND_FAILED
+        if _explicit_failure(response, response_payload, connection_failure)
+        else UNCONFIRMED
+    )
     title = response_payload.get("error_title")
     return SendReplyResult(
-        SEND_FAILED,
-        message=message,
+        category,
+        message=await _message(db, message.id),
         error_code=response_payload.get("error_code"),
         error_title=title if isinstance(title, str) else None,
     )
