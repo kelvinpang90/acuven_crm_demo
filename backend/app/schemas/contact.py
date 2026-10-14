@@ -71,6 +71,7 @@ class ContactResponse(BaseModel):
     wa_handover_active: bool = False
     wa_handover_expires_at: Optional[datetime] = None
     wa_handover_updated_at: Optional[datetime] = None
+    wa_reply_window_until: Optional[datetime] = None
     # List and detail only; computed for admins, always False for other roles.
     phone_conflict: bool = False
     created_at: datetime

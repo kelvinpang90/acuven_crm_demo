@@ -10,9 +10,8 @@ from app.models.contact import Contact
 from app.models.message import Message
 from app.models.user import User
 from app.schemas.message import EmailSendRequest, WhatsAppSendRequest
-from app.services import access_service, email_service, whatsapp_service
+from app.services import access_service, chatbot_send_service, email_service
 from app.services.email_service import EmailSendError
-from app.services.whatsapp_service import WhatsAppSendError
 from app.utils.response import fail, ok
 
 router = APIRouter()
@@ -62,14 +61,7 @@ async def list_messages(
     result = await db.execute(query)
     messages = result.scalars().all()
 
-    # Enrich with contact name
-    items = []
-    for m in messages:
-        d = _msg_to_dict(m)
-        if m.contact_id:
-            cr = await db.execute(select(Contact.name).where(Contact.id == m.contact_id))
-            d["contact_name"] = cr.scalar()
-        items.append(d)
+    items = await _message_dicts(db, messages, include_contact_name=True)
 
     return ok(
         data={
@@ -93,7 +85,7 @@ async def contact_messages(
     result = await db.execute(
         select(Message).where(Message.contact_id == contact_id).order_by(Message.created_at.asc())
     )
-    messages = [_msg_to_dict(m) for m in result.scalars().all()]
+    messages = await _message_dicts(db, result.scalars().all())
     return ok(data=messages)
 
 
@@ -115,7 +107,7 @@ async def mark_read(
         return fail(message="Message not found", code=404)
     msg.is_read = True
     await db.commit()
-    return ok(data=_msg_to_dict(msg))
+    return ok(data=(await _message_dicts(db, [msg]))[0])
 
 
 @router.post("/whatsapp/send")
@@ -127,21 +119,46 @@ async def send_whatsapp(
     if not await access_service.may_access_contact(db, current_user, body.contact_id):
         return fail(message=NOT_YOURS, code="NOT_ASSIGNED", status_code=403)
 
-    try:
-        data = await whatsapp_service.send_message(db, body.contact_id, body.message)
-    except WhatsAppSendError as exc:
-        if exc.reason == "no_phone":
-            return fail(
-                message="Contact not found or has no phone number", code="NO_PHONE", status_code=400
+    result = await chatbot_send_service.send_agent_reply(
+        db,
+        contact_id=body.contact_id,
+        text=body.message,
+        agent_id=current_user.id,
+        agent_name=current_user.name,
+    )
+    return await _send_result(db, result)
+
+
+@router.post("/{message_id}/whatsapp/retry")
+async def retry_whatsapp(
+    message_id: str,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    message = (
+        await db.execute(select(Message).where(Message.id == message_id))
+    ).scalar_one_or_none()
+    contact_is_live = (
+        message is not None
+        and (
+            await db.execute(
+                select(Contact.id).where(
+                    Contact.id == message.contact_id, Contact.deleted_at.is_(None)
+                )
             )
-        if exc.reason == "not_configured":
-            return fail(
-                message="WhatsApp is not configured; the message was not sent",
-                code="NOT_CONFIGURED",
-                status_code=503,
-            )
-        return fail(message=f"WhatsApp API error: {exc.detail}", code="API_ERROR", status_code=502)
-    return ok(data=data)
+        ).scalar_one_or_none()
+    )
+    if (
+        message is None
+        or message.author_kind != "agent"
+        or not await access_service.may_access_contact(db, current_user, message.contact_id)
+        or contact_is_live is None
+    ):
+        return fail(message=NOT_YOURS, code="NOT_ASSIGNED", status_code=403)
+    result = await chatbot_send_service.retry_agent_reply(db, message_id=message_id)
+    if result.category in (chatbot_send_service.NOT_FOUND, chatbot_send_service.NOT_RETRYABLE):
+        return fail(message=NOT_YOURS, code="NOT_ASSIGNED", status_code=403)
+    return await _send_result(db, result)
 
 
 @router.post("/email/send")
@@ -188,4 +205,71 @@ def _msg_to_dict(m: Message) -> dict:
         # See whatsapp_service._msg_to_dict for rationale.
         "created_at": m.created_at.isoformat() + "Z" if m.created_at else None,
         "contact_name": None,
+        "sent_by": m.sent_by,
+        "sent_by_name": None,
     }
+
+
+async def _message_dicts(
+    db: AsyncSession, messages: list[Message], *, include_contact_name: bool = False
+) -> list[dict]:
+    user_ids = {m.sent_by for m in messages if m.sent_by}
+    user_names = {}
+    if user_ids:
+        user_names = dict(
+            (await db.execute(select(User.id, User.name).where(User.id.in_(user_ids)))).all()
+        )
+    contact_names = {}
+    if include_contact_name:
+        contact_ids = {m.contact_id for m in messages if m.contact_id}
+        if contact_ids:
+            contact_names = dict(
+                (
+                    await db.execute(
+                        select(Contact.id, Contact.name).where(Contact.id.in_(contact_ids))
+                    )
+                ).all()
+            )
+    items = []
+    for message in messages:
+        item = _msg_to_dict(message)
+        item["sent_by_name"] = user_names.get(message.sent_by)
+        if include_contact_name:
+            item["contact_name"] = contact_names.get(message.contact_id)
+        items.append(item)
+    return items
+
+
+async def _send_result(db: AsyncSession, result: chatbot_send_service.SendReplyResult):
+    category = result.category
+    if category == chatbot_send_service.SENT:
+        return ok(data=(await _message_dicts(db, [result.message]))[0])
+    if category == chatbot_send_service.UNCONFIRMED:
+        return ok(
+            data=(await _message_dicts(db, [result.message]))[0],
+            message="UNCONFIRMED",
+            status_code=202,
+        )
+    if category == chatbot_send_service.NO_PHONE:
+        return fail("Contact not found or has no phone number", code="NO_PHONE", status_code=400)
+    if category == chatbot_send_service.WINDOW_CLOSED:
+        return fail(
+            "WhatsApp reply window is closed",
+            code="WINDOW_CLOSED",
+            fields={"window_closed_at": result.window_until},
+            status_code=409,
+        )
+    if category == chatbot_send_service.NOT_CONFIGURED:
+        return fail("Chatbot is not configured", code="NOT_CONFIGURED", status_code=503)
+    if category == chatbot_send_service.IN_PROGRESS:
+        return fail("Message is still being sent", code="IN_PROGRESS", status_code=409)
+    if category == chatbot_send_service.RETRY_EXPIRED:
+        return fail("Retry window has expired", code="RETRY_EXPIRED", status_code=409)
+    if category == chatbot_send_service.SEND_FAILED:
+        return fail(
+            "Chatbot did not send the message",
+            code="SEND_FAILED",
+            fields={"error_code": result.error_code, "error_title": result.error_title},
+            status_code=502,
+        )
+    return fail(message=NOT_YOURS, code="NOT_ASSIGNED", status_code=403)

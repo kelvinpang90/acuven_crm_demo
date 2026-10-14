@@ -17,6 +17,7 @@ from app.services import (
     access_service,
     activity_service,
     autocount_service,
+    chatbot_send_service,
     contact_service,
     routing_service,
 )
@@ -218,6 +219,28 @@ async def get_contact(
     if not contact:
         return _not_found()
     return ok(data=contact)
+
+
+@router.post("/{contact_id}/whatsapp/handback")
+async def handback_whatsapp(
+    contact_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    if not await access_service.may_access_contact(db, current_user, contact_id):
+        return fail("This customer is not assigned to you.", code="NOT_ASSIGNED", status_code=403)
+    result = await chatbot_send_service.handback_to_ai(
+        db, contact_id=contact_id, agent_id=current_user.id, agent_name=current_user.name
+    )
+    if result.category == chatbot_send_service.NOT_FOUND:
+        return fail("This customer is not assigned to you.", code="NOT_ASSIGNED", status_code=403)
+    if result.category == chatbot_send_service.NO_IDENTITY:
+        return fail("Contact has no WhatsApp identity", code="NO_IDENTITY", status_code=400)
+    if result.category == chatbot_send_service.NOT_CONFIGURED:
+        return fail("Chatbot is not configured", code="NOT_CONFIGURED", status_code=503)
+    if result.category == chatbot_send_service.CHATBOT_FAILED:
+        return fail("Chatbot handback failed", code="CHATBOT_FAILED", status_code=502)
+    return ok(data=contact_service.handover_to_dict(result.contact))
 
 
 @router.post("")

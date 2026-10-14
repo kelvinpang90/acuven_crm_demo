@@ -19,7 +19,12 @@ from pydantic import (
 from app.utils.phone import normalize_phone
 
 EventType = Literal[
-    "customer_message", "ai_reply", "console_reply", "handover_changed", "delivery_status"
+    "customer_message",
+    "ai_reply",
+    "console_reply",
+    "agent_reply",
+    "handover_changed",
+    "delivery_status",
 ]
 MESSAGE_EVENTS = ("customer_message", "ai_reply", "console_reply")
 
@@ -87,6 +92,7 @@ class ChatbotEvent(BaseModel):
     bot_id: Optional[StrictStr] = Field(None, max_length=50)
     handover: Optional[EventHandover] = None
     status: Optional[EventStatus] = None
+    crm_message_id: Optional[StrictStr] = Field(None, min_length=1, max_length=36)
 
     @field_validator("occurred_at", mode="before")
     @classmethod
@@ -95,8 +101,10 @@ class ChatbotEvent(BaseModel):
 
     @model_validator(mode="after")
     def type_fields_present(self) -> "ChatbotEvent":
-        if self.type in MESSAGE_EVENTS and self.message is None:
+        if (self.type in MESSAGE_EVENTS or self.type == "agent_reply") and self.message is None:
             raise ValueError(f"{self.type} needs message")
+        if self.type == "agent_reply" and not self.crm_message_id:
+            raise ValueError("agent_reply needs crm_message_id")
         if self.type == "handover_changed" and self.handover is None:
             raise ValueError("handover_changed needs handover")
         if self.type == "delivery_status" and self.status is None:
@@ -117,6 +125,12 @@ class ChatbotEvent(BaseModel):
                 wa_message_id=self.message.wa_message_id,
                 body=self.message.body,
                 bot_id=self.bot_id if self.type == "ai_reply" else None,
+            )
+        elif self.type == "agent_reply":
+            kwargs.update(
+                crm_message_id=self.crm_message_id,
+                wa_message_id=self.message.wa_message_id,
+                body=self.message.body,
             )
         elif self.type == "handover_changed":
             kwargs.update(

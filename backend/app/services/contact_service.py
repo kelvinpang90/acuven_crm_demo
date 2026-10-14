@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Iterable, Optional
 
 from sqlalchemy import func, or_, select, update
@@ -92,6 +92,7 @@ async def list_contacts(
     contact_ids = [c.id for c in contacts]
     deal_summary = await _bulk_deal_summary(db, contact_ids)
     conflicts = await _phone_conflicts_for(db, current_user, contacts)
+    reply_windows = await _reply_windows_for(db, contact_ids)
 
     # Enrich with assigned_to_name
     data = []
@@ -99,6 +100,7 @@ async def list_contacts(
     for c in contacts:
         d = _contact_to_dict(c)
         d["phone_conflict"] = c.phone in conflicts
+        d["wa_reply_window_until"] = reply_windows.get(c.id)
         if c.assigned_to:
             if c.assigned_to not in user_cache:
                 u = await db.execute(select(User.name).where(User.id == c.assigned_to))
@@ -130,6 +132,7 @@ async def get_contact(
     summary = await _bulk_deal_summary(db, [contact_id])
     d["total_deal_amount"] = summary.get(contact_id, {}).get("total", 0.0)
     d["deal_count"] = summary.get(contact_id, {}).get("count", 0)
+    d["wa_reply_window_until"] = (await _reply_windows_for(db, [contact_id])).get(contact_id)
     return d
 
 
@@ -539,6 +542,30 @@ def _contact_to_dict(contact: Contact) -> dict:
         # Naive UTC like created_at; ok() marks them with Z on the way out.
         "wa_handover_expires_at": _isoformat(contact.wa_handover_expires_at),
         "wa_handover_updated_at": _isoformat(contact.wa_handover_updated_at),
+        "wa_reply_window_until": None,
         "created_at": contact.created_at.isoformat() if contact.created_at else None,
         "updated_at": contact.updated_at.isoformat() if contact.updated_at else None,
+    }
+
+
+async def _reply_windows_for(db: AsyncSession, contact_ids: list[str]) -> dict[str, datetime]:
+    if not contact_ids:
+        return {}
+    result = await db.execute(
+        select(Message.contact_id, func.max(Message.created_at))
+        .where(
+            Message.contact_id.in_(contact_ids),
+            Message.channel == "whatsapp",
+            Message.direction == "inbound",
+        )
+        .group_by(Message.contact_id)
+    )
+    return {contact_id: created_at + timedelta(hours=24) for contact_id, created_at in result.all()}
+
+
+def handover_to_dict(contact: Contact) -> dict:
+    return {
+        "wa_handover_active": _handover_in_effect(contact),
+        "wa_handover_expires_at": _isoformat(contact.wa_handover_expires_at),
+        "wa_handover_updated_at": _isoformat(contact.wa_handover_updated_at),
     }

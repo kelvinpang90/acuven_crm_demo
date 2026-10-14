@@ -2055,3 +2055,19 @@ PRECHECK_RESULT: NOT_READY
 
 - `ruff check` 与 `ruff format --check` 本地通过。
 - pytest 本地没有跑（本机 Python 版本装不上锁定的依赖），以 PR 的必需 CI 检查 `backend` 为准。
+
+## CRM-TASK-015（2026-10-14）
+
+### 做了什么
+
+- WhatsApp 发送与重试接口改由 chatbot 发送服务处理，补齐结果映射、发送人字段和正文模型校验。
+- 新增交还 AI 接口及 agent_reply 事件的接口校验与转交；联系人和消息响应补齐回复窗口与发送人显示字段。
+- 新增接口层测试，并移除经旧发送路由断言 Graph 行为的用例。
+
+### 偏离了什么
+
+- 无。
+
+### 验证到什么程度
+
+- 新增测试覆盖发送映射、重试与交还的权限隐藏、agent_reply 校验和委托。

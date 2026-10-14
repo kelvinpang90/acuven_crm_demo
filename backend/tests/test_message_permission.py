@@ -81,7 +81,9 @@ async def test_send_endpoint_refuses_and_sends_nothing(client, async_session_mak
 
     app.dependency_overrides[get_current_user] = lambda: REP
     try:
-        with patch("app.services.whatsapp_service.send_message", new=AsyncMock()) as mock_send:
+        with patch(
+            "app.services.chatbot_send_service.send_agent_reply", new=AsyncMock()
+        ) as mock_send:
             resp = await client.post(
                 "/api/messages/whatsapp/send",
                 json={"contact_id": "c-theirs", "message": "hello"},
