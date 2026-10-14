@@ -94,10 +94,15 @@ export default function ConversationView({ contactId, contactName, channel }: Pr
   }, [loadContact]);
 
   useEffect(() => {
+    setClock(Date.now());
+  }, [channel, messages]);
+
+  useEffect(() => {
     if (channel !== 'whatsapp') return undefined;
+    const now = Date.now();
     const pending = messages
       .filter((message) => message.author_kind === 'agent' && !message.external_id)
-      .map((message) => new Date(message.created_at).getTime() + 45000 - clock)
+      .map((message) => new Date(message.created_at).getTime() + 45000 - now)
       .filter((delay) => delay > 0);
     if (pending.length === 0) return undefined;
     const timer = window.setTimeout(() => setClock(Date.now()), Math.min(...pending));
