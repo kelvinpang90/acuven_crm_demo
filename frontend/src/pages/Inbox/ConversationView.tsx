@@ -44,6 +44,7 @@ function handbackErrorMessage(error: unknown, t: TFunction<'inbox'>) {
     case 'NOT_CONFIGURED': return t('chatbotNotConfigured');
     case 'NOT_ASSIGNED': return t('notAssigned');
     case 'NO_IDENTITY': return t('noWhatsAppIdentity');
+    case 'CHATBOT_FAILED': return t('handbackFailed');
     default: return apiError.message || t('handbackFailed');
   }
 }
@@ -68,9 +69,9 @@ export default function ConversationView({ contactId, contactName, channel }: Pr
     setLoading(true);
     try {
       const res = await messagesApi.getContactMessages(contactId);
-      setMessages(res.data.data);
+      if (activeContactId.current === contactId) setMessages(res.data.data);
     } catch { /* ignore */ }
-    setLoading(false);
+    if (activeContactId.current === contactId) setLoading(false);
   }, [contactId]);
 
   const loadContact = useCallback(async () => {
