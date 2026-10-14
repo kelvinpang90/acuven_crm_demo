@@ -432,7 +432,7 @@ tasks:
       按 docs/chatbot-replies.md 第六节「重试」「agent_reply 事件」「交还 AI」，在 CRM-TASK-013 的发送服务上补齐三条业务规则：
       未确认送出的消息用同一个幂等键重试且重试失败不删，chatbot 推回的 agent_reply 事件回填 wa_message_id，经 chatbot 交还 AI 并写入接管状态。
       只做业务规则层，由 CRM-TASK-015 的接口调用：不加接口与事件类型校验、不改表结构、不改前端。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-013
     acceptance_criteria:
