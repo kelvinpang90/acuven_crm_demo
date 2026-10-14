@@ -55,5 +55,22 @@
   "deliveryFailed": "Not delivered",
   "deliveryFailedWithError": "Not delivered: {{error}}",
   "handoverActive": "Taken over until {{expiresAt}}",
-  "aiReplying": "AI is replying"
+  "aiReplying": "AI is replying",
+  "aiBrief": "Conversation brief",
+  "aiBriefLoading": "Creating brief...",
+  "aiBriefCollapse": "Collapse",
+  "aiGeneratedUnverified": "AI generated, not verified",
+  "aiBriefTruncated": "Only the most recent part of this conversation was reviewed.",
+  "aiBriefCustomerNeed": "Customer need",
+  "aiBriefConversationState": "Conversation progress",
+  "aiBriefCustomerMood": "Mood",
+  "aiBriefOpenQuestions": "Unanswered questions",
+  "aiBriefSuggestedNextStep": "Suggested next step",
+  "aiBriefNone": "None",
+  "aiBriefMood": { "calm": "Calm", "neutral": "Neutral", "frustrated": "Frustrated", "urgent": "Urgent" },
+  "aiTemporarilyUnavailable": "AI is temporarily unavailable",
+  "aiError": "AI encountered an error",
+  "aiNotEnabled": "AI is not enabled",
+  "aiNoMessages": "There are no messages to summarize",
+  "aiRequestFailed": "AI request failed"
 }

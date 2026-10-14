@@ -5,7 +5,8 @@ import axios from 'axios';
 import type { TFunction } from 'i18next';
 import { messagesApi } from '@/services/messages';
 import { contactsApi, type WhatsAppHandover } from '@/services/contacts';
-import type { ApiError, Contact, Message } from '@/types';
+import { aiApi } from '@/services/ai';
+import type { AiConversationBrief, ApiError, Contact, Message } from '@/types';
 import dayjs from 'dayjs';
 import ReplyBox from './ReplyBox';
 
@@ -53,13 +54,34 @@ function isHandoverActive(handover: WhatsAppHandover) {
   return handover.wa_handover_active && !!handover.wa_handover_updated_at;
 }
 
+function briefErrorMessage(error: unknown, t: TFunction<'inbox'>) {
+  if (!axios.isAxiosError<ApiError>(error) || !error.response) return t('aiTemporarilyUnavailable');
+  switch (error.response.data?.error?.code) {
+    case 'AI_UNAVAILABLE': return t('aiTemporarilyUnavailable');
+    case 'AI_ERROR': return t('aiError');
+    case 'AI_NOT_CONFIGURED': return t('aiNotEnabled');
+    case 'NO_MESSAGES': return t('aiNoMessages');
+    case 'NOT_ASSIGNED': return t('notAssigned');
+    default: return t('aiRequestFailed');
+  }
+}
+
+function briefOutputLanguage(language: string): 'zh-CN' | 'en' | undefined {
+  if (language.startsWith('zh')) return 'zh-CN';
+  if (language.startsWith('en')) return 'en';
+  return undefined;
+}
+
 export default function ConversationView({ contactId, contactName, channel }: Props) {
-  const { t } = useTranslation('inbox');
+  const { t, i18n } = useTranslation('inbox');
   const [messages, setMessages] = useState<Message[]>([]);
   const [contact, setContact] = useState<Contact | null>(null);
   const [loading, setLoading] = useState(true);
   const [retryingId, setRetryingId] = useState<string | null>(null);
   const [handingBack, setHandingBack] = useState(false);
+  const [aiEnabled, setAiEnabled] = useState(false);
+  const [briefing, setBriefing] = useState(false);
+  const [brief, setBrief] = useState<{ contactId: string; data: AiConversationBrief } | null>(null);
   const [clock, setClock] = useState(Date.now());
   const activeContactId = useRef(contactId);
   const handbackRefreshTimer = useRef<number | null>(null);
@@ -84,8 +106,18 @@ export default function ConversationView({ contactId, contactName, channel }: Pr
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
+    let active = true;
+    void aiApi.getStatus().then(
+      (status) => { if (active) setAiEnabled(status.enabled); },
+      () => { if (active) setAiEnabled(false); },
+    );
+    return () => { active = false; };
+  }, []);
+  useEffect(() => {
     setContact(null);
     setHandingBack(false);
+    setBrief(null);
+    setBriefing(false);
     loadContact();
     return () => {
       if (handbackRefreshTimer.current !== null) {
@@ -183,6 +215,26 @@ export default function ConversationView({ contactId, contactName, channel }: Pr
     }
   };
 
+  const createBrief = async () => {
+    const requestedContactId = contactId;
+    setBriefing(true);
+    try {
+      const response = await aiApi.createConversationBrief(
+        requestedContactId,
+        briefOutputLanguage(i18n.language),
+      );
+      if (activeContactId.current === requestedContactId) {
+        setBrief({ contactId: requestedContactId, data: response.data.data });
+      }
+    } catch (error: unknown) {
+      if (activeContactId.current === requestedContactId) toast.error(briefErrorMessage(error, t));
+    } finally {
+      if (activeContactId.current === requestedContactId) setBriefing(false);
+    }
+  };
+
+  const visibleBrief = brief?.contactId === contactId ? brief.data : null;
+
   return (
     <div className="flex flex-col h-full">
       <div className="p-3 border-b border-dark-border">
@@ -200,8 +252,29 @@ export default function ConversationView({ contactId, contactName, channel }: Pr
               {t('handbackToAi')}
             </button>
           )}
+          {aiEnabled && (
+            <button type="button" className="btn-secondary text-xs" disabled={briefing || messages.length === 0} onClick={createBrief}>
+              {briefing ? t('aiBriefLoading') : t('aiBrief')}
+            </button>
+          )}
         </div>
         <p className="text-xs text-text-muted">{t('conversation')} · {channel}</p>
+        {visibleBrief && (
+          <section className="mt-3 rounded-lg border border-dark-border bg-dark-hover p-3 text-sm text-text-primary">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <p className="text-xs font-medium text-text-secondary">{t('aiGeneratedUnverified')}</p>
+              <button type="button" className="text-xs text-primary" onClick={() => setBrief(null)}>{t('aiBriefCollapse')}</button>
+            </div>
+            {visibleBrief.truncated && <p className="mb-2 text-xs text-text-muted">{t('aiBriefTruncated')}</p>}
+            <dl className="space-y-2">
+              <div><dt className="font-medium">{t('aiBriefCustomerNeed')}</dt><dd>{visibleBrief.customer_need}</dd></div>
+              <div><dt className="font-medium">{t('aiBriefConversationState')}</dt><dd>{visibleBrief.conversation_state}</dd></div>
+              <div><dt className="font-medium">{t('aiBriefCustomerMood')}</dt><dd>{t(`aiBriefMood.${visibleBrief.customer_mood}`)}</dd></div>
+              <div><dt className="font-medium">{t('aiBriefOpenQuestions')}</dt><dd>{visibleBrief.open_questions.length ? <ul className="list-disc pl-5">{visibleBrief.open_questions.map((question, index) => <li key={`${index}-${question}`}>{question}</li>)}</ul> : t('aiBriefNone')}</dd></div>
+              <div><dt className="font-medium">{t('aiBriefSuggestedNextStep')}</dt><dd>{visibleBrief.suggested_next_step || t('aiBriefNone')}</dd></div>
+            </dl>
+          </section>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto p-3 space-y-3">

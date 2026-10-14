@@ -250,3 +250,18 @@ export interface ApiError {
     fields?: Record<string, string | null> | null;
   };
 }
+
+// === AI Assistance ===
+export interface AiStatus {
+  enabled: boolean;
+}
+
+export interface AiConversationBrief {
+  request_id: string | null;
+  customer_need: string;
+  conversation_state: string;
+  customer_mood: 'calm' | 'neutral' | 'frustrated' | 'urgent';
+  open_questions: string[];
+  suggested_next_step: string;
+  truncated: boolean;
+}
