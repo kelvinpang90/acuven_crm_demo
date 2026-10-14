@@ -36,6 +36,7 @@ export interface Contact {
   wa_handover_active: boolean;
   wa_handover_expires_at: string | null;
   wa_handover_updated_at: string | null;
+  wa_reply_window_until: string | null;
   phone_conflict: boolean;
   deleted_at: string | null;
   created_at: string;
@@ -147,6 +148,8 @@ export interface Message {
   external_id: string | null;
   is_read: boolean;
   assigned_to: string | null;
+  sent_by: string | null;
+  sent_by_name: string | null;
   author_kind: MessageAuthorKind | null;
   bot_id: string | null;
   delivery_status: MessageDeliveryStatus | null;

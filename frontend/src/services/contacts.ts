@@ -20,6 +20,11 @@ export const contactsApi = {
   getContact: (id: string) =>
     api.get<ApiResponse<Contact>>(`/contacts/${id}`),
 
+  handbackWhatsApp: (id: string) =>
+    api.post<ApiResponse<Pick<Contact, 'wa_handover_active' | 'wa_handover_expires_at' | 'wa_handover_updated_at'>>>(
+      `/contacts/${id}/whatsapp/handback`,
+    ),
+
   createContact: (data: Partial<Contact>) =>
     api.post<ApiResponse<Contact>>('/contacts', data),
 
