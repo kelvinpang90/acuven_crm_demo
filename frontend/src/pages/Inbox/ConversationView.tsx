@@ -6,7 +6,7 @@ import type { TFunction } from 'i18next';
 import { messagesApi } from '@/services/messages';
 import { contactsApi, type WhatsAppHandover } from '@/services/contacts';
 import { aiApi } from '@/services/ai';
-import type { AiConversationBrief, ApiError, Contact, Message } from '@/types';
+import type { AiConversationBrief, AiLanguage, ApiError, Contact, Message } from '@/types';
 import dayjs from 'dayjs';
 import ReplyBox from './ReplyBox';
 
@@ -72,6 +72,10 @@ function briefOutputLanguage(language: string): 'zh-CN' | 'en' | undefined {
   return undefined;
 }
 
+function bubbleLanguage(language: string): AiLanguage {
+  return language.startsWith('en') ? 'en' : 'zh-CN';
+}
+
 export default function ConversationView({ contactId, contactName, channel }: Props) {
   const { t, i18n } = useTranslation('inbox');
   const [messages, setMessages] = useState<Message[]>([]);
@@ -82,6 +86,8 @@ export default function ConversationView({ contactId, contactName, channel }: Pr
   const [aiEnabled, setAiEnabled] = useState(false);
   const [briefing, setBriefing] = useState(false);
   const [brief, setBrief] = useState<{ contactId: string; data: AiConversationBrief } | null>(null);
+  const [messageTranslations, setMessageTranslations] = useState<Record<string, string>>({});
+  const [translatingId, setTranslatingId] = useState<string | null>(null);
   const [clock, setClock] = useState(Date.now());
   const activeContactId = useRef(contactId);
   const handbackRefreshTimer = useRef<number | null>(null);
@@ -118,6 +124,8 @@ export default function ConversationView({ contactId, contactName, channel }: Pr
     setHandingBack(false);
     setBrief(null);
     setBriefing(false);
+    setMessageTranslations({});
+    setTranslatingId(null);
     loadContact();
     return () => {
       if (handbackRefreshTimer.current !== null) {
@@ -235,6 +243,23 @@ export default function ConversationView({ contactId, contactName, channel }: Pr
 
   const visibleBrief = brief?.contactId === contactId ? brief.data : null;
 
+  const translateMessage = async (message: Message) => {
+    const text = message.body.trim();
+    if (!text || Array.from(text).length > 2000 || translatingId) return;
+    const requestedContactId = contactId;
+    setTranslatingId(message.id);
+    try {
+      const response = await aiApi.translate(requestedContactId, text, bubbleLanguage(i18n.language));
+      if (activeContactId.current === requestedContactId) {
+        setMessageTranslations((current) => ({ ...current, [message.id]: response.data.data.translation }));
+      }
+    } catch (error: unknown) {
+      if (activeContactId.current === requestedContactId) toast.error(briefErrorMessage(error, t));
+    } finally {
+      if (activeContactId.current === requestedContactId) setTranslatingId(null);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full">
       <div className="p-3 border-b border-dark-border">
@@ -283,6 +308,15 @@ export default function ConversationView({ contactId, contactName, channel }: Pr
             <div className={`max-w-[75%] rounded-xl px-3 py-2 ${msg.direction === 'outbound' ? 'bg-primary/20 text-text-primary' : 'bg-dark-hover text-text-primary'}`}>
               {msg.subject && <p className="text-xs font-medium text-text-secondary mb-1">{msg.subject}</p>}
               <p className="text-sm whitespace-pre-wrap break-words">{msg.body}</p>
+              {aiEnabled && (
+                <div className="mt-2">
+                  <button type="button" className="text-xs text-primary" disabled={translatingId !== null || !msg.body.trim() || Array.from(msg.body.trim()).length > 2000} onClick={() => translateMessage(msg)}>
+                    {translatingId === msg.id ? t('aiTranslationLoading') : t('aiTranslate')}
+                  </button>
+                  {(!msg.body.trim() || Array.from(msg.body.trim()).length > 2000) && <p className="text-[10px] text-text-muted">{!msg.body.trim() ? t('aiTranslationEmpty') : t('aiTranslationInputTooLong')}</p>}
+                  {messageTranslations[msg.id] && <p className="mt-1 text-sm whitespace-pre-wrap break-words text-text-secondary">{messageTranslations[msg.id]}<span className="mt-1 block text-[10px] text-text-muted">{t('aiGeneratedUnverified')}</span></p>}
+                </div>
+              )}
               <div className="flex flex-wrap items-center justify-end gap-x-2 text-[10px] text-text-muted mt-1">
                 {authorLabel(msg) && <span>{authorLabel(msg)}</span>}
                 {deliveryLabel(msg) && <span>{deliveryLabel(msg)}</span>}
@@ -298,7 +332,7 @@ export default function ConversationView({ contactId, contactName, channel }: Pr
         ))}
       </div>
 
-      <ReplyBox contactId={contactId} channel={channel} waReplyWindowUntil={contact?.wa_reply_window_until} onSent={handleSent} />
+      <ReplyBox contactId={contactId} channel={channel} waReplyWindowUntil={contact?.wa_reply_window_until} contactPhone={contact?.phone} aiEnabled={aiEnabled} messageCount={messages.length} onSent={handleSent} />
     </div>
   );
 }

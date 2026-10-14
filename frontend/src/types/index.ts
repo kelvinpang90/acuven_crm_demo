@@ -265,3 +265,18 @@ export interface AiConversationBrief {
   suggested_next_step: string;
   truncated: boolean;
 }
+
+export type AiLanguage = 'zh-CN' | 'en' | 'ms';
+
+export interface AiReplyDraft {
+  request_id: string | null;
+  draft: string;
+  subject: string | null;
+  note_for_agent: string;
+}
+
+export interface AiTranslation {
+  request_id: string | null;
+  translation: string;
+  detected_language: AiLanguage | 'other';
+}
