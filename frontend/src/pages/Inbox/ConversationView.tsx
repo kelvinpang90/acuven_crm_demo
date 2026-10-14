@@ -66,6 +66,7 @@ export default function ConversationView({ contactId, contactName, channel }: Pr
   activeContactId.current = contactId;
 
   const load = useCallback(async () => {
+    if (activeContactId.current !== contactId) return;
     setLoading(true);
     try {
       const res = await messagesApi.getContactMessages(contactId);
