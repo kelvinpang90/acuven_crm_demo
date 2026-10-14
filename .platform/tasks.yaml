@@ -462,7 +462,7 @@ tasks:
       按 docs/chatbot-replies.md 第六节，把 WhatsApp 回复接口改成调用 CRM-TASK-013 的发送服务，新增重试与交还 AI 两个接口，
       会话事件接口接受第四节新增的 agent_reply，消息与联系人接口返回发送人与回复窗口，供 CRM-TASK-016 使用。
       只做接口层：不改业务规则、不改表结构、不改前端、不删旧的 webhook 与网关代码（CRM-TASK-017）。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-014
     acceptance_criteria:
