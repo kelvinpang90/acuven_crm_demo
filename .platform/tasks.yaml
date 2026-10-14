@@ -828,7 +828,7 @@ tasks:
       按 docs/inbox-ai-assist.md 第 4.5 节与第八节第 1、2 条，在 CRM-TASK-016 的回复框之上加 AI 起草与翻译成某语言，在每条消息气泡上加翻译。
       草稿与译文只填进回复框或显示在原文下方，发不发由员工决定，发送、超时、重试全按 CRM-TASK-016 的规则。AI 未配置时整体不显示。
       只改前端：不改后端、不加页面或路由。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-025
     acceptance_criteria:
