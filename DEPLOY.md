@@ -153,6 +153,12 @@ SMTP_USER=
 SMTP_PASSWORD=
 SMTP_FROM=
 
+# AI 辅助：四项均需由部署环境提供，任一为空时 AI 功能不会启用。
+AI_API_BASE_URL=
+AI_CLIENT_ID=
+AI_CLIENT_TOKEN=
+AI_MODEL=
+
 # 前端
 VITE_API_BASE_URL=https://crm.kelvinpeng.com/api
 VITE_APP_NAME=CRM Pro
