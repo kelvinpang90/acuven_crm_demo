@@ -14,7 +14,6 @@
 <!-- openclaw:planning-v1:begin -->
 ### 当前计划
 
-1. `CRM-TASK-026` 回复框加AI起草与翻译，消息气泡加翻译
 
 ### 已阻塞
 
