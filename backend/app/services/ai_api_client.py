@@ -1,5 +1,6 @@
 """Client for the Billing Hub Messages API."""
 
+import asyncio
 import json
 import logging
 from dataclasses import dataclass
@@ -85,13 +86,16 @@ async def send_message(
         "Content-Type": "application/json",
     }
     try:
-        async with httpx.AsyncClient(timeout=httpx.Timeout(50.0)) as client:
-            response = await client.post(
-                f"{settings.ai_api_base_url.rstrip('/')}/v1/messages",
-                content=content.encode("utf-8"),
-                headers=headers,
+        async with httpx.AsyncClient(timeout=None) as client:
+            response = await asyncio.wait_for(
+                client.post(
+                    f"{settings.ai_api_base_url.rstrip('/')}/v1/messages",
+                    content=content.encode("utf-8"),
+                    headers=headers,
+                ),
+                timeout=50.0,
             )
-    except (httpx.TimeoutException, httpx.NetworkError, httpx.RequestError):
+    except (asyncio.TimeoutError, httpx.TimeoutException, httpx.NetworkError, httpx.RequestError):
         _log(feature, UNAVAILABLE)
         return AiApiResult(UNAVAILABLE)
 

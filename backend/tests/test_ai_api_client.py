@@ -1,5 +1,6 @@
 """CRM-TASK-022 tests for the isolated Billing Hub AI client."""
 
+import asyncio
 import json
 from unittest.mock import AsyncMock, MagicMock
 
@@ -34,6 +35,12 @@ def _response(status, payload=None):
     return response
 
 
+def _invalid_json_response(status=200):
+    response = MagicMock(status_code=status)
+    response.json.side_effect = json.JSONDecodeError("invalid JSON", "x", 0)
+    return response
+
+
 async def _send():
     return await ai_api_client.send_message(
         feature="crm.test",
@@ -52,13 +59,21 @@ async def test_request_shape_headers_and_success_follow_acceptance_criteria(monk
         monkeypatch,
         _response(200, {"request_id": "req-1", "stop_reason": "end_turn", "text": '{"answer":1}'}),
     )
+    observed_timeouts = []
+
+    async def track_total_timeout(awaitable, timeout):
+        observed_timeouts.append(timeout)
+        return await awaitable
+
+    monkeypatch.setattr(ai_api_client.asyncio, "wait_for", track_total_timeout)
 
     result = await _send()
 
     assert result.outcome == ai_api_client.OK
     assert result.output == {"answer": 1}
     assert result.request_id == "req-1"
-    assert client.call_args.kwargs["timeout"].connect == 50.0
+    assert client.call_args.kwargs["timeout"] is None
+    assert observed_timeouts == [50.0]
     assert post.call_args.args[0] == "https://ai.invalid/v1/messages"
     assert post.call_args.kwargs["headers"] == {
         "X-Acuven-Client-Id": "aic_test",
@@ -108,6 +123,26 @@ async def test_request_over_64_kib_is_an_error_without_http(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_total_50_second_deadline_returns_temporary_unavailability(monkeypatch):
+    """Guards the criterion that the whole HTTP call has a 50-second total deadline."""
+    _configure(monkeypatch)
+    _stub(monkeypatch, _response(200))
+    observed_timeouts = []
+
+    async def expire_total_deadline(awaitable, timeout):
+        observed_timeouts.append(timeout)
+        awaitable.close()
+        raise asyncio.TimeoutError
+
+    monkeypatch.setattr(ai_api_client.asyncio, "wait_for", expire_total_deadline)
+
+    result = await _send()
+
+    assert observed_timeouts == [50.0]
+    assert result.outcome == ai_api_client.UNAVAILABLE
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("response_or_error", "outcome"),
     [
@@ -116,9 +151,19 @@ async def test_request_over_64_kib_is_an_error_without_http(monkeypatch):
             ai_api_client.ERROR,
         ),
         (
+            _response(200, {"request_id": "r", "stop_reason": "max_tokens", "text": "{}"}),
+            ai_api_client.ERROR,
+        ),
+        (
+            _response(200, {"request_id": "r", "stop_reason": "end_turn", "text": "not-json"}),
+            ai_api_client.ERROR,
+        ),
+        (
             _response(200, {"request_id": "r", "stop_reason": "end_turn", "text": "[]"}),
             ai_api_client.ERROR,
         ),
+        (_invalid_json_response(), ai_api_client.ERROR),
+        (_response(200, []), ai_api_client.ERROR),
         (_response(401), ai_api_client.ERROR),
         (_response(403), ai_api_client.ERROR),
         (_response(413), ai_api_client.ERROR),
@@ -130,6 +175,7 @@ async def test_request_over_64_kib_is_an_error_without_http(monkeypatch):
         (_response(504), ai_api_client.UNAVAILABLE),
         (httpx.ConnectError("offline"), ai_api_client.UNAVAILABLE),
         (httpx.ReadTimeout("late"), ai_api_client.UNAVAILABLE),
+        (asyncio.TimeoutError(), ai_api_client.UNAVAILABLE),
     ],
 )
 async def test_all_result_classification_branches_follow_acceptance_criteria(

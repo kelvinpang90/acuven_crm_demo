@@ -135,6 +135,28 @@ async def test_snapshot_uses_recent_40_and_drops_oldest_until_16_kib(async_sessi
 
 
 @pytest.mark.asyncio
+async def test_snapshot_selects_the_recent_40_in_chronological_id_order(async_session_maker):
+    """Guards the criterion that exactly the recent 40 messages are ordered by time then id."""
+    rows = [_contact()]
+    for index in range(42):
+        rows.append(
+            _message(
+                f"message-{index:02}",
+                NOW + timedelta(seconds=index // 2),
+                body=f"body-{index:02}",
+            )
+        )
+    await _seed(async_session_maker, *rows)
+    async with async_session_maker() as session:
+        snapshot = await build_conversation_snapshot(session, "contact-1", now=NOW)
+
+    assert [message["body"] for message in snapshot["messages"]] == [
+        f"body-{index:02}" for index in range(2, 42)
+    ]
+    assert snapshot["truncated"] is False
+
+
+@pytest.mark.asyncio
 async def test_snapshot_keeps_latest_message_when_it_alone_exceeds_16_kib(async_session_maker):
     """Guards the criterion that an oversized final message is retained without setting truncation by size alone."""
     controls = "\x00"
