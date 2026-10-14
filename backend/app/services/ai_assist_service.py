@@ -1,5 +1,6 @@
 """Database-side building blocks shared by inbox AI assistance features."""
 
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any
@@ -11,9 +12,50 @@ from app.models.ai_request import AiRequest
 from app.models.contact import Contact
 from app.models.deal import Deal
 from app.models.message import Message
+from app.services import ai_api_client
 from app.services.ai_api_client import compact_json
+from app.services.ai_features import (
+    BRIEF_FEATURE,
+    BRIEF_SCHEMA,
+    BRIEF_SYSTEM,
+    EMAIL_DRAFT_SCHEMA,
+    MAX_TOKENS,
+    REPLY_DRAFT_FEATURE,
+    REPLY_DRAFT_SYSTEM,
+    TRANSLATE_FEATURE,
+    TRANSLATE_SCHEMA,
+    TRANSLATE_SYSTEM,
+    WHATSAPP_DRAFT_SCHEMA,
+    validate_brief,
+    validate_reply_draft,
+    validate_translation,
+)
 
 SNAPSHOT_LIMIT_BYTES = 16 * 1024
+LANGUAGES = {"zh-CN", "en", "ms"}
+OK = "ok"
+ERROR = "error"
+UNAVAILABLE = "unavailable"
+NOT_CONFIGURED = "not_configured"
+NO_MESSAGES = "no_messages"
+INVALID_INPUT = "invalid_input"
+
+
+@dataclass(frozen=True)
+class AiAssistResult:
+    category: str
+    request_id: str | None = None
+    customer_need: str | None = None
+    conversation_state: str | None = None
+    customer_mood: str | None = None
+    open_questions: list[str] | None = None
+    suggested_next_step: str | None = None
+    draft: str | None = None
+    subject: str | None = None
+    note_for_agent: str | None = None
+    translation: str | None = None
+    detected_language: str | None = None
+    truncated: bool | None = None
 
 
 def _truncate(value: str | None, limit: int) -> tuple[str | None, bool]:
@@ -167,3 +209,212 @@ async def write_ai_request(
     db.add(request)
     await db.flush()
     return request
+
+
+def _as_of(now: datetime | None = None) -> str:
+    return _as_utc_string(now or datetime.utcnow())
+
+
+async def _record_result(
+    db: AsyncSession,
+    *,
+    user_id: str,
+    contact_id: str,
+    feature: str,
+    api_result: ai_api_client.AiApiResult,
+) -> AiAssistResult:
+    category = api_result.outcome
+    await write_ai_request(
+        db,
+        user_id=user_id,
+        contact_id=contact_id,
+        feature=feature,
+        request_id=api_result.request_id,
+        outcome=category,
+    )
+    return AiAssistResult(category=category, request_id=api_result.request_id)
+
+
+async def generate_conversation_brief(
+    db: AsyncSession, *, user_id: str, contact_id: str, output_language: str
+) -> AiAssistResult:
+    """Generate a validated brief and audit every request which reaches the AI client."""
+    if not isinstance(output_language, str) or output_language not in LANGUAGES:
+        return AiAssistResult(INVALID_INPUT)
+    if not ai_api_client.is_ai_configured():
+        return AiAssistResult(NOT_CONFIGURED)
+    snapshot = await build_conversation_snapshot(db, contact_id)
+    if not snapshot["messages"]:
+        return AiAssistResult(NO_MESSAGES)
+    result = await ai_api_client.send_message(
+        feature=BRIEF_FEATURE,
+        system=BRIEF_SYSTEM,
+        messages=[
+            {
+                "role": "user",
+                "content": compact_json(
+                    {"as_of": _as_of(), "output_language": output_language, "snapshot": snapshot}
+                ),
+            }
+        ],
+        max_tokens=MAX_TOKENS,
+        schema=BRIEF_SCHEMA,
+    )
+    if result.outcome != ai_api_client.OK:
+        recorded = await _record_result(
+            db, user_id=user_id, contact_id=contact_id, feature=BRIEF_FEATURE, api_result=result
+        )
+        return AiAssistResult(
+            category=recorded.category,
+            request_id=recorded.request_id,
+            truncated=snapshot["truncated"],
+        )
+    output = validate_brief(result.output)
+    if output is None:
+        result = ai_api_client.AiApiResult(ERROR, request_id=result.request_id)
+        recorded = await _record_result(
+            db, user_id=user_id, contact_id=contact_id, feature=BRIEF_FEATURE, api_result=result
+        )
+        return AiAssistResult(
+            ERROR, request_id=recorded.request_id, truncated=snapshot["truncated"]
+        )
+    await write_ai_request(
+        db,
+        user_id=user_id,
+        contact_id=contact_id,
+        feature=BRIEF_FEATURE,
+        request_id=result.request_id,
+        outcome=OK,
+    )
+    return AiAssistResult(
+        OK, request_id=result.request_id, truncated=snapshot["truncated"], **output
+    )
+
+
+async def generate_reply_draft(
+    db: AsyncSession,
+    *,
+    user_id: str,
+    contact_id: str,
+    channel: str,
+    output_language: str,
+    instruction: str | None = None,
+) -> AiAssistResult:
+    """Generate a validated channel-specific reply draft and audit the AI request."""
+    if (
+        not isinstance(output_language, str)
+        or output_language not in LANGUAGES
+        or not isinstance(channel, str)
+        or channel not in {"whatsapp", "email"}
+    ):
+        return AiAssistResult(INVALID_INPUT)
+    normalized_instruction = None
+    if instruction is not None:
+        if not isinstance(instruction, str):
+            return AiAssistResult(INVALID_INPUT)
+        normalized_instruction = instruction.strip()
+        if not 1 <= len(normalized_instruction) <= 200:
+            return AiAssistResult(INVALID_INPUT)
+    if not ai_api_client.is_ai_configured():
+        return AiAssistResult(NOT_CONFIGURED)
+    snapshot = await build_conversation_snapshot(db, contact_id)
+    if not snapshot["messages"]:
+        return AiAssistResult(NO_MESSAGES)
+    payload: dict[str, Any] = {
+        "as_of": _as_of(),
+        "output_language": output_language,
+        "snapshot": snapshot,
+        "channel": channel,
+    }
+    if normalized_instruction is not None:
+        payload["instruction"] = normalized_instruction
+    result = await ai_api_client.send_message(
+        feature=REPLY_DRAFT_FEATURE,
+        system=REPLY_DRAFT_SYSTEM,
+        messages=[{"role": "user", "content": compact_json(payload)}],
+        max_tokens=MAX_TOKENS,
+        schema=WHATSAPP_DRAFT_SCHEMA if channel == "whatsapp" else EMAIL_DRAFT_SCHEMA,
+    )
+    if result.outcome != ai_api_client.OK:
+        recorded = await _record_result(
+            db,
+            user_id=user_id,
+            contact_id=contact_id,
+            feature=REPLY_DRAFT_FEATURE,
+            api_result=result,
+        )
+        return AiAssistResult(
+            category=recorded.category,
+            request_id=recorded.request_id,
+            truncated=snapshot["truncated"],
+        )
+    output = validate_reply_draft(result.output, channel)
+    if output is None:
+        result = ai_api_client.AiApiResult(ERROR, request_id=result.request_id)
+        recorded = await _record_result(
+            db,
+            user_id=user_id,
+            contact_id=contact_id,
+            feature=REPLY_DRAFT_FEATURE,
+            api_result=result,
+        )
+        return AiAssistResult(
+            ERROR, request_id=recorded.request_id, truncated=snapshot["truncated"]
+        )
+    await write_ai_request(
+        db,
+        user_id=user_id,
+        contact_id=contact_id,
+        feature=REPLY_DRAFT_FEATURE,
+        request_id=result.request_id,
+        outcome=OK,
+    )
+    return AiAssistResult(
+        OK, request_id=result.request_id, truncated=snapshot["truncated"], **output
+    )
+
+
+async def translate_text(
+    db: AsyncSession, *, user_id: str, contact_id: str, text: str, target_language: str
+) -> AiAssistResult:
+    """Translate normalized text and audit every request which reaches the AI client."""
+    if not isinstance(text, str) or not isinstance(target_language, str):
+        return AiAssistResult(INVALID_INPUT)
+    normalized_text = text.strip()
+    if target_language not in LANGUAGES or not 1 <= len(normalized_text) <= 2000:
+        return AiAssistResult(INVALID_INPUT)
+    if not ai_api_client.is_ai_configured():
+        return AiAssistResult(NOT_CONFIGURED)
+    result = await ai_api_client.send_message(
+        feature=TRANSLATE_FEATURE,
+        system=TRANSLATE_SYSTEM,
+        messages=[
+            {
+                "role": "user",
+                "content": compact_json(
+                    {"text": normalized_text, "target_language": target_language}
+                ),
+            }
+        ],
+        max_tokens=MAX_TOKENS,
+        schema=TRANSLATE_SCHEMA,
+    )
+    if result.outcome != ai_api_client.OK:
+        return await _record_result(
+            db, user_id=user_id, contact_id=contact_id, feature=TRANSLATE_FEATURE, api_result=result
+        )
+    output = validate_translation(result.output)
+    if output is None:
+        result = ai_api_client.AiApiResult(ERROR, request_id=result.request_id)
+        return await _record_result(
+            db, user_id=user_id, contact_id=contact_id, feature=TRANSLATE_FEATURE, api_result=result
+        )
+    await write_ai_request(
+        db,
+        user_id=user_id,
+        contact_id=contact_id,
+        feature=TRANSLATE_FEATURE,
+        request_id=result.request_id,
+        outcome=OK,
+    )
+    return AiAssistResult(OK, request_id=result.request_id, **output)
