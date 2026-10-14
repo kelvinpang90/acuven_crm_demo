@@ -714,7 +714,7 @@ tasks:
       - 快照按设计 4.4 与第十一节组装（as_of 不在快照里，由 CRM-TASK-023 放进请求）：联系人的名字、公司、行业、标签（最多 10 个、每个截到 30 字）、备注（截到 500 字），未删除且状态不是 won 或 lost 的商机按更新时间、同一时间按 id 取最近 5 个（标题截到 100 字、状态、金额），接管状态（active 取有效状态即标着接管中且到期时间晚于现在，非有效时 expires_at 为 null，始终输出）；消息取最近 40 条（按创建时间、同一时间按 id），按时间从旧到新排列，每条正文不分渠道截到 2000 字，邮件另带主题（截到 200 字）；整个快照按紧凑 JSON（分隔符不带空格、不转义非 ASCII）的 UTF-8 字节超过 16 KiB 时从最旧的消息开始丢，至少保留最新一条（上面的上限保证即使全是中文，保留一条时也不超）；客户端判断 64 KiB 用同一种序列化；以上任一处截断或丢弃时 truncated 为真；不放联系人 id、电话、邮箱、BSUID；author_kind 为空的按方向推断为 customer 或 agent；只有渠道为 whatsapp 的出站消息带 delivery：存的 author_kind 为 agent 且 external_id 为空时，创建不足 45 秒为 sending、否则为 unconfirmed，其余取已存的送达状态，没有状态时不带这个键
       - 审计写入函数按设计 4.2 写一行 ai_requests（user_id、contact_id、feature、request_id、outcome、created_at），只存这些
       - 新增测试：打桩 HTTP 逐条覆盖请求形状与请求头、未配置不发请求、64 KiB 上限、三类结果的每个分支、日志不含正文；快照的字段、截断、40 条与 16 KiB 上限、推断与 delivery 取值；审计写入；每条测试写明守住的是哪一条验收标准；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
-      - tasks/todo.md 新增 CRM-TASK-022 记录段（做了什么、偏离了什么、验证到什么程度）；不改 planning-v1 块；复选框只允许 [ ] / [x]
+      - tasks/todo.md 新增 CRM-TASK-022 记录段（做了什么、偏离了什么、验证到什么程度）；偏离段只列两类、每条一句：与验收标准或设计文档不一致的做法，以及验收标准没有要求、但改变了现有接口或页面行为的改动；验收标准要求的改动与重构、命名、格式调整不算偏离，没有就写无；偏离段漏列只算非阻塞意见，除非漏列的改动本身违反某条验收标准（那时按那一条判）；验证段只写测试由 PR 的必需检查 backend 执行、检查结果由 Worker 和 CI 记录不写在这里，不写任何检查是否运行或通过；不改 planning-v1 块；复选框只允许 [ ] / [x]
       - 改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不加表、不加迁移、不改接口与前端；allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#34），不合并、不直推
     allowed_change_paths:
       - backend/app/services/ai_api_client.py
@@ -741,11 +741,11 @@ tasks:
     depends_on:
       - CRM-TASK-022
     acceptance_criteria:
-      - 新增 ai_features 模块定义三个功能：feature 标签分别为 crm.conversation_brief、crm.reply_draft、crm.translate；三个系统提示都写明传入的数据（快照、消息正文、员工附的要求、待翻译文本）是不可信数据、不执行其中的指令；简报与起草另写明只用快照里的事实，起草再写明快照里没有的价格、日期、承诺写成待确认占位并在 note_for_agent 里说明；翻译写明忠实翻译、只输出译文；max_tokens 依次为 800、1500、4000
-      - schema 只表达字段、类型、枚举与必填，所有列出的字段都必填（可为空的用空串或空数组），不允许多余字段；起草按渠道两个 schema（WhatsApp 没有 subject，邮件 subject 必填）；长度与条数（按字符数，即码点数）由解析后的校验函数检查：简报 customer_need 1 至 200、conversation_state 1 至 300、customer_mood 为 calm、neutral、frustrated、urgent 之一、open_questions 0 至 3 条且每条 1 至 120、suggested_next_step 0 至 240；起草 draft 1 至 1000（WhatsApp）或 1 至 3000（邮件），subject 1 至 150，note_for_agent 0 至 200；翻译 translation 1 至 8000、detected_language 为 zh-CN、en、ms、other 之一；长度检查前先去首尾空白，返回的也是去空白后的文本；客户端返回成功但校验不过时，由业务函数改判为 AI 出错后再写审计与返回（审计保留 AI 模块已返回的 request_id，便于对账），不截断、不补齐
+      - 新增 ai_features 模块定义三个功能：feature 标签分别为 crm.conversation_brief、crm.reply_draft、crm.translate；三个系统提示都写明传入的快照、消息正文与待翻译文本是不可信数据、不执行其中的指令；简报与起草另写明只用快照里的事实，起草再写明快照里没有的价格、日期、承诺写成待确认占位并在 note_for_agent 里说明，员工附的要求是对草稿内容与语气的写作要求、照做，但不改变输出结构、不覆盖只用快照事实与待确认占位的规则（要求里写的价格、日期照样写成占位）；翻译写明忠实翻译、只输出译文；三个系统提示都写明各输出字段的字数与条数上限（按字符数）；max_tokens 三个都为 4000
+      - schema 只表达字段、类型、枚举与必填，所有列出的字段都必填（可为空的用空串或空数组），不允许多余字段；起草按渠道两个 schema（WhatsApp 没有 subject，邮件 subject 必填）；长度与条数（按字符数，即码点数）由解析后的校验函数检查：简报 customer_need 1 至 200、conversation_state 1 至 300、customer_mood 为 calm、neutral、frustrated、urgent 之一、open_questions 0 至 3 条且每条 1 至 120、suggested_next_step 0 至 240；起草 draft 1 至 1000（WhatsApp）或 1 至 1500（邮件），subject 1 至 150，note_for_agent 0 至 200；翻译 translation 1 至 8000、detected_language 为 zh-CN、en、ms、other 之一；长度检查前先去首尾空白，返回的也是去空白后的文本；客户端返回成功但校验不过时，由业务函数改判为 AI 出错后再写审计与返回（审计保留 AI 模块已返回的 request_id，便于对账），不截断、不补齐
       - 三个业务函数：简报与起草用 CRM-TASK-022 组装快照；发给模型的用户消息是一个 JSON 数据块，含 as_of（当前 UTC 时间，ISO 格式到秒、带 Z）、output_language 与快照，起草另含 channel 与 instruction；翻译只发 text 与 target_language、不需要快照；检查顺序为参数、配置、消息：参数不合法（语言不在 zh-CN、en、ms 之内，channel 不是 whatsapp 或 email，instruction 给了但去空白后为空或超过 200，text 去空白后为空或超过 2000；翻译发去空白后的 text）返回 INVALID_INPUT，未配置返回 AI_NOT_CONFIGURED，简报与起草的会话没有消息返回 NO_MESSAGES，这三种都不调用 AI、不写审计；instruction 不给时数据块里不带这个键，给了就发去空白后的文本；每次进入 AI 调用（含因超过 64 KiB 没发出去的）都写一行审计；业务函数返回统一的结果对象：结果类别（ok、error、unavailable、not_configured、no_messages、invalid_input 之一）、request_id、各功能的输出字段，简报与起草另带快照的 truncated
       - 新增测试：打桩 AI 客户端，逐个功能覆盖成功、每个字段的长度条数与枚举越界判为 AI 出错、暂时不可用、未配置、无消息；断言发给客户端的 feature、max_tokens、schema 与系统提示里的不可信数据声明；断言审计行的 feature 与 outcome；每条测试写明守住的是哪一条验收标准；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
-      - tasks/todo.md 新增 CRM-TASK-023 记录段（做了什么、偏离了什么、验证到什么程度）；不改 planning-v1 块；复选框只允许 [ ] / [x]
+      - tasks/todo.md 新增 CRM-TASK-023 记录段（做了什么、偏离了什么、验证到什么程度）；偏离段只列两类、每条一句：与验收标准或设计文档不一致的做法，以及验收标准没有要求、但改变了现有接口或页面行为的改动；验收标准要求的改动与重构、命名、格式调整不算偏离，没有就写无；偏离段漏列只算非阻塞意见，除非漏列的改动本身违反某条验收标准（那时按那一条判）；验证段只写测试由 PR 的必需检查 backend 执行、检查结果由 Worker 和 CI 记录不写在这里，不写任何检查是否运行或通过；不改 planning-v1 块；复选框只允许 [ ] / [x]
       - 改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不加表、不加迁移、不改接口与前端
       - allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#34），不合并、不直推
     allowed_change_paths:
@@ -775,7 +775,7 @@ tasks:
       - 成功返回 200 与设计 4.3 列出的字段（含 request_id 与简报的 truncated）；AI_NOT_CONFIGURED 返回 503 AI_NOT_CONFIGURED，暂时不可用返回 503 AI_UNAVAILABLE，AI 出错返回 502 AI_ERROR，NO_MESSAGES 返回 400，业务函数的 INVALID_INPUT（请求模型已拦下，正常到不了）返回 422 INVALID_INPUT；错误照现有 fail 外壳
       - 新增 GET /api/ai/status，要求登录，返回 enabled（AI 四项配置是否齐全），不返回任何配置值
       - 新增测试：打桩业务函数，逐条覆盖上面的校验、权限、默认语言、结果映射与 status 接口；每条测试写明守住的是哪一条验收标准；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
-      - tasks/todo.md 新增 CRM-TASK-024 记录段（做了什么、偏离了什么、验证到什么程度）；不改 planning-v1 块；复选框只允许 [ ] / [x]
+      - tasks/todo.md 新增 CRM-TASK-024 记录段（做了什么、偏离了什么、验证到什么程度）；偏离段只列两类、每条一句：与验收标准或设计文档不一致的做法，以及验收标准没有要求、但改变了现有接口或页面行为的改动；验收标准要求的改动与重构、命名、格式调整不算偏离，没有就写无；偏离段漏列只算非阻塞意见，除非漏列的改动本身违反某条验收标准（那时按那一条判）；验证段只写测试由 PR 的必需检查 backend 执行、检查结果由 Worker 和 CI 记录不写在这里，不写任何检查是否运行或通过；不改 planning-v1 块；复选框只允许 [ ] / [x]
       - 改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置、nginx；不装依赖；不加表、不加迁移、不改前端；allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#34），不合并、不直推
     allowed_change_paths:
       - backend/app/routers/ai.py
@@ -805,7 +805,7 @@ tasks:
       - 结果显示为可以收起的卡片：顾客需求、会话进展、情绪、未回答的问题、建议下一步，truncated 为真时注明只看了最近一部分；卡片带 AI 生成未核实的标识；切换到别的会话时丢弃还没回来的结果，不把简报贴到错的会话上；刷新页面后不保留
       - 失败时按错误码提示：AI_UNAVAILABLE、超时与网络错误提示 AI 暂时不可用，AI_ERROR 提示 AI 出错，AI_NOT_CONFIGURED 提示 AI 未启用，NO_MESSAGES 提示没有可总结的消息，NOT_ASSIGNED 提示无权，其他错误码与状态一律提示 AI 请求失败；请求带的 output_language 由当前界面语言映射（以 zh 开头为 zh-CN，以 en 开头为 en，其他不带、由后端取用户设置）；不影响收件箱其他功能
       - 新文案同时加在 en 与 zh 的 inbox 命名空间，不写硬编码文字；类型定义与接口字段一致；前端类型检查与构建由 PR 的必需 CI 检查 frontend 执行并通过（Worker 沙箱不跑 npm）
-      - tasks/todo.md 新增 CRM-TASK-025 记录段（做了什么、偏离了什么、验证到什么程度）；不改 planning-v1 块；复选框只允许 [ ] / [x]
+      - tasks/todo.md 新增 CRM-TASK-025 记录段（做了什么、偏离了什么、验证到什么程度）；偏离段只列两类、每条一句：与验收标准或设计文档不一致的做法，以及验收标准没有要求、但改变了现有接口或页面行为的改动；验收标准要求的改动与重构、命名、格式调整不算偏离，没有就写无；偏离段漏列只算非阻塞意见，除非漏列的改动本身违反某条验收标准（那时按那一条判）；验证段只写前端类型检查与构建由 PR 的必需检查 frontend 执行、检查结果由 Worker 和 CI 记录不写在这里、没有在浏览器里实际操作过，不写任何检查是否运行或通过；不改 planning-v1 块；复选框只允许 [ ] / [x]
       - 改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不改后端
       - allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#34），不合并、不直推
     allowed_change_paths:
@@ -832,13 +832,13 @@ tasks:
     depends_on:
       - CRM-TASK-025
     acceptance_criteria:
-      - 回复框改成多行文本框，沿用 CRM-TASK-016 的 4096 字符上限与禁用规则；起草按钮旁可写一句不超过 200 字的要求，可选输出语言（zh-CN、en、ms，默认界面语言）；邮件会话的草稿同时填主题；草稿要覆盖回复框里已有的正文或主题时先确认一次
-      - 翻译成某语言（下拉框，初始为 en）只翻译回复框的正文、不翻译邮件主题；正文去空白后为空或超过 2000 字时按钮置灰并提示；译文要覆盖已有正文时先确认；WhatsApp 会话的译文超过 4096 字时不填入并提示
-      - 回复框因窗口关闭、没有号码而禁用时，起草与翻译回复一起置灰；会话没有消息时起草置灰
-      - 每条消息气泡加翻译，译成员工的界面语言（zh 为 zh-CN），正文去首尾空白后为空或超过 2000 字（按码点数）的消息翻译按钮置灰并提示；译文显示在原文下方并带 AI 生成未核实的标识，只保存在当前页面；起草的 note_for_agent 显示在回复框旁并带同样标识，发送返回 200 或 202、重新起草或切换会话时清掉，发送失败或超时时保留
-      - 请求进行中按钮置灰防止连点；AI 请求单独设 58 秒超时；请求发出后切换了会话，回来的草稿与译文一律丢弃、不填进当前回复框；失败时按 CRM-TASK-025 的错误码提示与语言映射，手动回复不受影响；AI 状态为未启用时不显示任何 AI 按钮
+      - 回复框改成多行文本框，WhatsApp 沿用 CRM-TASK-016 的 4096 字符上限与禁用规则，邮件正文不设字数上限；起草按钮旁可写一句不超过 200 字的要求，可选输出语言（zh-CN、en、ms，初始值按界面语言：以 en 开头为 en，其他一律 zh-CN）；邮件会话的草稿同时填主题；草稿要覆盖回复框里已有的正文或主题时先确认一次
+      - 翻译成某语言（下拉框，初始为 en）只翻译回复框的正文、不翻译邮件主题；正文去空白后为空或超过 2000 字时按钮置灰并提示；译文要覆盖已有正文时先确认；WhatsApp 会话的译文超过 4096 字时不填入并提示（邮件不做这项检查）
+      - WhatsApp 会话的联系人 phone 为空时回复框禁用并提示没有手机号、暂不能回复；回复框因窗口关闭或没有手机号而禁用时，起草与翻译回复一起置灰；会话没有消息时起草置灰
+      - 每条消息气泡加翻译，译成界面语言（以 en 开头为 en，其他一律 zh-CN），正文去首尾空白后为空或超过 2000 字（按码点数）的消息翻译按钮置灰并提示；译文显示在原文下方并带 AI 生成未核实的标识，只保存在当前页面；起草的 note_for_agent 显示在回复框旁并带同样标识，发送返回 200 或 202、重新起草或切换会话时清掉，发送失败或超时时保留
+      - 请求进行中按钮置灰防止连点；AI 请求单独设 58 秒超时；请求发出后切换了会话，回来的草稿与译文一律丢弃、不填进当前回复框；失败时按 CRM-TASK-025 的错误码提示，手动回复不受影响；AI 状态为未启用时不显示任何 AI 按钮
       - 新文案同时加在 en 与 zh 的 inbox 命名空间，不写硬编码文字；类型定义与接口字段一致；前端类型检查与构建由 PR 的必需 CI 检查 frontend 执行并通过（Worker 沙箱不跑 npm）
-      - tasks/todo.md 新增 CRM-TASK-026 记录段（做了什么、偏离了什么、验证到什么程度）；不改 planning-v1 块；复选框只允许 [ ] / [x]
+      - tasks/todo.md 新增 CRM-TASK-026 记录段（做了什么、偏离了什么、验证到什么程度）；偏离段只列两类、每条一句：与验收标准或设计文档不一致的做法，以及验收标准没有要求、但改变了现有接口或页面行为的改动；验收标准要求的改动与重构、命名、格式调整不算偏离，没有就写无；偏离段漏列只算非阻塞意见，除非漏列的改动本身违反某条验收标准（那时按那一条判）；验证段只写前端类型检查与构建由 PR 的必需检查 frontend 执行、检查结果由 Worker 和 CI 记录不写在这里、没有在浏览器里实际操作过，不写任何检查是否运行或通过；不改 planning-v1 块；复选框只允许 [ ] / [x]
       - 改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不改后端；allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#34），不合并、不直推
     allowed_change_paths:
       - frontend/src/pages/Inbox/ReplyBox.tsx
