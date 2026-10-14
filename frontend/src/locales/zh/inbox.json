@@ -72,5 +72,19 @@
   "aiNoMessages": "没有可总结的消息",
   "aiRequestFailed": "AI 请求失败",
   "handoverActive": "接管中，至 {{expiresAt}}",
-  "aiReplying": "AI 在回复"
+  "aiReplying": "AI 在回复",
+  "replyNoPhone": "该联系人没有手机号，暂不能回复。",
+  "aiDraft": "AI 起草",
+  "aiDraftLoading": "正在起草...",
+  "aiDraftInstruction": "可选要求（不超过 200 字）",
+  "aiTranslateReply": "翻译回复",
+  "aiTranslate": "翻译",
+  "aiTranslationLoading": "正在翻译...",
+  "aiTranslationEmpty": "请输入要翻译的内容。",
+  "aiTranslationInputTooLong": "要翻译的内容不能超过 2000 字。",
+  "aiTranslationTooLong": "译文超过 WhatsApp 字符上限。",
+  "aiOverwriteConfirm": "要覆盖已有的回复内容吗？",
+  "aiLanguageZhCn": "中文",
+  "aiLanguageEn": "英文",
+  "aiLanguageMs": "马来语"
 }

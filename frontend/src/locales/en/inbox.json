@@ -72,5 +72,19 @@
   "aiError": "AI encountered an error",
   "aiNotEnabled": "AI is not enabled",
   "aiNoMessages": "There are no messages to summarize",
-  "aiRequestFailed": "AI request failed"
+  "aiRequestFailed": "AI request failed",
+  "replyNoPhone": "This contact has no phone number and cannot be replied to yet.",
+  "aiDraft": "Draft with AI",
+  "aiDraftLoading": "Drafting...",
+  "aiDraftInstruction": "Optional instruction (up to 200 characters)",
+  "aiTranslateReply": "Translate reply",
+  "aiTranslate": "Translate",
+  "aiTranslationLoading": "Translating...",
+  "aiTranslationEmpty": "Enter text to translate.",
+  "aiTranslationInputTooLong": "Text to translate must not exceed 2000 characters.",
+  "aiTranslationTooLong": "The translation exceeds the WhatsApp character limit.",
+  "aiOverwriteConfirm": "Replace the existing reply content?",
+  "aiLanguageZhCn": "Chinese",
+  "aiLanguageEn": "English",
+  "aiLanguageMs": "Malay"
 }
