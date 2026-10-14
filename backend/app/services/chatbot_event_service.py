@@ -9,6 +9,7 @@ Each handler returns one of the results the endpoint answers with:
 `stored`, `duplicate` or `ignored`.
 """
 
+import logging
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
@@ -25,6 +26,8 @@ from app.utils.phone import normalize_phone
 STORED = "stored"
 DUPLICATE = "duplicate"
 IGNORED = "ignored"
+
+logger = logging.getLogger(__name__)
 
 MESSAGE_EVENTS = ("customer_message", "ai_reply", "console_reply")
 _AUTHOR_KIND = {"customer_message": "customer", "ai_reply": "ai", "console_reply": "console"}
@@ -252,6 +255,49 @@ async def store_message(
             created_at=to_naive_utc(occurred_at),
         )
     )
+    await db.flush()
+    return STORED
+
+
+async def store_agent_reply(
+    db: AsyncSession,
+    *,
+    crm_message_id: str,
+    wa_message_id: str,
+    body: str,
+) -> str:
+    """Confirm a CRM-originated agent message from its chatbot callback.
+
+    The event router has already validated the event shape.  ``body`` is
+    deliberately unused: this callback confirms the durable CRM message and
+    must never overwrite the text the agent originally sent.
+    """
+    del body
+    result = await db.execute(select(Message).where(Message.id == crm_message_id))
+    message = result.scalar_one_or_none()
+    if message is None or message.author_kind != "agent":
+        return IGNORED
+    if message.external_id == wa_message_id:
+        return DUPLICATE
+    if message.external_id is not None:
+        logger.warning(
+            "agent_reply external id conflicts with CRM message",
+            extra={"crm_message_id": crm_message_id, "wa_message_id": wa_message_id},
+        )
+        return IGNORED
+
+    occupied = await db.execute(
+        select(Message.id).where(
+            Message.external_id == wa_message_id,
+            Message.id != crm_message_id,
+        )
+    )
+    if occupied.scalar_one_or_none() is not None:
+        return DUPLICATE
+
+    message.external_id = wa_message_id
+    if message.delivery_status is None:
+        message.delivery_status = "sent"
     await db.flush()
     return STORED
 

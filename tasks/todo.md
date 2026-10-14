@@ -2030,3 +2030,29 @@ PRECHECK_RESULT: NOT_READY
 ### 验证到什么程度
 
 - 服务层用例对应本任务验收标准中的签名、校验、结果分类、条件更新与接管写入行为。
+
+## CRM-TASK-014（2026-10-14）
+
+### 做了什么
+
+- `chatbot_send_service`：新增 `retry_agent_reply`（同一个 request_id、同样正文、发给消息存的收件人、bsuid 取联系人现在的值、agent 为原发送人；
+  45 秒内 `IN_PROGRESS`、满 24 小时 `RETRY_EXPIRED`，先于联系人与窗口检查；任何失败都不删消息）与 `handback_to_ai`（签名调用交还接口，
+  只有 `ended` 且 handover 合法时经 `write_response_handover` 严格晚于写入；200 不合契约打 ERROR）。
+  签名请求、已发出的条件更新与「明确没发出」的判定从 `send_agent_reply` 提成共用函数，CRM-TASK-013 的行为不变。
+  重试与交还在调用 chatbot 前先提交（只结束只读事务，不写任何东西），调用后重新读取（`populate_existing`），
+  所以调用期间事件写入的状态会如实返回（例：交还时 handover_changed 先到、响应同一秒不写，返回的仍是事件写入后的接管状态）。
+- `chatbot_event_service`：新增 `store_agent_reply`，按设计第六节回填 `external_id`，只 flush、由事件接口提交（与其他事件处理函数一致）。
+- 新增 `backend/tests/test_chatbot_reply_rules.py`，按验收标准列出的重试（1）–（8）、agent_reply（9）–（12）与交还（1）–（7）用例逐条覆盖，
+  docstring 写明对应的验收用例与设计第十一节例 3（事件部分）、例 4、例 8、例 9。
+
+### 偏离了什么
+
+- 重试失败的结果类别沿用 CRM-TASK-013 的分类：明确没发出（502 rejected、401、422、503、连接失败）返回 `send_failed`，其余返回 `unconfirmed`；
+  两种都保留消息。验收只要求「返回结果类别与错误信息」，不区分会让接口层把可能已发出的超时说成发送失败。
+- 重试时消息不存在与不是 agent 消息一样返回 `not_retryable`（接口层两者都回 403 `NOT_ASSIGNED`）。
+- 本任务原由 OpenClaw run 45c0d6ea 实现，独立评审修复两轮后仍要求修改（重试结果类别），按 Kelvin 指示改在人工会话里接着这个分支完成。
+
+### 验证到什么程度
+
+- `ruff check` 与 `ruff format --check` 本地通过。
+- pytest 本地没有跑（本机 Python 版本装不上锁定的依赖），以 PR 的必需 CI 检查 `backend` 为准。
