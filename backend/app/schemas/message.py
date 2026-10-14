@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
 class MessageResponse(BaseModel):
@@ -23,6 +23,8 @@ class MessageResponse(BaseModel):
     delivery_error: Optional[str] = None
     created_at: datetime
     contact_name: Optional[str] = None
+    sent_by: Optional[str] = None
+    sent_by_name: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
@@ -30,6 +32,13 @@ class MessageResponse(BaseModel):
 class WhatsAppSendRequest(BaseModel):
     contact_id: str
     message: str
+
+    @field_validator("message")
+    @classmethod
+    def message_length(cls, value: str) -> str:
+        if not 1 <= len(value.strip()) <= 4096:
+            raise ValueError("message must contain 1 to 4096 non-whitespace characters")
+        return value
 
 
 class EmailSendRequest(BaseModel):

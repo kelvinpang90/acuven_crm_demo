@@ -94,7 +94,15 @@ async def chatbot_event(
         logger.warning("chatbot event rejected: %s", sorted(fields))
         return fail("Invalid event body", code="INVALID_EVENT", fields=fields, status_code=422)
 
-    result = await chatbot_event_service.process_event(db, **event.service_kwargs())
+    if event.type == "agent_reply":
+        result = await chatbot_event_service.store_agent_reply(
+            db,
+            crm_message_id=event.crm_message_id,
+            wa_message_id=event.message.wa_message_id,
+            body=event.message.body,
+        )
+    else:
+        result = await chatbot_event_service.process_event(db, **event.service_kwargs())
     await db.commit()
     logger.info("chatbot event %s type=%s result=%s", event.event_id, event.type, result)
     return JSONResponse({"result": result})
