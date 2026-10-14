@@ -166,6 +166,7 @@ export default function ConversationView({ contactId, contactName, channel }: Pr
       setContact((current) => current ? { ...current, ...handover } : current);
       if (isHandoverActive(handover)) {
         toast(t('handbackRequested'));
+        if (handbackRefreshTimer.current !== null) window.clearTimeout(handbackRefreshTimer.current);
         handbackRefreshTimer.current = window.setTimeout(() => {
           handbackRefreshTimer.current = null;
           if (activeContactId.current === requestedContactId) void loadContact();

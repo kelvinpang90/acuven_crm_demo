@@ -9,6 +9,7 @@ import type { ApiError } from '@/types';
 interface Props {
   contactId: string;
   channel: string;
+  // undefined: contact not loaded (or failed to load) — window state unknown, the backend still enforces it
   waReplyWindowUntil: string | null | undefined;
   onSent: () => void;
 }
@@ -42,7 +43,7 @@ export default function ReplyBox({ contactId, channel, waReplyWindowUntil, onSen
   const [sending, setSending] = useState(false);
   const [now, setNow] = useState(Date.now());
   const isWhatsApp = channel === 'whatsapp';
-  const windowOpen = !isWhatsApp || (
+  const windowOpen = !isWhatsApp || waReplyWindowUntil === undefined || (
     !!waReplyWindowUntil && new Date(waReplyWindowUntil).getTime() > now
   );
 
