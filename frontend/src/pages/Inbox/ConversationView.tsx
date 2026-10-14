@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import axios from 'axios';
@@ -15,10 +15,10 @@ interface Props {
   channel: string;
 }
 
-function errorMessage(error: unknown, t: TFunction<'inbox'>) {
-  if (!axios.isAxiosError<ApiError>(error)) return t('sendUnknownResult');
+function retryErrorMessage(error: unknown, t: TFunction<'inbox'>) {
+  if (!axios.isAxiosError<ApiError>(error) || !error.response) return t('sendUnknownResult');
   const apiError = error.response?.data?.error;
-  if (!apiError) return t('sendUnknownResult');
+  if (!apiError) return t('sendFailed');
   const fields = apiError.fields || {};
   switch (apiError.code) {
     case 'WINDOW_CLOSED': return t('windowClosedAt', { closedAt: fields.window_closed_at || t('unknownTime') });
@@ -31,9 +31,25 @@ function errorMessage(error: unknown, t: TFunction<'inbox'>) {
     case 'RETRY_EXPIRED': return t('retryExpired');
     case 'IN_PROGRESS': return t('sendingInProgress');
     case 'NO_IDENTITY': return t('noWhatsAppIdentity');
-    case 'CHATBOT_FAILED': return t('handbackFailed');
     default: return t('sendFailed');
   }
+}
+
+function handbackErrorMessage(error: unknown, t: TFunction<'inbox'>) {
+  if (!axios.isAxiosError<ApiError>(error) || !error.response) return t('handbackFailed');
+  const apiError = error.response.data?.error;
+  if (!apiError) return t('handbackFailed');
+
+  switch (apiError.code) {
+    case 'NOT_CONFIGURED': return t('chatbotNotConfigured');
+    case 'NOT_ASSIGNED': return t('notAssigned');
+    case 'NO_IDENTITY': return t('noWhatsAppIdentity');
+    default: return apiError.message || t('handbackFailed');
+  }
+}
+
+function isHandoverActive(handover: WhatsAppHandover) {
+  return handover.wa_handover_active && !!handover.wa_handover_updated_at;
 }
 
 export default function ConversationView({ contactId, contactName, channel }: Props) {
@@ -43,7 +59,10 @@ export default function ConversationView({ contactId, contactName, channel }: Pr
   const [loading, setLoading] = useState(true);
   const [retryingId, setRetryingId] = useState<string | null>(null);
   const [handingBack, setHandingBack] = useState(false);
-  const [, setClock] = useState(Date.now());
+  const [clock, setClock] = useState(Date.now());
+  const activeContactId = useRef(contactId);
+  const handbackRefreshTimer = useRef<number | null>(null);
+  activeContactId.current = contactId;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -57,25 +76,33 @@ export default function ConversationView({ contactId, contactName, channel }: Pr
   const loadContact = useCallback(async () => {
     try {
       const res = await contactsApi.getContact(contactId);
-      setContact(res.data.data);
+      if (activeContactId.current === contactId) setContact(res.data.data);
     } catch { /* ignore */ }
   }, [contactId]);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
     setContact(null);
+    setHandingBack(false);
     loadContact();
+    return () => {
+      if (handbackRefreshTimer.current !== null) {
+        window.clearTimeout(handbackRefreshTimer.current);
+        handbackRefreshTimer.current = null;
+      }
+    };
   }, [loadContact]);
 
   useEffect(() => {
+    if (channel !== 'whatsapp') return undefined;
     const pending = messages
       .filter((message) => message.author_kind === 'agent' && !message.external_id)
-      .map((message) => new Date(message.created_at).getTime() + 45000 - Date.now())
+      .map((message) => new Date(message.created_at).getTime() + 45000 - clock)
       .filter((delay) => delay > 0);
     if (pending.length === 0) return undefined;
     const timer = window.setTimeout(() => setClock(Date.now()), Math.min(...pending));
     return () => window.clearTimeout(timer);
-  }, [messages]);
+  }, [channel, clock, messages]);
 
   const handleSent = () => {
     load();
@@ -97,17 +124,18 @@ export default function ConversationView({ contactId, contactName, channel }: Pr
   };
 
   const deliveryLabel = (message: Message) => {
-    if (message.author_kind === 'agent' && !message.external_id) {
-      return Date.now() < new Date(message.created_at).getTime() + 45000 ? t('sending') : t('sentUnconfirmed');
+    if (channel === 'whatsapp' && message.author_kind === 'agent' && !message.external_id) {
+      return clock < new Date(message.created_at).getTime() + 45000 ? t('sending') : t('sentUnconfirmed');
     }
     if (message.direction !== 'outbound' || !message.delivery_status) return null;
     if (message.delivery_status === 'failed') return message.delivery_error ? t('deliveryFailedWithError', { error: message.delivery_error }) : t('deliveryFailed');
     return t(`delivery${message.delivery_status.charAt(0).toUpperCase()}${message.delivery_status.slice(1)}`);
   };
 
-  const isRetryable = (message: Message) => message.author_kind === 'agent'
+  const isRetryable = (message: Message) => channel === 'whatsapp'
+    && message.author_kind === 'agent'
     && !message.external_id
-    && Date.now() >= new Date(message.created_at).getTime() + 45000;
+    && clock >= new Date(message.created_at).getTime() + 45000;
 
   const retry = async (message: Message) => {
     setRetryingId(message.id);
@@ -115,7 +143,7 @@ export default function ConversationView({ contactId, contactName, channel }: Pr
       const response = await messagesApi.retryWhatsApp(message.id);
       toast(response.status === 202 ? t('sentUnconfirmed') : t('retrySent'));
     } catch (error: unknown) {
-      toast.error(errorMessage(error, t));
+      toast.error(retryErrorMessage(error, t));
     } finally {
       setRetryingId(null);
       load();
@@ -124,21 +152,26 @@ export default function ConversationView({ contactId, contactName, channel }: Pr
 
   const handback = async () => {
     if (!window.confirm(t('handbackConfirm'))) return;
+    const requestedContactId = contactId;
     setHandingBack(true);
     try {
-      const response = await contactsApi.handbackWhatsApp(contactId);
+      const response = await contactsApi.handbackWhatsApp(requestedContactId);
       const handover: WhatsAppHandover = response.data.data;
+      if (activeContactId.current !== requestedContactId) return;
       setContact((current) => current ? { ...current, ...handover } : current);
-      if (handover.wa_handover_active) {
+      if (isHandoverActive(handover)) {
         toast(t('handbackRequested'));
-        window.setTimeout(() => { loadContact(); }, 5000);
+        handbackRefreshTimer.current = window.setTimeout(() => {
+          handbackRefreshTimer.current = null;
+          if (activeContactId.current === requestedContactId) void loadContact();
+        }, 5000);
       } else {
         toast(t('handbackComplete'));
       }
     } catch (error: unknown) {
-      toast.error(errorMessage(error, t));
+      if (activeContactId.current === requestedContactId) toast.error(handbackErrorMessage(error, t));
     } finally {
-      setHandingBack(false);
+      if (activeContactId.current === requestedContactId) setHandingBack(false);
     }
   };
 
@@ -154,7 +187,7 @@ export default function ConversationView({ contactId, contactName, channel }: Pr
               </p>
             )}
           </div>
-          {channel === 'whatsapp' && contact?.wa_handover_active && (
+          {channel === 'whatsapp' && contact && isHandoverActive(contact) && (
             <button type="button" className="btn-secondary text-xs" disabled={handingBack} onClick={handback}>
               {t('handbackToAi')}
             </button>

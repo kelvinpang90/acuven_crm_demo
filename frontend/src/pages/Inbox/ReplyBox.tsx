@@ -14,9 +14,9 @@ interface Props {
 }
 
 function whatsappErrorMessage(error: unknown, t: TFunction<'inbox'>) {
-  if (!axios.isAxiosError<ApiError>(error)) return t('sendUnknownResult');
+  if (!axios.isAxiosError<ApiError>(error) || !error.response) return t('sendUnknownResult');
   const apiError = error.response?.data?.error;
-  if (!apiError) return t('sendUnknownResult');
+  if (!apiError) return t('sendFailed');
   const fields = apiError.fields || {};
 
   switch (apiError.code) {
