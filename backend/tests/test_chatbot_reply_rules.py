@@ -1,6 +1,7 @@
 """CRM-TASK-014 rules for retry callbacks and returning a visitor to AI."""
 
 import json
+import logging
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
@@ -34,7 +35,9 @@ PHONE = "60123456789"
 
 
 def _contact(**kwargs):
-    return Contact(id="c1", name="Visitor", phone=PHONE, **kwargs)
+    values = {"id": "c1", "name": "Visitor", "phone": PHONE}
+    values.update(kwargs)
+    return Contact(**values)
 
 
 def _agent_message(**kwargs):
@@ -201,6 +204,19 @@ async def test_retry_reuses_durable_request_details_and_confirms(async_session_m
     assert result.message.delivery_status == "sent"
 
 
+async def test_retry_sends_null_bsuid_when_contact_has_none(async_session_maker, monkeypatch):
+    """Guards retry acceptance rule (6): an absent current BSUID is sent as null."""
+    await _seed(async_session_maker, _contact(), _agent_message(), _inbound())
+    _configured(monkeypatch)
+
+    async def post(url, *, content, headers):
+        assert json.loads(content)["visitor"] == {"phone": PHONE, "bsuid": None}
+        return _response(200, {"result": "duplicate", "wa_message_id": "wamid.1"})
+
+    _stub_http(monkeypatch, AsyncMock(side_effect=post))
+    assert (await _retry(async_session_maker)).category == SENT
+
+
 @pytest.mark.parametrize(
     "outcome",
     [
@@ -244,9 +260,15 @@ async def test_agent_reply_ignores_non_agent_and_deduplicates(
         )
 
 
-async def test_agent_reply_stores_without_overwriting_status(async_session_maker):
+@pytest.mark.parametrize(
+    ("delivery_status", "expected_status"),
+    [(None, "sent"), ("delivered", "delivered")],
+)
+async def test_agent_reply_stores_without_overwriting_status(
+    async_session_maker, delivery_status, expected_status
+):
     """Guards agent_reply acceptance rule (11): confirmation fills only empty fields."""
-    await _seed(async_session_maker, _agent_message(delivery_status="delivered"))
+    await _seed(async_session_maker, _agent_message(delivery_status=delivery_status))
     async with async_session_maker() as session:
         assert (
             await chatbot_event_service.store_agent_reply(
@@ -254,9 +276,9 @@ async def test_agent_reply_stores_without_overwriting_status(async_session_maker
             )
             == "stored"
         )
-        assert (
-            await session.execute(select(Message).where(Message.id == "m1"))
-        ).scalar_one().delivery_status == "delivered"
+        message = (await session.execute(select(Message).where(Message.id == "m1"))).scalar_one()
+        assert message.external_id == "wamid.1"
+        assert message.delivery_status == expected_status
 
 
 async def test_agent_reply_duplicate_external_id_belongs_to_another_message(async_session_maker):
@@ -286,7 +308,9 @@ async def test_agent_reply_conflict_warns_and_changes_nothing(async_session_make
             )
             == "ignored"
         )
-    assert "conflicts" in caplog.text
+    assert any(record.levelno == logging.WARNING for record in caplog.records)
+    async with async_session_maker() as session:
+        assert (await session.get(Message, "m1")).external_id == "wamid.old"
 
 
 async def _handback(maker, **kwargs):
@@ -300,7 +324,14 @@ async def test_handback_uses_normalized_identity_and_writes_newer_state(
     async_session_maker, monkeypatch
 ):
     """Guards handback acceptance rules (1) and (4): valid ended response writes strictly newer state."""
-    await _seed(async_session_maker, _contact(phone="012-345 6789"))
+    await _seed(
+        async_session_maker,
+        _contact(
+            phone="012-345 6789",
+            wa_handover_active=True,
+            wa_handover_updated_at=T0,
+        ),
+    )
     _configured(monkeypatch)
 
     async def post(url, *, content, headers):
@@ -321,9 +352,9 @@ async def test_handback_uses_normalized_identity_and_writes_newer_state(
     _stub_http(monkeypatch, AsyncMock(side_effect=post))
     assert (await _handback(async_session_maker)).category == ENDED
     async with async_session_maker() as session:
-        assert (await session.get(Contact, "c1")).wa_handover_updated_at == T0 + timedelta(
-            minutes=1
-        )
+        contact = await session.get(Contact, "c1")
+        assert contact.wa_handover_updated_at == T0 + timedelta(minutes=1)
+        assert contact.wa_handover_active is False
 
 
 @pytest.mark.parametrize(
@@ -437,4 +468,8 @@ async def test_handback_bad_or_failed_response_does_not_mutate(
     async with async_session_maker() as session:
         assert (await session.get(Contact, "c1")).wa_handover_updated_at == T0
     if getattr(outcome, "status_code", None) == 200:
-        assert "invalid chatbot handback response" in caplog.text
+        assert any(
+            record.levelname == "ERROR"
+            and "invalid chatbot handback response" in record.getMessage()
+            for record in caplog.records
+        )
