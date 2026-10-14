@@ -75,11 +75,18 @@ def test_upgrade_creates_audit_table_and_indexes_then_downgrade_removes_them():
             assert set(indexes) == _INDEXES
             assert indexes["idx_ai_requests_contact_id"]["column_names"] == ["contact_id"]
             assert indexes["idx_ai_requests_created_at"]["column_names"] == ["created_at"]
-            assert all(index["unique"] is False for index in indexes.values())
+            assert not any(index["unique"] for index in indexes.values())
 
             _run(conn, migration.downgrade)
 
             assert "ai_requests" not in sa.inspect(conn).get_table_names()
+            remaining_indexes = {
+                row[0]
+                for row in conn.execute(
+                    sa.text("SELECT name FROM sqlite_master WHERE type = 'index'")
+                )
+            }
+            assert _INDEXES.isdisjoint(remaining_indexes)
     finally:
         engine.dispose()
 
