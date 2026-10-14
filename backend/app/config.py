@@ -69,6 +69,13 @@ class Settings(BaseSettings):
     chatbot_send_url: str = ""
     chatbot_send_secret: str = ""
 
+    # Billing Hub AI module. All four values are required before an AI request
+    # may leave the CRM process.
+    ai_api_base_url: str = ""
+    ai_client_id: str = ""
+    ai_client_token: str = ""
+    ai_model: str = ""
+
     @property
     def database_url(self) -> str:
         return (
