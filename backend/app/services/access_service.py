@@ -13,7 +13,7 @@ is refused the same way, so a caller can answer both with one response and
 never confirm that an id exists.
 """
 
-from typing import Optional
+from typing import Any, Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -33,6 +33,15 @@ async def may_access_owner(db: AsyncSession, user: User, owner_id: Optional[str]
     if user.role == "manager":
         return owner_id in await _get_team_ids(db, user.id)
     return owner_id == user.id
+
+
+async def owner_scope(db: AsyncSession, user: User, owner_column: Any) -> list[Any]:
+    """Return SQL predicates limiting an owner column to ``user``'s reach."""
+    if user.role == "admin":
+        return []
+    if user.role == "manager":
+        return [owner_column.in_(await _get_team_ids(db, user.id))]
+    return [owner_column == user.id]
 
 
 async def may_access_contact(db: AsyncSession, user: User, contact_id: str) -> bool:
