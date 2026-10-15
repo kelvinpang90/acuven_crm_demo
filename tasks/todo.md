@@ -1865,7 +1865,27 @@ PRECHECK_RESULT: READY
 
 ## 登记 CRM-TASK-027 至 030（2026-10-15）
 
-<!-- REG027 -->
+Kelvin 2026-10-15 批准客户摘要设计（kelvinpang90/acuven_crm_demo#75，第八节 Q1 至 Q4 均按建议），原话「Q1–Q4 都按建议，批准，开始登记」。本段是登记 PR 的记录。
+
+### 做了什么
+
+- `.platform/tasks.yaml`：登记 027–030，全部 `ready`。依赖：027 依赖 023（复用 AI 客户端、审计与结果对象）；028 依赖 027；029 依赖 028；030 依赖 027（用 027 加的 `owner_scope`）。
+- planning-v1：「当前计划」为 027、028、029、030；「已阻塞」里「待登记：CRM AI 客户摘要接入 Billing Hub 的 AI 模块」一行换成「待登记：AI 功能上线」（建密钥、配环境变量、两份设计的质量评测；Kelvin 2026-10-15「AI模块也要做登记」，选的是 CRM 侧上线步骤，属管理员操作、不是 Worker 任务）。
+- `docs/inbox-ai-assist.md` 4.4 加一行：商机只放本人可见的（Q4，030）。
+- 设计在合并前补了两处（随 #75 合并）：本人可见的范围条件在 `access_service` 加一个公开函数；摘要的商机查询不用 `deal_not_demo()`（CRM-TASK-018 要删掉 `is_gateway` 的全部用处，它的路径里没有本功能的文件）。
+
+### 设计闸门与预审
+
+- 设计闸门：四个都适用，都引用 #75（027 把客户资料、跟进记录、单据与聊天正文组装后发给模型；028 是收发这些内容的接口；029 展示 AI 输出；030 改发给模型的商机范围）。
+- `contract_check`：ready to register，四个任务都没有拆分 WARN。
+- 预审（设计文件 `docs/contact-ai-summary.md`，对登记分支的干净检出）：027、028、029、030 第 1 轮全部 READY，无发现。
+
+```
+CRM-TASK-027: (no findings) / session verdict: READY / PRECHECK_RESULT: READY
+CRM-TASK-028: (no findings) / session verdict: READY / PRECHECK_RESULT: READY
+CRM-TASK-029: (no findings) / session verdict: READY / PRECHECK_RESULT: READY
+CRM-TASK-030: (no findings) / session verdict: READY / PRECHECK_RESULT: READY
+```
 
 ## 登记 CRM-TASK-021 至 026（2026-10-13）
 
