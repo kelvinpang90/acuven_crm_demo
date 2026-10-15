@@ -1016,7 +1016,7 @@ tasks:
       按 docs/followup-ai-draft.md 4.1 至 4.3 节与第五节，定义 crm.followup_draft 的系统提示、JSON schema 与输出校验，组装发给模型的数据，
       并串成一个可调用的业务函数。复用 CRM-TASK-022、023 的 AI 客户端、审计写入与结果对象，以及 CRM-TASK-027 的 owner_scope。只做业务规则层：
       不加接口、不改前端、不加表与迁移、不改现有的建跟进记录与建任务；测试打桩 AI 客户端，不调真实模型、不写任何真实密钥与地址。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-031
     acceptance_criteria:
