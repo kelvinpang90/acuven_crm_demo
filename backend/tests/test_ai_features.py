@@ -138,6 +138,42 @@ async def test_each_feature_sends_its_contract_and_audits_success(async_session_
     }
 
 
+@pytest.mark.asyncio
+async def test_brief_passes_the_callers_user_id_to_the_snapshot(async_session_maker, monkeypatch):
+    """Guards CRM-TASK-030 acceptance: brief forwards its caller user_id to the snapshot."""
+    await _seed(async_session_maker)
+    _configured(monkeypatch)
+    received_user_ids = []
+
+    async def snapshot(db, contact_id, *, user_id, now=None):
+        received_user_ids.append(user_id)
+        return {"messages": [{"body": "Need help"}], "truncated": False}
+
+    _client(
+        monkeypatch,
+        ai_api_client.AiApiResult(
+            "ok",
+            {
+                "customer_need": "Need",
+                "conversation_state": "Open",
+                "customer_mood": "calm",
+                "open_questions": [],
+                "suggested_next_step": "Reply",
+            },
+            "brief-1",
+        ),
+        [],
+    )
+    monkeypatch.setattr(ai_assist_service, "build_conversation_snapshot", snapshot)
+    async with async_session_maker() as session:
+        result = await ai_assist_service.generate_conversation_brief(
+            session, user_id="caller", contact_id="contact-1", output_language="en"
+        )
+
+    assert result.category == "ok"
+    assert received_user_ids == ["caller"]
+
+
 @pytest.mark.parametrize(
     ("output", "validator"),
     [
