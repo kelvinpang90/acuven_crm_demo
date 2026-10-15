@@ -1843,7 +1843,7 @@ PRECHECK_RESULT: READY
 | 优先 | 模块 | 功能 | 状态 |
 |---|---|---|---|
 | 1 | 收件箱 | 会话简报、起草回复、翻译 | 第一版已批准（PR kelvinpang90/acuven_crm_demo#29）；AI 分工改了，第二版 2026-10-13 已批准：`docs/inbox-ai-assist.md`（PR kelvinpang90/acuven_crm_demo#34） |
-| 2 | 联系人 | 客户摘要（`crm.contact_summary`；原为 AI API 的契约 v1，按 ai_billing_hub 设计 #281 改为 CRM 自己的内部设计，待另写） | 已阻塞，待登记 |
+| 2 | 联系人 | 客户摘要（`crm.contact_summary`；原为 AI API 的契约 v1，按 ai_billing_hub 设计 #281 改为 CRM 自己的内部设计） | 设计草稿 `docs/contact-ai-summary.md`（2026-10-15），待 Kelvin 批准后登记 |
 | 3 | 跟进记录 / 任务 | 把员工的速记整理成结构化跟进记录，并生成任务草稿（E-09 原定的「任务草稿」） | 待设计 |
 | 4 | 商机 | 下一步建议、商机停滞的原因说明（只给文字，不改状态） | 想法 |
 | 4 | 仪表盘 | 经理看板的数据解读：数字由 CRM 算好，AI 只写解读 | 想法 |
