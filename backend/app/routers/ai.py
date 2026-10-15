@@ -11,10 +11,17 @@ from app.models.user import User
 from app.schemas.ai import (
     ContactSummaryRequest,
     ConversationBriefRequest,
+    FollowupDraftRequest,
     ReplyDraftRequest,
     TranslateRequest,
 )
-from app.services import access_service, ai_api_client, ai_assist_service, contact_summary_service
+from app.services import (
+    access_service,
+    ai_api_client,
+    ai_assist_service,
+    contact_summary_service,
+    followup_draft_service,
+)
 from app.utils.response import fail, ok
 
 router = APIRouter()
@@ -102,6 +109,27 @@ async def create_contact_summary(
     if result.category == ai_assist_service.NO_HISTORY:
         return fail("Contact has no history.", code="NO_HISTORY", status_code=400)
     return _result_response(result, ("request_id", "summary", "suggested_next_step", "truncated"))
+
+
+@router.post("/contacts/{contact_id}/followup-draft")
+async def create_followup_draft(
+    contact_id: str,
+    body: FollowupDraftRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    if not await _may_use_ai_for_contact(db, current_user, contact_id):
+        return _not_assigned()
+    result = await followup_draft_service.generate_followup_draft(
+        db,
+        user=current_user,
+        contact_id=contact_id,
+        deal_id=body.deal_id,
+        note=body.note,
+        today=body.today,
+        output_language=body.output_language or _default_output_language(current_user),
+    )
+    return _result_response(result, ("request_id", "activity_type", "content", "tasks"))
 
 
 @router.post("/conversations/{contact_id}/reply-draft")
