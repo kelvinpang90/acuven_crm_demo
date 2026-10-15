@@ -1,6 +1,7 @@
 # 联系人 AI 客户摘要（`crm.contact_summary`）
 
-> 状态：**草稿，待 Kelvin 批准**（2026-10-15）。第十节 Q1 至 Q4 待拍板。
+> 状态：**已批准**（Kelvin 2026-10-15，第八节 Q1 至 Q4 均按建议，原话「Q1–Q4 都按建议，批准，开始登记」，PR kelvinpang90/acuven_crm_demo#75）。
+> 登记的任务，设计闸门引用 kelvinpang90/acuven_crm_demo#75。
 > 设计闸门的理由：要把一个客户的资料、商机、跟进记录、待办、AutoCount 单据摘要与最近的聊天正文组装后发给模型。不新增表，审计沿用 `ai_requests`。
 > 上位决定：`acuven_hub` 的 `DECISIONS.md` E-12（发给模型的字段不设限制，现行部分）、E-13（第一轮成功标准含客户摘要上线、记录每次摘要的平均 token 与成本）、
 > E-16、E-17、A-18（CRM 定为 demo）；`ai_billing_hub` 规格 §141 与设计 #281。
@@ -51,8 +52,8 @@
 | 数据 | 可见口径（与现有接口一致） |
 |---|---|
 | 联系人本身、跟进记录、AutoCount 单据、消息 | 能访问这个联系人就能看全部（`may_access_contact`；现有的 activities、autocount-documents、收件箱会话接口都是这个口径） |
-| 商机 | 按商机负责人：与联系人面板的商机列表同一口径（`deal_service.list_deals` 的范围条件：管理员全部、经理本人及直属下属、销售本人） |
-| 待办 | 按待办负责人：与待办列表同一口径（`task_service.list_tasks` 的范围条件） |
+| 商机 | 按商机负责人：与联系人面板的商机列表同一口径（管理员全部、经理本人及直属下属、销售本人；没有负责人的只有管理员看得到） |
+| 待办 | 按待办负责人：与待办列表同一口径 |
 
 收件箱简报的同一问题见 Q4。
 
@@ -67,6 +68,8 @@
 - 参数要的是 `User` 对象，不是 `user_id`：商机与待办要按这个人的角色和团队取（第三节）。
 - 结果对象复用 `ai_assist_service.AiAssistResult`，加两个字段 `summary`、`suggested_next_step`（默认 `None`，收件箱三个功能不受影响）；类别新增 `no_history`。
 - 审计用 `ai_assist_service.write_ai_request`。
+- 「本人可见」的范围条件在 `access_service` 加一个公开函数（给定用户与负责人列，返回查询条件：管理员不加条件，经理为本人及直属下属，销售为本人），规则与同文件的 `may_access_owner` 相同；
+  商机与待办都用它。不改 `deal_service`、`task_service` 现有的列表查询。
 - 提示词、schema 与输出校验加在 `ai_features.py`（`SUMMARY_FEATURE`、`SUMMARY_SYSTEM`、`SUMMARY_SCHEMA`、`validate_summary`），与收件箱三个功能放在一起评审。
 
 ### 4.2 快照
@@ -157,7 +160,8 @@
 - **一键 demo 管理员**：任务三（2026-10-09）记过「demo admin 能对所有真实客户触发摘要」。CRM 已定为 demo（A-18），没有真实客户，不再是问题；以后若接真实客户，要和一键账号一起重新看。
 - **成本**：每点一次就是一次调用，不缓存。试点期不设上限（E-14）。`no_history` 不调 AI。
 - **AI 模块不可用或计费阻断**：只影响这个按钮，面板其他部分照常。
-- **第 2 阶段与 is_gateway**：商机查询用与商机列表相同的范围条件（含 `deal_not_demo()`）；CRM-TASK-018 去掉 `is_gateway` 时会一并改那个条件，本功能跟着变，不用另改。
+- **第 2 阶段与 is_gateway**：商机查询**不用** `deal_not_demo()`。那个条件本来就不用于按 id 查单个联系人（`utils/demo_scope.py` 的说明），而且 CRM-TASK-018 要删掉 `is_gateway` 的全部用处、它的路径里没有本功能的文件，新代码不能再引入。
+  差别只在 018 合并前：网关访客的零金额线索商机，联系人面板的商机列表不显示，摘要的快照里有。
 
 ## 七、登记时怎么拆
 
@@ -166,13 +170,13 @@
 每个任务只做一层：
 
 1. 业务：快照、提示词、schema、校验、业务函数（4.1–4.3、第五节），`AiAssistResult` 加字段。单元测试打桩 AI client，覆盖每一块的取法与截断、可见口径（销售看不到别人名下的商机与待办）、16 KiB 丢弃顺序、检查顺序、各类结果与审计。
-   路径：`backend/app/services/contact_summary_service.py`（新）、`backend/app/services/ai_features.py`、`backend/app/services/ai_assist_service.py`、`backend/tests/test_contact_summary_service.py`（新）、`tasks/todo.md`
+   路径：`backend/app/services/contact_summary_service.py`（新）、`backend/app/services/ai_features.py`、`backend/app/services/ai_assist_service.py`、`backend/app/services/access_service.py`、`backend/tests/test_contact_summary_service.py`（新）、`tasks/todo.md`
 2. 接口：4.4。路径：`backend/app/routers/ai.py`、`backend/app/schemas/ai.py`、`backend/tests/test_ai_contact_summary_api.py`（新）、`tasks/todo.md`；依赖 1
 3. 前端：4.5。路径：`frontend/src/pages/Contacts/ContactAiSummary.tsx`（新）、`frontend/src/pages/Contacts/ContactDetailPanel.tsx`、`frontend/src/services/ai.ts`、`frontend/src/types/index.ts`、
    `frontend/src/locales/en/contacts.json`、`frontend/src/locales/zh/contacts.json`、`tasks/todo.md`；依赖 2
 
 三个任务都有设计闸门（引用本设计的 PR），登记前跑设计预审。不改表结构、不加迁移，与第 2 阶段 017 至 020 没有文件冲突（020 的迁移号不受影响）。
-Q4 若选 B，另加一个业务任务收窄收件箱快照的商机。
+Q4 选了 B：另加第 4 个任务（业务层），让收件箱简报与起草的快照也只放本人可见的商机，用第 1 个任务加的范围函数；业务函数仍收 `user_id`、在函数里读出用户，不改函数签名与接口。排在第 1 个任务之后。
 
 ## 八、需要 Kelvin 拍板
 
