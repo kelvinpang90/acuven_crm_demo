@@ -10,6 +10,10 @@ class ConversationBriefRequest(BaseModel):
     output_language: Language | None = None
 
 
+class ContactSummaryRequest(BaseModel):
+    output_language: Language | None = None
+
+
 class ReplyDraftRequest(BaseModel):
     channel: Channel
     instruction: str | None = None
