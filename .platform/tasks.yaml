@@ -986,7 +986,7 @@ tasks:
     purpose: >-
       按 docs/contact-ai-summary.md 第三节与第八节 Q4，收件箱会话快照的未结商机原本不看商机负责人，员工看不到的商机也会发给模型。
       改为用 CRM-TASK-027 加的 owner_scope 只放点按钮的员工本人可见的商机。只做业务规则层：三个业务函数与接口的签名不变、不改快照的其他规则、不改前端。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-027
     acceptance_criteria:

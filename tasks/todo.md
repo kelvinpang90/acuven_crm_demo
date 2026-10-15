@@ -14,7 +14,6 @@
 <!-- openclaw:planning-v1:begin -->
 ### 当前计划
 
-1. `CRM-TASK-030` 收件箱AI简报与起草的快照只放本人可见的商机
 
 ### 已阻塞
 
