@@ -1905,6 +1905,34 @@ PRECHECK_RESULT: READY
 退出码 0
 ```
 
+## 登记 CRM-TASK-035 至 038（2026-10-15）
+
+Kelvin 2026-10-15 批准商机下一步建议设计（kelvinpang90/acuven_crm_demo#97），原话「Q5，7天，其他同意」：Q5 停滞阈值改为固定 7 天，Q1 至 Q4、Q6 按建议。本段是登记 PR 的记录。
+
+### 做了什么
+
+- `.platform/tasks.yaml`：登记 035–038，全部 `ready`。依赖：035 依赖 031（复用 `owner_scope` 与客户摘要快照的取法）；036 依赖 035；037 依赖 036；038 依赖 037。
+- 按 027 拆分的教训（kelvinpang90/acuven_crm_demo#78），快照与业务函数分成 035、036 两个任务，测试标准写成编号的用例清单，清单之外的补充覆盖只算非阻塞意见。
+- planning-v1：「当前计划」为 035、036、037、038；「AI 功能上线」一行的评测范围加上商机下一步建议。
+- 与 017 至 020 没有文件冲突（018 改 `routers/pipeline.py` 与 `services/deal_service.py`，本组任务都不改）。
+
+### 设计闸门与预审
+
+- 设计闸门：四个都适用，都引用 #97（035 组装商机、客户资料、跟进、单据与聊天正文的快照；036 把快照发给模型；037 是收发这些内容的接口；038 展示 AI 输出）。
+- `contract_check`：ready to register，四个任务都没有拆分 WARN；planning-v1 `ok, next: CRM-TASK-035`。WARN 只有原有的四条，与本次无关。
+- 预审（设计文件 `docs/deal-next-step.md`，对登记分支的干净检出）：035–038 第 1 轮全部 READY，无发现。它调模型、不是确定性的，READY 不保证没有缺陷。
+
+```text
+CRM-TASK-035: (no findings) / session verdict: READY / PRECHECK_RESULT: READY / 退出码 0
+用量：Claude 会话 1 次，共 15.1 万 token（其中缓存读取 12 万），折合 API 价约 $0.32；周额度读数 61%。
+CRM-TASK-036: (no findings) / session verdict: READY / PRECHECK_RESULT: READY / 退出码 0
+用量：Claude 会话 1 次，共 18.9 万 token（其中缓存读取 15.7 万），折合 API 价约 $0.33；周额度读数 61%。
+CRM-TASK-037: (no findings) / session verdict: READY / PRECHECK_RESULT: READY / 退出码 0
+用量：Claude 会话 1 次，共 16.4 万 token（其中缓存读取 13.6 万），折合 API 价约 $0.29；周额度读数 61%。
+CRM-TASK-038: (no findings) / session verdict: READY / PRECHECK_RESULT: READY / 退出码 0
+用量：Claude 会话 1 次，共 8.4 万 token（其中缓存读取 6.2 万），折合 API 价约 $0.22；周额度读数 61%。
+```
+
 ## 登记 CRM-TASK-032 至 034（2026-10-15）
 
 Kelvin 2026-10-15 批准跟进记录 AI 整理设计（kelvinpang90/acuven_crm_demo#89，第八节 Q1 至 Q3 按建议），原话「批准」。本段是登记 PR 的记录。
