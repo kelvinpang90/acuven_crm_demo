@@ -66,6 +66,7 @@ export default function FollowUpAiDraft({
   const [tasks, setTasks] = useState<EditableTask[]>([]);
   const [restore, setRestore] = useState<{ activityType: Exclude<ActivityType, 'status change'>; note: string } | null>(null);
   const requestVersion = useRef(0);
+  const cardVersion = useRef(0);
 
   useEffect(() => {
     let active = true;
@@ -77,18 +78,25 @@ export default function FollowUpAiDraft({
   }, []);
 
   useEffect(() => {
+    setRestore(null);
+  }, [contactId]);
+
+  useEffect(() => {
     requestVersion.current += 1;
+    cardVersion.current += 1;
     setGenerating(false);
     setDraft(null);
     setTasks([]);
-    setRestore(null);
   }, [contactId, dealId]);
 
   useEffect(() => {
     onPendingTasksChange(tasks.filter((task) => !task.added).length);
   }, [onPendingTasksChange, tasks]);
 
-  useEffect(() => () => { requestVersion.current += 1; }, []);
+  useEffect(() => () => {
+    requestVersion.current += 1;
+    cardVersion.current += 1;
+  }, []);
 
   const generate = async () => {
     if (generating || !note.trim() || Array.from(note).length > 2000 || !dealId) return;
@@ -102,6 +110,7 @@ export default function FollowUpAiDraft({
         ...(outputLanguage(i18n.language) ? { output_language: outputLanguage(i18n.language) } : {}),
       });
       if (requestVersion.current === version) {
+        cardVersion.current += 1;
         setDraft(response.data.data);
         setTasks(response.data.data.tasks.map((task) => ({
           title: task.title,
@@ -138,6 +147,7 @@ export default function FollowUpAiDraft({
   const addTask = async (index: number) => {
     const task = tasks[index];
     if (!task || task.adding || task.added || !task.title.trim()) return;
+    const version = cardVersion.current;
     updateTask(index, { adding: true, error: null });
     try {
       await tasksApi.createTask({
@@ -146,10 +156,10 @@ export default function FollowUpAiDraft({
         due_date: task.dueDate || null,
         priority: task.priority,
       });
-      updateTask(index, { adding: false, added: true });
+      if (cardVersion.current === version) updateTask(index, { adding: false, added: true });
     } catch (error: unknown) {
       const message = axios.isAxiosError<ApiError>(error) ? error.response?.data?.error?.message : undefined;
-      updateTask(index, { adding: false, error: message || t('aiFollowUpTaskFailed') });
+      if (cardVersion.current === version) updateTask(index, { adding: false, error: message || t('aiFollowUpTaskFailed') });
     }
   };
 
