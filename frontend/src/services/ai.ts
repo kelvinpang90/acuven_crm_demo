@@ -1,5 +1,5 @@
 import api from './api';
-import type { AiContactSummary, AiConversationBrief, AiLanguage, AiReplyDraft, AiStatus, AiTranslation, ApiResponse } from '@/types';
+import type { AiContactSummary, AiConversationBrief, AiFollowUpDraft, AiLanguage, AiReplyDraft, AiStatus, AiTranslation, ApiResponse } from '@/types';
 
 let aiStatusPromise: Promise<AiStatus> | null = null;
 
@@ -24,6 +24,11 @@ export const aiApi = {
       outputLanguage ? { output_language: outputLanguage } : {},
       { timeout: 58000 },
     ),
+
+  createFollowUpDraft: (
+    contactId: string,
+    data: { deal_id: string; note: string; today: string; output_language?: 'zh-CN' | 'en' },
+  ) => api.post<ApiResponse<AiFollowUpDraft>>(`/ai/contacts/${contactId}/followup-draft`, data, { timeout: 58000 }),
 
   createReplyDraft: (contactId: string, channel: 'whatsapp' | 'email', instruction: string | undefined, outputLanguage: AiLanguage) =>
     api.post<ApiResponse<AiReplyDraft>>(`/ai/conversations/${contactId}/reply-draft`, { channel, ...(instruction ? { instruction } : {}), output_language: outputLanguage }, { timeout: 58000 }),
