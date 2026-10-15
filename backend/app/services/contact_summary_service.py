@@ -54,6 +54,28 @@ async def _limited_records(db: AsyncSession, query: Any, limit: int) -> tuple[li
     return records[:limit], len(records) > limit
 
 
+def _document_item(document: AutocountDocument) -> tuple[dict[str, Any], bool]:
+    item: dict[str, Any] = {
+        "type": document.doc_type,
+        "status": document.status,
+        "currency": document.currency_code,
+        "total": _amount(document.total_amount),
+        "doc_date": _date(document.doc_date),
+    }
+    if document.doc_type == "invoice":
+        item["outstanding"] = (
+            _amount(document.outstanding_amount)
+            if document.outstanding_amount is not None
+            else None
+        )
+        item["due_date"] = _date(document.due_date)
+    elif document.doc_type == "quotation":
+        validity, truncated = _truncate(document.validity, 100)
+        item["validity"] = validity
+        return item, truncated
+    return item, False
+
+
 async def build_contact_snapshot(
     db: AsyncSession, *, user: User, contact_id: str, now: datetime | None = None
 ) -> dict[str, Any]:
@@ -152,24 +174,8 @@ async def build_contact_snapshot(
         )
         truncated = truncated or title_truncated
     for document in documents:
-        item: dict[str, Any] = {
-            "type": document.doc_type,
-            "status": document.status,
-            "currency": document.currency_code,
-            "total": _amount(document.total_amount),
-            "doc_date": _date(document.doc_date),
-        }
-        if document.doc_type == "invoice":
-            item["outstanding"] = (
-                _amount(document.outstanding_amount)
-                if document.outstanding_amount is not None
-                else None
-            )
-            item["due_date"] = _date(document.due_date)
-        elif document.doc_type == "quotation":
-            validity, validity_truncated = _truncate(document.validity, 100)
-            item["validity"] = validity
-            truncated = truncated or validity_truncated
+        item, item_truncated = _document_item(document)
+        truncated = truncated or item_truncated
         snapshot["documents"].append(item)
     for activity in activities:
         content, content_truncated = _truncate(activity.content or "", 300)

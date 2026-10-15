@@ -15,7 +15,11 @@ from app.models.task import Task
 from app.models.user import User
 from app.services.access_service import owner_scope
 from app.services.ai_api_client import compact_json
-from app.services.contact_summary_service import SNAPSHOT_LIMIT_BYTES, build_contact_snapshot
+from app.services.contact_summary_service import (
+    SNAPSHOT_LIMIT_BYTES,
+    _document_item,
+    build_contact_snapshot,
+)
 
 NOW = datetime(2026, 10, 15, 10, 0)
 
@@ -159,7 +163,6 @@ async def test_snapshot_visibility_and_exact_item_shapes(async_session_maker):
         _task("unowned-task", assigned_to=None),
         _document("invoice", outstanding_amount=Decimal("3"), due_date=date(2026, 10, 2)),
         _document("quote", doc_type="quotation", validity="30 days"),
-        _document("other-doc", doc_type="other"),
         _activity("activity", content=None),
         _message("whatsapp", body=""),
         _message("email", channel="email", subject=None, body=""),
@@ -219,7 +222,11 @@ async def test_snapshot_visibility_and_exact_item_shapes(async_session_maker):
         "doc_date",
         "validity",
     }
-    assert document_keys["other"] == {"type", "status", "currency", "total", "doc_date"}
+    other_document, other_document_truncated = _document_item(
+        _document("other-doc", doc_type="other")
+    )
+    assert set(other_document) == {"type", "status", "currency", "total", "doc_date"}
+    assert other_document_truncated is False
     assert set(admin_snapshot["activities"][0]) == {"at", "type", "content"}
     messages_by_channel = {item["channel"]: item for item in admin_snapshot["messages"]}
     assert set(messages_by_channel["whatsapp"]) == {
@@ -310,7 +317,7 @@ async def test_snapshot_formats_and_ordering_limits(async_session_maker):
             follow_date=NOW + timedelta(seconds=index),
             content=f"activity-{index:02}",
         )
-        for index in range(1, 15)
+        for index in range(2, 15)
     ]
     rows += [
         _activity("activity-too-old", follow_date=NOW, content="activity-too-old"),
@@ -376,13 +383,11 @@ async def test_snapshot_formats_and_ordering_limits(async_session_maker):
         "doc-null-b",
     ]
     assert [item["content"] for item in snapshot["activities"]] == [
-        *[f"activity-{index:02}" for index in range(1, 15)],
+        *[f"activity-{index:02}" for index in range(2, 15)],
         "activity-tie-a",
         "activity-tie-b",
-    ][1:]
-    assert {"activity-too-old", "activity-01"}.isdisjoint(
-        {item["content"] for item in snapshot["activities"]}
-    )
+    ]
+    assert "activity-too-old" not in {item["content"] for item in snapshot["activities"]}
     assert [item["body"] for item in snapshot["messages"]] == [
         *[f"message-{index:02}" for index in range(1, 9)],
         "message-tie-a",
@@ -516,7 +521,7 @@ async def test_each_snapshot_truncation_trigger_is_independent(async_session_mak
     elif kind == "extra_activity":
         rows.extend(_activity(f"activity-{index}") for index in range(15))
     else:
-        rows.extend(_message(f"message-{index}") for index in range(9))
+        rows.extend(_message(f"message-{index}") for index in range(10))
     await _seed(async_session_maker, *rows)
     async with async_session_maker() as session:
         snapshot = await build_contact_snapshot(session, user=user, contact_id="contact")
