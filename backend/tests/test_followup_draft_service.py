@@ -62,6 +62,14 @@ def _output(**changes):
         (_output(tasks=[{"title": "x", "due_date": None, "priority": "invalid"}]), False),
         ({"content": "x", "tasks": []}, False),
         (_output(extra="x"), False),
+        (
+            _output(tasks=[{"title": "x", "due_date": None}]),
+            False,
+        ),
+        (
+            _output(tasks=[{"title": "x", "due_date": None, "priority": "mid", "extra": "x"}]),
+            False,
+        ),
         ([], False),
     ],
 )
@@ -218,6 +226,24 @@ async def test_preflight_order_and_contact_lookup(async_session_maker, monkeypat
                 today=date.today().isoformat(),
                 output_language="fr",
             )
+        session.add(
+            Contact(
+                id="soft-deleted",
+                name="Soft deleted",
+                deleted_at=datetime.utcnow(),
+            )
+        )
+        await session.flush()
+        with pytest.raises(ValueError):
+            await generate_followup_draft(
+                session,
+                user=user,
+                contact_id="soft-deleted",
+                deal_id="deal",
+                note="note",
+                today=date.today().isoformat(),
+                output_language="fr",
+            )
         await session.commit()
         audits = (await session.execute(select(AiRequest))).scalars().all()
     assert [invalid.category, unconfigured.category] == ["invalid_input", "not_configured"]
@@ -310,9 +336,13 @@ async def test_result_and_audit(async_session_maker, monkeypatch, outcome):
     user = await _seed(async_session_maker)
     calls = []
     _configured(monkeypatch)
+    output = _output(
+        content=" Followed up ",
+        tasks=[{"title": " Call back ", "due_date": None, "priority": "mid"}],
+    )
     _client(
         monkeypatch,
-        ai_api_client.AiApiResult(outcome, _output() if outcome == "ok" else None, "request"),
+        ai_api_client.AiApiResult(outcome, output if outcome == "ok" else None, "request"),
         calls,
     )
     async with async_session_maker() as session:
@@ -332,6 +362,9 @@ async def test_result_and_audit(async_session_maker, monkeypatch, outcome):
         and result.request_id == audit.request_id == "request"
     )
     assert audit.feature == FOLLOWUP_FEATURE
+    if outcome == "ok":
+        assert result.content == "Followed up"
+        assert result.tasks == [{"title": "Call back", "due_date": None, "priority": "mid"}]
 
 
 @pytest.mark.asyncio
