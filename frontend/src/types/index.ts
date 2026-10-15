@@ -287,3 +287,16 @@ export interface AiTranslation {
   translation: string;
   detected_language: AiLanguage | 'other';
 }
+
+export interface AiFollowUpTaskDraft {
+  title: string;
+  due_date: string | null;
+  priority: Priority;
+}
+
+export interface AiFollowUpDraft {
+  request_id: string | null;
+  activity_type: Exclude<ActivityType, 'status change'>;
+  content: string;
+  tasks: AiFollowUpTaskDraft[];
+}

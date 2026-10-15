@@ -98,5 +98,18 @@
   "aiNoHistory": "This customer has no records to summarize yet",
   "aiTemporarilyUnavailable": "AI is temporarily unavailable",
   "aiError": "AI request failed",
-  "aiRequestFailed": "AI request failed"
+  "aiRequestFailed": "AI request failed",
+  "aiFollowUpGenerate": "Organize with AI",
+  "aiFollowUpLoading": "Organizing...",
+  "aiFollowUpTooLong": "Note is too long",
+  "aiFollowUpInvalidInput": "The note or deal is invalid. Please check and try again",
+  "aiFollowUpFill": "Fill in",
+  "aiFollowUpRestore": "Restore note",
+  "aiFollowUpTasks": "Task drafts",
+  "aiFollowUpNoTasks": "No task drafts",
+  "aiFollowUpAddTask": "Add as task",
+  "aiFollowUpTaskAdding": "Adding...",
+  "aiFollowUpTaskAdded": "Added",
+  "aiFollowUpTaskFailed": "Failed to add task",
+  "aiFollowUpSubmitConfirm": "There are still {{count}} task drafts not added. Submit anyway?"
 }

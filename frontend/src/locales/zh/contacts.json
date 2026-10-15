@@ -98,5 +98,18 @@
   "aiNoHistory": "这个客户还没有可总结的记录",
   "aiTemporarilyUnavailable": "AI 暂时不可用",
   "aiError": "AI 请求失败",
-  "aiRequestFailed": "AI 请求失败"
+  "aiRequestFailed": "AI 请求失败",
+  "aiFollowUpGenerate": "AI 整理",
+  "aiFollowUpLoading": "整理中...",
+  "aiFollowUpTooLong": "速记过长",
+  "aiFollowUpInvalidInput": "速记或商机无效，请检查后再试",
+  "aiFollowUpFill": "填入",
+  "aiFollowUpRestore": "还原速记",
+  "aiFollowUpTasks": "任务草稿",
+  "aiFollowUpNoTasks": "没有任务草稿",
+  "aiFollowUpAddTask": "加为任务",
+  "aiFollowUpTaskAdding": "添加中...",
+  "aiFollowUpTaskAdded": "已加",
+  "aiFollowUpTaskFailed": "添加任务失败",
+  "aiFollowUpSubmitConfirm": "还有 {{count}} 条任务草稿没加，确定提交？"
 }
