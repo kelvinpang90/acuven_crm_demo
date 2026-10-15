@@ -1074,7 +1074,7 @@ tasks:
     purpose: >-
       按 docs/followup-ai-draft.md 第 4.5 节，在联系人面板的跟进表单里加 AI 整理，调用 CRM-TASK-033 的接口；结果先预览，员工点填入才替换表单，
       任务草稿改过后点加为任务才用现有的建任务接口建。保存跟进记录仍走现有的提交。AI 未配置时不显示。只改前端：不改后端、不加页面或路由、不改 services/tasks.ts。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-033
     acceptance_criteria:
