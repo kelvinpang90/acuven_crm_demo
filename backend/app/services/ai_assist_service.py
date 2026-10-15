@@ -59,6 +59,9 @@ class AiAssistResult:
     note_for_agent: str | None = None
     translation: str | None = None
     detected_language: str | None = None
+    activity_type: str | None = None
+    content: str | None = None
+    tasks: list[dict[str, Any]] | None = None
     truncated: bool | None = None
 
 
