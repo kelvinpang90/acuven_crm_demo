@@ -20,7 +20,7 @@
 
 ### 已阻塞
 
-- 待登记：AI 功能上线：为 CRM 建 AI 客户端密钥、配四项环境变量、按两份设计做质量评测（收件箱三项与客户摘要）、Kelvin 打分认可｜阻塞：等 Billing Hub AI 模块上线（AIH-TASK-063 至 070）
+- 待登记：AI 功能上线：为 CRM 建 AI 客户端密钥、配四项环境变量、按三份设计做质量评测（收件箱三项、客户摘要、跟进记录整理）、Kelvin 打分认可｜阻塞：等 Billing Hub AI 模块上线（AIH-TASK-063 至 070）
 - `CRM-TASK-017` 删掉 CRM 自己的 Meta webhook、网关入口与直连发送及其配置｜阻塞：等第 2 阶段真机验收通过（chatbot 侧 C3、C4 上线并配好第二把密钥）
 
 ### 后续计划
@@ -1860,7 +1860,7 @@ PRECHECK_RESULT: READY
 - [x] 按设计第七节拆分并登记 CRM-TASK-021 至 026（Kelvin 2026-10-13 定不等 AI 模块上线、按 A 排在 016 之后，见下「登记 CRM-TASK-021 至 026」）
 - [x] 客户摘要设计获 Kelvin 批准（2026-10-15，PR kelvinpang90/acuven_crm_demo#75，第八节 Q1 至 Q4 均按建议），登记 CRM-TASK-027 至 030（见下「登记 CRM-TASK-027 至 030」）
 - [x] 跟进记录 AI 整理设计获 Kelvin 批准（2026-10-15，PR kelvinpang90/acuven_crm_demo#89，Q1 至 Q3 按建议），登记 CRM-TASK-032 至 034（见下「登记 CRM-TASK-032 至 034」）
-- [ ] AI 模块上线后：建客户端密钥、配四项环境变量、按两份设计（收件箱第五节、客户摘要第五节）用 demo 数据做质量评测，Kelvin 打分认可（planning-v1「已阻塞」里的待登记行，管理员操作，不是 Worker 任务）
+- [ ] AI 模块上线后：建客户端密钥、配四项环境变量、按三份设计（收件箱、客户摘要、跟进记录整理各自的第五节）用 demo 数据做质量评测，Kelvin 打分认可（planning-v1「已阻塞」里的待登记行，管理员操作，不是 Worker 任务）
 
 ## 拆分 CRM-TASK-027（2026-10-15）
 
