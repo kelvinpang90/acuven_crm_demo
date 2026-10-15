@@ -14,11 +14,13 @@
 <!-- openclaw:planning-v1:begin -->
 ### 当前计划
 
+1. `CRM-TASK-032` 跟进记录AI整理的提示词、输出校验与业务函数
+2. `CRM-TASK-033` 跟进记录AI整理的接口
+3. `CRM-TASK-034` 跟进表单加AI整理，预览后填入并可把任务草稿加为任务
 
 ### 已阻塞
 
 - 待登记：AI 功能上线：为 CRM 建 AI 客户端密钥、配四项环境变量、按两份设计做质量评测（收件箱三项与客户摘要）、Kelvin 打分认可｜阻塞：等 Billing Hub AI 模块上线（AIH-TASK-063 至 070）
-- 待登记：跟进记录 AI 整理成结构化记录并生成任务草稿（任务八）｜阻塞：设计草稿已写，待 Kelvin 批准
 - `CRM-TASK-017` 删掉 CRM 自己的 Meta webhook、网关入口与直连发送及其配置｜阻塞：等第 2 阶段真机验收通过（chatbot 侧 C3、C4 上线并配好第二把密钥）
 
 ### 后续计划
@@ -1844,7 +1846,7 @@ PRECHECK_RESULT: READY
 |---|---|---|---|
 | 1 | 收件箱 | 会话简报、起草回复、翻译 | 第一版已批准（PR kelvinpang90/acuven_crm_demo#29）；AI 分工改了，第二版 2026-10-13 已批准：`docs/inbox-ai-assist.md`（PR kelvinpang90/acuven_crm_demo#34） |
 | 2 | 联系人 | 客户摘要（`crm.contact_summary`；原为 AI API 的契约 v1，按 ai_billing_hub 设计 #281 改为 CRM 自己的内部设计） | 设计 `docs/contact-ai-summary.md` 2026-10-15 已批准（PR kelvinpang90/acuven_crm_demo#75），登记为 CRM-TASK-027 至 029；Q4 的收件箱快照收窄为 CRM-TASK-030 |
-| 3 | 跟进记录 / 任务 | 把员工的速记整理成结构化跟进记录，并生成任务草稿（E-09 原定的「任务草稿」） | 设计草稿 `docs/followup-ai-draft.md`（2026-10-15），待 Kelvin 批准后登记 |
+| 3 | 跟进记录 / 任务 | 把员工的速记整理成结构化跟进记录，并生成任务草稿（E-09 原定的「任务草稿」） | 设计 `docs/followup-ai-draft.md` 2026-10-15 已批准（PR kelvinpang90/acuven_crm_demo#89），登记为 CRM-TASK-032 至 034 |
 | 4 | 商机 | 下一步建议、商机停滞的原因说明（只给文字，不改状态） | 想法 |
 | 4 | 仪表盘 | 经理看板的数据解读：数字由 CRM 算好，AI 只写解读 | 想法 |
 | 5 | 联系人 | 从聊天里提取客户资料作为建议填入；表格导入时识别列名；疑似重复客户提示（不自动合并，B-05） | 想法 |
@@ -1857,6 +1859,7 @@ PRECHECK_RESULT: READY
 - [x] 设计第二版（AI 分工改了，并补与第 2 阶段 CRM-TASK-012 至 020 的衔接，第八节）获 Kelvin 批准（2026-10-13，PR kelvinpang90/acuven_crm_demo#34，第十节 Q7 至 Q10 均按建议：共用一个 `AI_MODEL`、评测样例用 demo 数据、客户摘要另写设计、归档 ai_billing_hub 起草契约的会话）
 - [x] 按设计第七节拆分并登记 CRM-TASK-021 至 026（Kelvin 2026-10-13 定不等 AI 模块上线、按 A 排在 016 之后，见下「登记 CRM-TASK-021 至 026」）
 - [x] 客户摘要设计获 Kelvin 批准（2026-10-15，PR kelvinpang90/acuven_crm_demo#75，第八节 Q1 至 Q4 均按建议），登记 CRM-TASK-027 至 030（见下「登记 CRM-TASK-027 至 030」）
+- [x] 跟进记录 AI 整理设计获 Kelvin 批准（2026-10-15，PR kelvinpang90/acuven_crm_demo#89，Q1 至 Q3 按建议），登记 CRM-TASK-032 至 034（见下「登记 CRM-TASK-032 至 034」）
 - [ ] AI 模块上线后：建客户端密钥、配四项环境变量、按两份设计（收件箱第五节、客户摘要第五节）用 demo 数据做质量评测，Kelvin 打分认可（planning-v1「已阻塞」里的待登记行，管理员操作，不是 Worker 任务）
 
 ## 拆分 CRM-TASK-027（2026-10-15）
@@ -1899,6 +1902,10 @@ PRECHECK_RESULT: READY
 用量：Claude 会话 1 次，共 23.9 万 token（其中缓存读取 20.1 万），折合 API 价约 $0.38；周额度读数 52%。
 退出码 0
 ```
+
+## 登记 CRM-TASK-032 至 034（2026-10-15）
+
+<!-- REG032 -->
 
 ## 登记 CRM-TASK-027 至 030（2026-10-15）
 
