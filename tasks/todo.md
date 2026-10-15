@@ -1886,7 +1886,24 @@ Kelvin 2026-10-15 选「拆成两项、列明测试后重跑」。本段是拆�
 ### 设计闸门与预审
 
 - 设计闸门：027、031 都引用 #75（理由同上一段）。
-- 预审：见下「预审完整输出」。
+- `contract_check`：ready to register，没有拆分 WARN；planning-v1 `ok, next: CRM-TASK-027`。WARN 只有原有的四条，与本次无关。
+- 预审（设计文件 `docs/contact-ai-summary.md`，对登记分支的干净检出）：027、031 第 1 轮都 READY，无发现。它调模型、不是确定性的，READY 不保证没有缺陷。
+
+```text
+第 1 轮 CRM-TASK-027:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 21.7 万 token（其中缓存读取 18.1 万），折合 API 价约 $0.41；周额度读数 52%。
+退出码 0
+
+第 1 轮 CRM-TASK-031:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 23.9 万 token（其中缓存读取 20.1 万），折合 API 价约 $0.38；周额度读数 52%。
+退出码 0
+```
 
 ## 登记 CRM-TASK-027 至 030（2026-10-15）
 
