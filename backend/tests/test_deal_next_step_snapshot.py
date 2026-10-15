@@ -36,6 +36,9 @@ def _deal(deal_id="deal", **values):
         "id": deal_id,
         "contact_id": "contact",
         "title": "Deal",
+        "status": "lead",
+        "priority": "mid",
+        "amount": Decimal("0.00"),
         "created_at": NOW.replace(tzinfo=None),
     }
     fields.update(values)
@@ -86,8 +89,8 @@ async def _snapshot(maker, deal=None, contact=None):
 @pytest.mark.asyncio
 async def test_deal_and_contact_shape_and_field_truncation(async_session_maker):
     """Guards criterion 1: exact deal/contact shapes, formats, and truncation."""
-    deal = _deal(title="x" * 101, amount=Decimal("12.3"), created_at=datetime(2026, 10, 1))
-    contact = _contact(tags=["x" * 31] * 11, notes="n" * 501)
+    deal = _deal(title=None, amount=Decimal("12.3"), created_at=datetime(2026, 10, 1))
+    contact = _contact()
     await _seed(async_session_maker, _user(), deal, contact)
     snapshot = await _snapshot(async_session_maker, deal, contact)
     assert set(snapshot) == {
@@ -110,10 +113,25 @@ async def test_deal_and_contact_shape_and_field_truncation(async_session_maker):
         "stalled",
     }
     assert set(snapshot["contact"]) == {"name", "company", "industry", "tags", "notes"}
-    assert snapshot["deal"]["title"] == "x" * 100
+    assert snapshot["deal"]["title"] == ""
     assert snapshot["deal"]["amount"] == "12.30"
     assert snapshot["deal"]["created_on"] == "2026-10-01"
-    assert snapshot["truncated"] is True
+    assert snapshot["truncated"] is False
+
+    long_deal = _deal("long-deal", title="x" * 101)
+    long_contact = _contact("long-contact")
+    await _seed(async_session_maker, long_deal, long_contact)
+    long_snapshot = await _snapshot(async_session_maker, long_deal, long_contact)
+    assert long_snapshot["deal"]["title"] == "x" * 100
+    assert long_snapshot["truncated"] is True
+
+    capped_deal = _deal("capped-deal")
+    capped_contact = _contact("capped-contact", tags=["x" * 31] * 11, notes="n" * 501)
+    await _seed(async_session_maker, capped_deal, capped_contact)
+    capped_snapshot = await _snapshot(async_session_maker, capped_deal, capped_contact)
+    assert capped_snapshot["contact"]["tags"] == ["x" * 30] * 10
+    assert capped_snapshot["contact"]["notes"] == "n" * 500
+    assert capped_snapshot["truncated"] is True
 
 
 @pytest.mark.asyncio
@@ -192,6 +210,7 @@ async def test_days_in_status_and_stalled_statuses(async_session_maker):
     for index, (status, idle, expected) in enumerate(
         (
             ("lead", 7, True),
+            ("following", 7, True),
             ("following", 6, False),
             ("negotiating", 7, True),
             ("won", 30, False),
@@ -214,11 +233,21 @@ async def test_activities_messages_tasks_and_documents_are_bounded(async_session
     deal, contact = _deal(), _contact()
     user, other = _user(), _user("other")
     activities = [
-        _activity(f"{index:02}", follow_date=(NOW - timedelta(minutes=index)).replace(tzinfo=None))
+        _activity(
+            f"activity-{index:02}",
+            content=f"activity-{index:02}",
+            follow_date=(NOW - timedelta(minutes=4 if index in (4, 5) else index)).replace(
+                tzinfo=None
+            ),
+        )
         for index in range(16)
     ]
     messages = [
-        _message(f"{index:02}", created_at=(NOW - timedelta(minutes=index)).replace(tzinfo=None))
+        _message(
+            f"message-{index:02}",
+            body=f"message-{index:02}",
+            created_at=(NOW - timedelta(minutes=index)).replace(tzinfo=None),
+        )
         for index in range(11)
     ]
     tasks = [
@@ -242,9 +271,9 @@ async def test_activities_messages_tasks_and_documents_are_bounded(async_session
         deal,
         contact,
         *activities,
-        _activity("foreign", deal_id="other"),
+        _activity("foreign", deal_id="other", content="foreign-activity"),
         *messages,
-        _message("foreign-message", contact_id="other"),
+        _message("foreign-message", contact_id="other", body="foreign-message"),
         *tasks,
         Task(id="done", contact_id="contact", title="done", assigned_to="sales", is_done=True),
         Task(id="other-task", contact_id="contact", title="other", assigned_to="other"),
@@ -252,29 +281,45 @@ async def test_activities_messages_tasks_and_documents_are_bounded(async_session
     )
     snapshot = await _snapshot(async_session_maker, deal, contact)
     assert len(snapshot["activities"]) == 15
-    assert [item["at"] for item in snapshot["activities"]] == sorted(
-        item["at"] for item in snapshot["activities"]
+    expected_activities = sorted(
+        activities[:-1], key=lambda activity: (activity.follow_date, activity.id)
     )
+    assert [item["content"] for item in snapshot["activities"]] == [
+        activity.content for activity in expected_activities
+    ]
+    assert "foreign-activity" not in [item["content"] for item in snapshot["activities"]]
     assert len(snapshot["messages"]) == 10
-    assert [item["at"] for item in snapshot["messages"]] == sorted(
-        item["at"] for item in snapshot["messages"]
-    )
+    assert [item["body"] for item in snapshot["messages"]] == [
+        f"message-{index:02}" for index in range(9, -1, -1)
+    ]
+    assert "foreign-message" not in [item["body"] for item in snapshot["messages"]]
     assert set(snapshot["activities"][0]) == {"at", "type", "content"}
     assert len(snapshot["open_tasks"]) == 5
+    assert {item["title"] for item in snapshot["open_tasks"]}.isdisjoint({"done", "other"})
     assert len(snapshot["documents"]) == 5
     assert snapshot["truncated"] is True
 
 
 @pytest.mark.asyncio
-async def test_content_truncation_and_size_trimming_order(async_session_maker):
-    """Guards criteria 5 and 8: content caps and 16 KiB removal order/minimum retention."""
+async def test_activity_content_truncation(async_session_maker):
+    """Guards criterion 5: 301-character activity content is capped and marked."""
+    deal, contact = _deal(), _contact()
+    await _seed(async_session_maker, _user(), deal, contact, _activity("long", content="x" * 301))
+    snapshot = await _snapshot(async_session_maker, deal, contact)
+    assert snapshot["activities"][0]["content"] == "x" * 300
+    assert snapshot["truncated"] is True
+
+
+@pytest.mark.asyncio
+async def test_size_limit_drops_oldest_messages_before_activities(async_session_maker):
+    """Guards criterion 8: size trimming first removes only oldest messages when sufficient."""
     deal, contact = _deal(), _contact()
     emoji = chr(0x1F600) * 300
     messages = [
         _message(
             f"m{index}",
             body=emoji,
-            created_at=(NOW - timedelta(minutes=20 - index)).replace(tzinfo=None),
+            created_at=(NOW - timedelta(minutes=9 - index)).replace(tzinfo=None),
         )
         for index in range(10)
     ]
@@ -282,7 +327,36 @@ async def test_content_truncation_and_size_trimming_order(async_session_maker):
         _activity(
             f"a{index}",
             content=emoji,
-            follow_date=(NOW - timedelta(minutes=20 - index)).replace(tzinfo=None),
+            follow_date=(NOW - timedelta(minutes=4 - index)).replace(tzinfo=None),
+        )
+        for index in range(5)
+    ]
+    await _seed(async_session_maker, _user(), deal, contact, *messages, *activities)
+    snapshot = await _snapshot(async_session_maker, deal, contact)
+    assert snapshot["truncated"] is True
+    assert 1 < len(snapshot["messages"]) < len(messages)
+    assert len(snapshot["activities"]) == len(activities)
+    assert snapshot["messages"][0]["at"] > messages[0].created_at.isoformat() + "Z"
+
+
+@pytest.mark.asyncio
+async def test_size_limit_drops_oldest_activities_after_messages(async_session_maker):
+    """Guards criterion 8: activities trim only after messages reach one record."""
+    deal, contact = _deal(), _contact()
+    emoji = chr(0x1F600) * 300
+    messages = [
+        _message(
+            f"m{index}",
+            body=emoji,
+            created_at=(NOW - timedelta(minutes=9 - index)).replace(tzinfo=None),
+        )
+        for index in range(10)
+    ]
+    activities = [
+        _activity(
+            f"a{index}",
+            content=emoji,
+            follow_date=(NOW - timedelta(minutes=14 - index)).replace(tzinfo=None),
         )
         for index in range(15)
     ]
@@ -290,12 +364,29 @@ async def test_content_truncation_and_size_trimming_order(async_session_maker):
     snapshot = await _snapshot(async_session_maker, deal, contact)
     assert snapshot["truncated"] is True
     assert len(snapshot["messages"]) == 1
-    assert len(snapshot["activities"]) == 1
+    assert 1 < len(snapshot["activities"]) < len(activities)
+    assert snapshot["messages"][0]["at"] == NOW.replace(microsecond=0).isoformat().replace(
+        "+00:00", "Z"
+    )
+    assert snapshot["activities"][0]["at"] > activities[0].follow_date.isoformat() + "Z"
+    assert snapshot["activities"][-1]["at"] == NOW.replace(microsecond=0).isoformat().replace(
+        "+00:00", "Z"
+    )
 
-    oversized = _activity("long", content="x" * 301)
-    await _seed(async_session_maker, oversized)
-    capped = await _snapshot(async_session_maker, deal, contact)
-    assert all(len(item["content"]) <= 300 for item in capped["activities"])
+
+@pytest.mark.asyncio
+async def test_size_limit_returns_one_record_each_when_still_oversized(async_session_maker):
+    """Guards criterion 8: snapshots over 16 KiB retain one message and activity."""
+    deal = _deal()
+    contact = _contact(company="c" * 17000)
+    emoji = chr(0x1F600) * 300
+    messages = [_message(f"m{index}", body=emoji) for index in range(10)]
+    activities = [_activity(f"a{index}", content=emoji) for index in range(15)]
+    await _seed(async_session_maker, _user(), deal, contact, *messages, *activities)
+    snapshot = await _snapshot(async_session_maker, deal, contact)
+    assert snapshot["truncated"] is True
+    assert len(snapshot["messages"]) == 1
+    assert len(snapshot["activities"]) == 1
 
 
 @pytest.mark.asyncio
