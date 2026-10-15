@@ -1047,7 +1047,7 @@ tasks:
     purpose: >-
       按 docs/followup-ai-draft.md 第 4.4 节，把 CRM-TASK-032 的业务函数接成 POST /api/ai/contacts/{contact_id}/followup-draft，供 CRM-TASK-034 的跟进表单使用。
       只做接口层：加在已有的 AI 路由里，不改 main.py、不改业务规则、不改表结构、不改前端、不改现有的建跟进记录与建任务接口。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-032
     acceptance_criteria:
