@@ -1912,7 +1912,7 @@ Kelvin 2026-10-15 批准跟进记录 AI 整理设计（kelvinpang90/acuven_crm_d
 - `.platform/tasks.yaml`：登记 032–034，全部 `ready`。依赖：032 依赖 031（复用结果对象、`owner_scope` 与客户摘要的待办取法）；033 依赖 032；034 依赖 033。
 - 测试标准按 027 拆分的教训（kelvinpang90/acuven_crm_demo#78）写成编号的用例清单，清单之外的补充覆盖只算非阻塞意见。
 - planning-v1：「当前计划」为 032、033、034；「已阻塞」删掉「待登记：跟进记录 AI 整理……」一行；「AI 功能上线」一行的评测范围加上跟进记录整理。
-- `docs/followup-ai-draft.md` 加第九节「登记预审后的补充」（3 条，待 Kelvin 在本 PR 批准）。
+- `docs/followup-ai-draft.md` 加第九节「登记预审后的补充」（3 条，Kelvin 2026-10-15 在本 PR 批准，原话「批准」）。
 
 ### 设计闸门与预审
 
