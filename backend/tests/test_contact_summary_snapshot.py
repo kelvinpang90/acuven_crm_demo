@@ -223,7 +223,8 @@ async def test_snapshot_visibility_and_exact_item_shapes(async_session_maker):
         "validity",
     }
     other_document, other_document_truncated = _document_item(
-        _document("other-doc", doc_type="other")
+        # Unsaved, so column defaults never apply: set the total explicitly.
+        _document("other-doc", doc_type="other", total_amount=Decimal("0"))
     )
     assert set(other_document) == {"type", "status", "currency", "total", "doc_date"}
     assert other_document_truncated is False
