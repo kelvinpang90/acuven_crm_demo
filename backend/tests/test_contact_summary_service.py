@@ -176,7 +176,7 @@ async def test_snapshot_fields_order_limits_visibility_and_truncation(async_sess
     assert len(snapshot["activities"]) == 15 and len(snapshot["messages"]) == 10
     assert snapshot["deals"][0]["title"] == "d" * 100 and snapshot["deals"][0]["amount"] == "12.50"
     assert snapshot["deals"][0]["updated_at"] > snapshot["deals"][-1]["updated_at"]
-    assert snapshot["open_tasks"][-1]["due_date"] is None
+    assert snapshot["open_tasks"][-1]["due_date"] == (NOW.date() + timedelta(days=4)).isoformat()
     assert (
         snapshot["documents"][0]["type"] == "invoice" and "outstanding" in snapshot["documents"][0]
     )
@@ -189,6 +189,59 @@ async def test_snapshot_fields_order_limits_visibility_and_truncation(async_sess
     serialized = json.dumps(snapshot, ensure_ascii=False)
     for forbidden in ("contact_id", "assigned_to", "doc_no", "customer_code", "user_id"):
         assert forbidden not in serialized
+
+
+@pytest.mark.asyncio
+async def test_snapshot_tasks_sort_same_due_date_by_id_and_undated_last(async_session_maker):
+    """Guards task due-date ordering, same-date ID ordering, and undated-last criteria."""
+    await _seed(
+        async_session_maker,
+        _user("sales"),
+        _contact(),
+        Task(
+            id="task-b",
+            contact_id="contact",
+            assigned_to="sales",
+            title="same-date-second",
+            due_date=NOW.date(),
+            is_done=False,
+        ),
+        Task(
+            id="task-a",
+            contact_id="contact",
+            assigned_to="sales",
+            title="same-date-first",
+            due_date=NOW.date(),
+            is_done=False,
+        ),
+        Task(
+            id="task-later",
+            contact_id="contact",
+            assigned_to="sales",
+            title="later",
+            due_date=NOW.date() + timedelta(days=1),
+            is_done=False,
+        ),
+        Task(
+            id="task-undated",
+            contact_id="contact",
+            assigned_to="sales",
+            title="undated",
+            due_date=None,
+            is_done=False,
+        ),
+    )
+    async with async_session_maker() as session:
+        snapshot = await contact_summary_service.build_contact_summary_snapshot(
+            session, user=await session.get(User, "sales"), contact_id="contact"
+        )
+    assert [item["title"] for item in snapshot["open_tasks"]] == [
+        "same-date-first",
+        "same-date-second",
+        "later",
+        "undated",
+    ]
+    assert snapshot["open_tasks"][-1]["due_date"] is None
 
 
 @pytest.mark.asyncio
