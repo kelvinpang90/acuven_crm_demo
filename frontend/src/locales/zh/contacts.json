@@ -86,5 +86,17 @@
   "importStrategyWorkload": "平均工作量",
   "importStrategyWinRate": "赢率优先",
   "importStrategyMe": "全部指派给我",
-  "phoneConflict": "号码冲突"
+  "phoneConflict": "号码冲突",
+  "aiCustomerSummary": "AI 客户摘要",
+  "aiSummaryGenerate": "生成摘要",
+  "aiSummaryRegenerate": "重新生成",
+  "aiSummaryLoading": "生成中...",
+  "aiGeneratedUnverified": "AI 生成，未核实",
+  "aiSummaryTruncated": "只看了最近一部分记录。",
+  "aiSuggestedNextStep": "建议下一步",
+  "aiNotEnabled": "AI 未启用",
+  "aiNoHistory": "这个客户还没有可总结的记录",
+  "aiTemporarilyUnavailable": "AI 暂时不可用",
+  "aiError": "AI 请求失败",
+  "aiRequestFailed": "AI 请求失败"
 }
