@@ -66,6 +66,11 @@ async def test_owner_scope_matches_all_three_roles_and_hides_unassigned(async_se
         _user("manager", "manager"),
         _user("staff", manager_id="manager"),
         _user("other"),
+        *[
+            Deal(id=f"scope-{owner}", contact_id="contact", assigned_to=owner)
+            for owner in ("admin", "manager", "staff", "other")
+        ],
+        Deal(id="scope-unassigned", contact_id="contact", assigned_to=None),
     )
     async with async_session_maker() as session:
         scopes = [
@@ -75,12 +80,16 @@ async def test_owner_scope_matches_all_three_roles_and_hides_unassigned(async_se
         rows = []
         for scope in scopes:
             rows.append(
-                (await session.execute(select(User.id).where(*scope).order_by(User.id)))
+                (await session.execute(select(Deal.id).where(*scope).order_by(Deal.id)))
                 .scalars()
                 .all()
             )
     assert scopes[0] == []
-    assert rows == [["admin", "manager", "other", "staff"], ["manager", "staff"], ["staff"]]
+    assert rows == [
+        ["scope-admin", "scope-manager", "scope-other", "scope-staff", "scope-unassigned"],
+        ["scope-manager", "scope-staff"],
+        ["scope-staff"],
+    ]
 
 
 @pytest.mark.asyncio
@@ -162,10 +171,11 @@ async def test_snapshot_fields_order_limits_visibility_and_truncation(async_sess
         snapshot = await contact_summary_service.build_contact_summary_snapshot(
             session, user=await session.get(User, "sales"), contact_id="contact"
         )
-    assert len(snapshot["deals"]) == len(snapshot["open_tasks"]) == len(snapshot["documents"]) == 5
+    assert len(snapshot["deals"]) == 10
+    assert len(snapshot["open_tasks"]) == len(snapshot["documents"]) == 5
     assert len(snapshot["activities"]) == 15 and len(snapshot["messages"]) == 10
     assert snapshot["deals"][0]["title"] == "d" * 100 and snapshot["deals"][0]["amount"] == "12.50"
-    assert snapshot["deals"][-1]["updated_at"] > snapshot["deals"][0]["updated_at"]
+    assert snapshot["deals"][0]["updated_at"] > snapshot["deals"][-1]["updated_at"]
     assert snapshot["open_tasks"][-1]["due_date"] is None
     assert (
         snapshot["documents"][0]["type"] == "invoice" and "outstanding" in snapshot["documents"][0]
@@ -182,9 +192,98 @@ async def test_snapshot_fields_order_limits_visibility_and_truncation(async_sess
 
 
 @pytest.mark.asyncio
-async def test_snapshot_16_kib_drops_oldest_messages_then_activities(async_session_maker):
-    """Guards the 16 KiB discard order and minimum one-message/activity retention criteria."""
-    rows = [_user("sales"), _contact(notes="\x00" * 500)]
+async def test_snapshot_respects_deal_and_task_owner_scopes(async_session_maker):
+    """Guards sales, manager, and admin deal/task visibility acceptance criteria."""
+    owners = ("manager", "staff", "other", None)
+    await _seed(
+        async_session_maker,
+        _user("admin", "admin"),
+        _user("manager", "manager"),
+        _user("staff", manager_id="manager"),
+        _user("other"),
+        _contact(),
+        *[
+            Deal(
+                id=f"deal-{owner or 'unassigned'}",
+                contact_id="contact",
+                assigned_to=owner,
+                title=owner or "unassigned",
+                updated_at=NOW,
+            )
+            for owner in owners
+        ],
+        *[
+            Task(
+                id=f"task-{owner or 'unassigned'}",
+                contact_id="contact",
+                assigned_to=owner,
+                title=owner or "unassigned",
+                due_date=NOW.date(),
+                is_done=False,
+            )
+            for owner in owners
+        ],
+    )
+    async with async_session_maker() as session:
+        snapshots = {
+            role: await contact_summary_service.build_contact_summary_snapshot(
+                session, user=await session.get(User, role), contact_id="contact"
+            )
+            for role in ("staff", "manager", "admin")
+        }
+    visible = {
+        role: {
+            block: {item["title"] for item in snapshot[block]} for block in ("deals", "open_tasks")
+        }
+        for role, snapshot in snapshots.items()
+    }
+    assert visible["staff"] == {"deals": {"staff"}, "open_tasks": {"staff"}}
+    assert visible["manager"] == {
+        "deals": {"manager", "staff"},
+        "open_tasks": {"manager", "staff"},
+    }
+    assert visible["admin"] == {
+        "deals": {"manager", "staff", "other", "unassigned"},
+        "open_tasks": {"manager", "staff", "other", "unassigned"},
+    }
+
+
+@pytest.mark.asyncio
+async def test_snapshot_16_kib_drops_to_newest_message_and_activity(async_session_maker):
+    """Guards 16 KiB discard order, both one-record floors, and no-error overflow behavior."""
+    rows = [_user("sales"), _contact(notes="\x00" * 500, tags=["\x00" * 30] * 10)]
+    rows += [
+        Deal(
+            id=f"d{index}",
+            contact_id="contact",
+            assigned_to="sales",
+            title="\x00" * 100,
+            updated_at=NOW,
+        )
+        for index in range(10)
+    ]
+    rows += [
+        Task(
+            id=f"t{index}",
+            contact_id="contact",
+            assigned_to="sales",
+            title="\x00" * 100,
+            due_date=NOW.date(),
+            is_done=False,
+        )
+        for index in range(5)
+    ]
+    rows += [
+        AutocountDocument(
+            id=f"q{index}",
+            doc_type="quotation",
+            doc_no=f"q{index}",
+            customer_code="code",
+            contact_id="contact",
+            validity="\x00" * 100,
+        )
+        for index in range(5)
+    ]
     rows += [
         Activity(
             id=f"a{index}",
@@ -195,11 +294,57 @@ async def test_snapshot_16_kib_drops_oldest_messages_then_activities(async_sessi
             content="\x00" * 300,
             follow_date=NOW + timedelta(seconds=index),
         )
-        for index in range(15)
+        for index in range(2)
     ]
     rows += [
         _message(f"m{index:02}", NOW + timedelta(seconds=index), body="\x00" * 300)
+        for index in range(2)
+    ]
+    await _seed(async_session_maker, *rows)
+    async with async_session_maker() as session:
+        snapshot = await contact_summary_service.build_contact_summary_snapshot(
+            session, user=await session.get(User, "sales"), contact_id="contact"
+        )
+    assert snapshot["truncated"] is True
+    assert [item["at"] for item in snapshot["messages"]] == ["2026-10-15T08:00:01Z"]
+    assert [item["at"] for item in snapshot["activities"]] == ["2026-10-15T08:00:01Z"]
+
+
+@pytest.mark.asyncio
+async def test_snapshot_over_16_kib_without_discard_is_not_truncated(async_session_maker):
+    """Guards that size alone does not set truncated when no record or field is cut."""
+    rows = [_user("sales"), _contact(notes="\x00" * 500, tags=["\x00" * 30] * 10)]
+    rows += [
+        Deal(
+            id=f"d{index}",
+            contact_id="contact",
+            assigned_to="sales",
+            title="\x00" * 100,
+            updated_at=NOW,
+        )
         for index in range(10)
+    ]
+    rows += [
+        Task(
+            id=f"t{index}",
+            contact_id="contact",
+            assigned_to="sales",
+            title="\x00" * 100,
+            due_date=NOW.date(),
+            is_done=False,
+        )
+        for index in range(5)
+    ]
+    rows += [
+        AutocountDocument(
+            id=f"q{index}",
+            doc_type="quotation",
+            doc_no=f"q{index}",
+            customer_code="code",
+            contact_id="contact",
+            validity="\x00" * 100,
+        )
+        for index in range(5)
     ]
     await _seed(async_session_maker, *rows)
     async with async_session_maker() as session:
@@ -207,9 +352,10 @@ async def test_snapshot_16_kib_drops_oldest_messages_then_activities(async_sessi
             session, user=await session.get(User, "sales"), contact_id="contact"
         )
     assert (
-        snapshot["truncated"] is True and snapshot["messages"][-1]["at"] == "2026-10-15T08:00:09Z"
+        len(json.dumps(snapshot, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
+        > 16 * 1024
     )
-    assert snapshot["messages"] and snapshot["activities"]
+    assert snapshot["truncated"] is False
 
 
 @pytest.mark.parametrize(
@@ -264,8 +410,19 @@ async def test_generation_invalid_configuration_and_no_history_do_not_call_or_au
 
 
 @pytest.mark.asyncio
-async def test_generation_order_contract_results_and_audit(async_session_maker, monkeypatch):
-    """Guards no-call order plus successful, invalid, and unavailable call auditing criteria."""
+@pytest.mark.parametrize(
+    "invalid_output",
+    [
+        {"summary": "x" * 601, "suggested_next_step": ""},
+        {"summary": "ok", "suggested_next_step": "x" * 241},
+        {"summary": "ok"},
+        {"summary": "ok", "suggested_next_step": "", "extra": "x"},
+    ],
+)
+async def test_generation_order_contract_results_and_audit(
+    async_session_maker, monkeypatch, invalid_output
+):
+    """Guards every invalid output's error audit, request id, and unavailable auditing criteria."""
     await _seed(async_session_maker, _user("sales"), _contact(), _message("m", NOW))
     calls = []
     monkeypatch.setattr(contact_summary_service.ai_api_client, "is_ai_configured", lambda: True)
@@ -274,7 +431,7 @@ async def test_generation_order_contract_results_and_audit(async_session_maker, 
             ai_api_client.AiApiResult(
                 "ok", {"summary": " summary ", "suggested_next_step": " "}, "good"
             ),
-            ai_api_client.AiApiResult("ok", {"summary": "", "suggested_next_step": ""}, "bad"),
+            ai_api_client.AiApiResult("ok", invalid_output, "bad"),
             ai_api_client.AiApiResult("unavailable", request_id="down"),
         ]
     )
@@ -310,10 +467,10 @@ async def test_generation_order_contract_results_and_audit(async_session_maker, 
         and good.suggested_next_step == ""
     )
     assert (bad.category, bad.request_id, unavailable.category) == ("error", "bad", "unavailable")
-    assert [(audit.feature, audit.outcome) for audit in audits] == [
-        (SUMMARY_FEATURE, "error"),
-        (SUMMARY_FEATURE, "unavailable"),
-        (SUMMARY_FEATURE, "ok"),
+    assert [(audit.feature, audit.outcome, audit.request_id) for audit in audits] == [
+        (SUMMARY_FEATURE, "error", "bad"),
+        (SUMMARY_FEATURE, "unavailable", "down"),
+        (SUMMARY_FEATURE, "ok", "good"),
     ]
     assert all(
         call["feature"] == SUMMARY_FEATURE
