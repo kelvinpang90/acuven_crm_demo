@@ -116,6 +116,7 @@
 ```
 
 - 不放联系人 id、电话、邮箱、BSUID：模型用不到，少发一项是一项。
+- 商机只放点按钮的员工本人可见的（按商机负责人，与商机列表同一口径）：客户摘要设计 [contact-ai-summary.md](contact-ai-summary.md) 第三节与 Q4，CRM-TASK-030。
 - `author_kind` 为空的历史消息，按 `direction` 推断为 `customer` 或 `agent`。
 - WhatsApp 出站消息带 `delivery`：`sent` / `delivered` / `read` / `failed`；第 2 阶段客服回复尚未确认的，创建不足 45 秒为 `sending`、否则 `unconfirmed`；没有状态的不带这个键（第八节第 3 条、第十一节第 4 条）。
 - 上限与截断见第十一节第 3 条与第十三节第 1 条；`as_of` 不在快照里，放在用户消息的数据块里（第十一节第 8 条）。
