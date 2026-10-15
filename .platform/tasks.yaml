@@ -867,7 +867,7 @@ tasks:
       按 docs/contact-ai-summary.md 第三节与 4.2 节，在 access_service 加本人可见的范围函数，并在新文件 contact_summary_service 组装发给模型的客户快照
       （商机与待办只放本人可见的）。提示词、输出校验与业务函数在 CRM-TASK-031。只做业务规则层：不调 AI、不加接口、不改前端、不加表与迁移、
       不改收件箱快照（CRM-TASK-030）；不写任何真实密钥与地址。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-023
     acceptance_criteria:
