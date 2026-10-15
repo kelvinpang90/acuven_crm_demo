@@ -1905,7 +1905,45 @@ PRECHECK_RESULT: READY
 
 ## 登记 CRM-TASK-032 至 034（2026-10-15）
 
-<!-- REG032 -->
+Kelvin 2026-10-15 批准跟进记录 AI 整理设计（kelvinpang90/acuven_crm_demo#89，第八节 Q1 至 Q3 按建议），原话「批准」。本段是登记 PR 的记录。
+
+### 做了什么
+
+- `.platform/tasks.yaml`：登记 032–034，全部 `ready`。依赖：032 依赖 031（复用结果对象、`owner_scope` 与客户摘要的待办取法）；033 依赖 032；034 依赖 033。
+- 测试标准按 027 拆分的教训（kelvinpang90/acuven_crm_demo#78）写成编号的用例清单，清单之外的补充覆盖只算非阻塞意见。
+- planning-v1：「当前计划」为 032、033、034；「已阻塞」删掉「待登记：跟进记录 AI 整理……」一行；「AI 功能上线」一行的评测范围加上跟进记录整理。
+- `docs/followup-ai-draft.md` 加第九节「登记预审后的补充」（3 条，待 Kelvin 在本 PR 批准）。
+
+### 设计闸门与预审
+
+- 设计闸门：三个都适用，都引用 #89（032 把速记与客户、商机、待办发给模型；033 是收发这些内容的接口；034 展示 AI 输出并经员工确认后保存）。
+- `contract_check`：ready to register，三个任务都没有拆分 WARN。
+- 预审（设计文件 `docs/followup-ai-draft.md`，登记分支的干净检出）：第 1 轮 033 READY 无发现，032 READY 带两条 UNDECIDED，034 NOT_READY；改后第 2 轮只复跑 032、034，都 READY，034 报的两条 UNDECIDED 已写进第九节与验收标准，之后没有再跑。
+
+| 轮次 / 任务 | 发现 | 处理 |
+|---|---|---|
+| 1 / 032 | UNDECIDED：联系人不存在的 `ValueError` 在检查顺序里的位置；软删除算不算不存在 | 第九节第 1 条：第一步读联系人，不存在或已软删除抛 `ValueError` |
+| 1 / 034 | DESIGN_DEFECT：换联系人时跟进表单不重新挂载，带着旧联系人的商机 | 照原文不成立（面板带全屏遮罩，点别的客户先关面板、组件卸载）；但同一问题在删掉选中的商机后真实存在（列表重新加载不改选，只剩一个商机时下拉框隐藏），第九节第 2 条：不在列表里就改选第一个 |
+| 1 / 034 | UNDECIDED：再点一次 AI 整理时卡片、还原速记、已加标记怎么处理；改选商机要不要丢卡片 | 第九节第 3 条 |
+| 2 / 034 | UNDECIDED：商机列表变空时怎么办 | 第九节第 2 条：收起表单 |
+| 2 / 034 | UNDECIDED：换了新卡片后显不显示还原速记 | 第九节第 3 条：这次打开表单以来填入过就显示 |
+
+```
+第 1 轮
+CRM-TASK-032: PRECHECK_FINDING: UNDECIDED backend/app/services/followup_draft_service.py :: The ValueError for a missing contact has no stated place in the check order; checked after the deal_id check, a missing contact yields invalid_input, so the contact must be looked up first.
+CRM-TASK-032: PRECHECK_FINDING: UNDECIDED 4.2 :: Whether a soft-deleted contact counts as nonexistent (ValueError) in the business function is not stated; contact_summary_service treats it as not found.
+CRM-TASK-032: session verdict: READY / PRECHECK_RESULT: READY
+CRM-TASK-033: (no findings) / session verdict: READY / PRECHECK_RESULT: READY
+CRM-TASK-034: PRECHECK_FINDING: DESIGN_DEFECT 4.5 :: ActivityTimeline is not remounted on contact switch and keeps the old contact's selectedDealId (hidden selector for one-deal contacts), so "表单选中的 deal_id" always yields INVALID_INPUT; the design must say to reset the selected deal on contact change.
+CRM-TASK-034: PRECHECK_FINDING: UNDECIDED 4.5 :: Clicking AI 整理 again with a card open (after 填入 the box holds AI text): replace the card or not, which note 还原速记 restores, whether 已加 marks are kept, and whether a deal change drops the card are not decided.
+CRM-TASK-034: session verdict: NOT_READY / PRECHECK_RESULT: NOT_READY
+
+第 2 轮
+CRM-TASK-032: (no findings) / session verdict: READY / PRECHECK_RESULT: READY
+CRM-TASK-034: PRECHECK_FINDING: UNDECIDED 4.5 :: When a deal-list reload leaves no deals while the form is open, there is no first deal to switch to; the design does not say whether the AI button is hidden or disabled, or sends an empty deal_id.
+CRM-TASK-034: PRECHECK_FINDING: UNDECIDED 9 :: After filling from one card and running AI again, it is unclear whether the replacing card shows the restore-note button (to the text before the earlier fill) or hides it because that card was never filled.
+CRM-TASK-034: session verdict: READY / PRECHECK_RESULT: READY
+```
 
 ## 登记 CRM-TASK-027 至 030（2026-10-15）
 
