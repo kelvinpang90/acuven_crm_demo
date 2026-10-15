@@ -408,7 +408,7 @@ async def test_snapshot_field_and_count_truncation_flags(async_session_maker):
     await _seed(
         async_session_maker,
         user,
-        _contact(tags=["t" * 30], notes="n" * 500),
+        _contact(tags=["t" * 30] * 10, notes="n" * 500),
         _deal("deal", assigned_to="sales", title="d" * 100),
         _task("task", assigned_to="sales", title="t" * 100),
         _document("quote", doc_type="quotation", validity="v" * 100),
@@ -488,7 +488,7 @@ async def test_snapshot_at_every_record_limit_is_not_truncated(async_session_mak
 async def test_each_snapshot_truncation_trigger_is_independent(async_session_maker, kind):
     """Guards criterion 7: each specified trigger alone sets truncated."""
     user = _user("sales")
-    contact = _contact(tags=["t" * 30], notes="n" * 500)
+    contact = _contact(tags=["t" * 30] * 10, notes="n" * 500)
     deal = _deal("deal", assigned_to="sales", title="d" * 100)
     task = _task("task", assigned_to="sales", title="t" * 100)
     document = _document("quote", doc_type="quotation", validity="v" * 100)
@@ -496,9 +496,9 @@ async def test_each_snapshot_truncation_trigger_is_independent(async_session_mak
     message = _message("message", channel="email", body="m" * 300, subject="s" * 100)
     rows = [user, contact, deal, task, document, activity, message]
     if kind == "eleven_tags":
-        contact.tags = ["tag"] * 11
+        contact.tags = ["t" * 30] * 11
     elif kind == "long_tag":
-        contact.tags = ["t" * 31]
+        contact.tags = ["t" * 31] + ["t" * 30] * 9
     elif kind == "long_notes":
         contact.notes = "n" * 501
     elif kind == "long_deal_title":
