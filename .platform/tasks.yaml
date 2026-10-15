@@ -927,7 +927,7 @@ tasks:
     purpose: >-
       按 docs/contact-ai-summary.md 第 4.4 节，把 CRM-TASK-031 的业务函数接成 POST /api/ai/contacts/{contact_id}/summary，供 CRM-TASK-029 的联系人面板使用。
       只做接口层：加在已有的 AI 路由里，不改 main.py、不改业务规则、不改表结构、不改前端。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-031
     acceptance_criteria:
