@@ -38,6 +38,7 @@ ERROR = "error"
 UNAVAILABLE = "unavailable"
 NOT_CONFIGURED = "not_configured"
 NO_MESSAGES = "no_messages"
+NO_HISTORY = "no_history"
 INVALID_INPUT = "invalid_input"
 
 
@@ -50,6 +51,7 @@ class AiAssistResult:
     customer_mood: str | None = None
     open_questions: list[str] | None = None
     suggested_next_step: str | None = None
+    summary: str | None = None
     draft: str | None = None
     subject: str | None = None
     note_for_agent: str | None = None

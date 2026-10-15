@@ -14,8 +14,26 @@ from app.models.deal import Deal
 from app.models.message import Message
 from app.models.task import Task
 from app.models.user import User
+from app.services import ai_api_client
 from app.services.access_service import owner_scope
 from app.services.ai_api_client import compact_json
+from app.services.ai_assist_service import (
+    ERROR,
+    INVALID_INPUT,
+    LANGUAGES,
+    NO_HISTORY,
+    NOT_CONFIGURED,
+    OK,
+    AiAssistResult,
+    write_ai_request,
+)
+from app.services.ai_features import (
+    MAX_TOKENS,
+    SUMMARY_FEATURE,
+    SUMMARY_SCHEMA,
+    SUMMARY_SYSTEM,
+    validate_summary,
+)
 
 SNAPSHOT_LIMIT_BYTES = 16 * 1024
 
@@ -223,3 +241,67 @@ async def build_contact_snapshot(
         snapshot["activities"].pop(0)
         snapshot["truncated"] = True
     return snapshot
+
+
+def _as_of() -> str:
+    return datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+
+
+async def generate_contact_summary(
+    db: AsyncSession, *, user: User, contact_id: str, output_language: str
+) -> AiAssistResult:
+    """Generate a validated customer summary and audit every AI client call."""
+    if not isinstance(output_language, str) or output_language not in LANGUAGES:
+        return AiAssistResult(INVALID_INPUT)
+    if not ai_api_client.is_ai_configured():
+        return AiAssistResult(NOT_CONFIGURED)
+    snapshot = await build_contact_snapshot(db, user=user, contact_id=contact_id)
+    if not any(
+        snapshot[section]
+        for section in ("deals", "open_tasks", "documents", "activities", "messages")
+    ):
+        return AiAssistResult(NO_HISTORY)
+    result = await ai_api_client.send_message(
+        feature=SUMMARY_FEATURE,
+        system=SUMMARY_SYSTEM,
+        messages=[
+            {
+                "role": "user",
+                "content": compact_json(
+                    {
+                        "as_of": _as_of(),
+                        "output_language": output_language,
+                        "snapshot": snapshot,
+                    }
+                ),
+            }
+        ],
+        max_tokens=MAX_TOKENS,
+        schema=SUMMARY_SCHEMA,
+    )
+    if result.outcome == ai_api_client.OK:
+        output = validate_summary(result.output)
+        if output is not None:
+            await write_ai_request(
+                db,
+                user_id=user.id,
+                contact_id=contact_id,
+                feature=SUMMARY_FEATURE,
+                request_id=result.request_id,
+                outcome=OK,
+            )
+            return AiAssistResult(
+                OK, request_id=result.request_id, truncated=snapshot["truncated"], **output
+            )
+        outcome = ERROR
+    else:
+        outcome = result.outcome
+    await write_ai_request(
+        db,
+        user_id=user.id,
+        contact_id=contact_id,
+        feature=SUMMARY_FEATURE,
+        request_id=result.request_id,
+        outcome=outcome,
+    )
+    return AiAssistResult(outcome, request_id=result.request_id, truncated=snapshot["truncated"])
