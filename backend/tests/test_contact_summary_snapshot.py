@@ -36,7 +36,13 @@ def _contact(**values):
 
 
 def _deal(deal_id, **values):
-    fields = {"id": deal_id, "contact_id": "contact", "status": "lead", "updated_at": NOW}
+    fields = {
+        "id": deal_id,
+        "contact_id": "contact",
+        "title": deal_id,
+        "status": "lead",
+        "updated_at": NOW,
+    }
     fields.update(values)
     return Deal(**fields)
 
@@ -60,7 +66,13 @@ def _document(document_id, **values):
 
 
 def _activity(activity_id, **values):
-    fields = {"id": activity_id, "contact_id": "contact", "user_id": "sales", "deal_id": "deal"}
+    fields = {
+        "id": activity_id,
+        "contact_id": "contact",
+        "user_id": "sales",
+        "deal_id": "deal",
+        "type": "phone",
+    }
     fields.update(values)
     return Activity(**fields)
 
@@ -105,7 +117,12 @@ async def test_owner_scope_matches_owner_access_rules(async_session_maker):
         _deal("unowned", assigned_to=None),
     )
     async with async_session_maker() as session:
-        for user, expected in ((admin, 5), (manager, 2), (sales, 1), (outsider, 1)):
+        for user, expected in (
+            (admin, {"admin", "manager", "sales", "outsider", "unowned"}),
+            (manager, {"manager", "sales"}),
+            (sales, {"sales"}),
+            (outsider, {"outsider"}),
+        ):
             ids = (
                 (
                     await session.execute(
@@ -115,7 +132,7 @@ async def test_owner_scope_matches_owner_access_rules(async_session_maker):
                 .scalars()
                 .all()
             )
-            assert len(ids) == expected
+            assert set(ids) == expected
 
 
 @pytest.mark.asyncio
@@ -153,8 +170,19 @@ async def test_snapshot_visibility_and_exact_item_shapes(async_session_maker):
         admin_snapshot = await build_contact_snapshot(session, user=admin, contact_id="contact")
 
     assert [item["title"] for item in sales_snapshot["deals"]] == ["sales-deal"]
+    assert [item["title"] for item in sales_snapshot["open_tasks"]] == ["sales-task"]
+    assert [item["title"] for item in manager_snapshot["deals"]] == ["sales-deal"]
     assert [item["title"] for item in manager_snapshot["open_tasks"]] == ["sales-task"]
-    assert len(admin_snapshot["deals"]) == len(admin_snapshot["open_tasks"]) == 3
+    assert {item["title"] for item in admin_snapshot["deals"]} == {
+        "sales-deal",
+        "other-deal",
+        "unowned-deal",
+    }
+    assert {item["title"] for item in admin_snapshot["open_tasks"]} == {
+        "sales-task",
+        "other-task",
+        "unowned-task",
+    }
     assert set(admin_snapshot["contact"]) == {
         "name",
         "company",
@@ -212,6 +240,18 @@ async def test_snapshot_visibility_and_exact_item_shapes(async_session_maker):
     assert admin_snapshot["activities"][0]["content"] == ""
     assert messages_by_channel["whatsapp"]["body"] == ""
     assert messages_by_channel["email"]["subject"] is None
+    assert admin_snapshot["deals"][0]["won_at"] is None
+    assert document_keys["invoice"]
+    assert (
+        next(item for item in admin_snapshot["documents"] if item["type"] == "invoice")["doc_date"]
+        is None
+    )
+    assert (
+        next(item for item in admin_snapshot["documents"] if item["type"] == "quotation")[
+            "validity"
+        ]
+        == "30 days"
+    )
     assert admin_snapshot["contact"]["last_contact"] == "2026-10-01"
 
 
@@ -221,121 +261,346 @@ async def test_snapshot_formats_and_ordering_limits(async_session_maker):
     user = _user("sales")
     rows = [_contact(last_contact=None), user]
     rows += [
-        _deal(f"deal-{index:02}", assigned_to="sales", updated_at=NOW + timedelta(seconds=index))
-        for index in range(11)
+        _deal("deal-too-old", assigned_to="sales", updated_at=NOW),
+        _deal("deal-tie-a", assigned_to="sales", updated_at=NOW + timedelta(seconds=100)),
+        _deal("deal-tie-b", assigned_to="sales", updated_at=NOW + timedelta(seconds=100)),
+        *[
+            _deal(
+                f"deal-{index:02}",
+                assigned_to="sales",
+                updated_at=NOW + timedelta(seconds=index),
+            )
+            for index in range(11, 19)
+        ],
     ]
     rows += [_deal("deleted", assigned_to="sales", deleted_at=NOW + timedelta(days=1))]
     rows += [
-        _task(f"task-{index:02}", assigned_to="sales", due_date=date(2026, 10, index + 1))
-        for index in range(6)
+        _task("task-tie-a", assigned_to="sales", due_date=date(2026, 10, 1)),
+        _task("task-tie-b", assigned_to="sales", due_date=date(2026, 10, 1)),
+        _task("task-02", assigned_to="sales", due_date=date(2026, 10, 2)),
+        _task("task-03", assigned_to="sales", due_date=date(2026, 10, 3)),
+        _task("task-null-a", assigned_to="sales", due_date=None),
+        _task("task-null-b", assigned_to="sales", due_date=None),
     ]
     rows += [
         _task("done", assigned_to="sales", is_done=True),
         Task(id="other-contact", contact_id="other", title="other", assigned_to="sales"),
     ]
-    rows += [_document(f"doc-{index:02}", doc_date=date(2026, 10, index + 1)) for index in range(6)]
     rows += [
-        _document("no-date", doc_date=None),
+        _document("doc-tie-a", doc_date=date(2026, 10, 5), status="doc-tie-a"),
+        _document("doc-tie-b", doc_date=date(2026, 10, 5), status="doc-tie-b"),
+        _document("doc-04", doc_date=date(2026, 10, 4), status="doc-04"),
+        _document("doc-03", doc_date=date(2026, 10, 3), status="doc-03"),
+        _document("doc-null-a", doc_date=None, status="doc-null-a"),
+        _document("doc-null-b", doc_date=None, status="doc-null-b"),
+    ]
+    rows += [
         AutocountDocument(
             id="other-document",
             doc_type="invoice",
             doc_no="other",
             customer_code="customer",
             contact_id="other",
+            status="other-document",
         ),
     ]
     rows += [
-        _activity(f"activity-{index:02}", follow_date=NOW + timedelta(seconds=index))
-        for index in range(16)
+        _activity(
+            f"activity-{index:02}",
+            follow_date=NOW + timedelta(seconds=index),
+            content=f"activity-{index:02}",
+        )
+        for index in range(1, 15)
     ]
     rows += [
-        _message(f"message-{index:02}", created_at=NOW + timedelta(seconds=index))
-        for index in range(11)
+        _activity("activity-too-old", follow_date=NOW, content="activity-too-old"),
+        _activity(
+            "activity-tie-a", follow_date=NOW + timedelta(seconds=100), content="activity-tie-a"
+        ),
+        _activity(
+            "activity-tie-b", follow_date=NOW + timedelta(seconds=100), content="activity-tie-b"
+        ),
+        *[
+            _message(
+                f"message-{index:02}",
+                created_at=NOW + timedelta(seconds=index),
+                body=f"message-{index:02}",
+            )
+            for index in range(1, 9)
+        ],
+        _message("message-too-old", created_at=NOW, body="message-too-old"),
+        _message("message-tie-a", created_at=NOW + timedelta(seconds=100), body="message-tie-a"),
+        _message("message-tie-b", created_at=NOW + timedelta(seconds=100), body="message-tie-b"),
     ]
     await _seed(async_session_maker, *rows)
     async with async_session_maker() as session:
         snapshot = await build_contact_snapshot(session, user=user, contact_id="contact")
 
-    assert len(snapshot["deals"]) == 10 and snapshot["deals"][0]["title"] == "deal-10"
-    assert len(snapshot["open_tasks"]) == 5 and snapshot["open_tasks"][-1]["title"] == "task-04"
-    assert len(snapshot["documents"]) == 5 and snapshot["documents"][0]["doc_date"] == "2026-10-06"
-    assert [item["content"] for item in snapshot["activities"]] == ["" for _ in range(15)]
-    assert [item["body"] for item in snapshot["messages"]] == ["body" for _ in range(10)]
+    assert [item["title"] for item in snapshot["deals"]] == [
+        "deal-tie-b",
+        "deal-tie-a",
+        "deal-18",
+        "deal-17",
+        "deal-16",
+        "deal-15",
+        "deal-14",
+        "deal-13",
+        "deal-12",
+        "deal-11",
+    ]
+    assert "deleted" not in {item["title"] for item in snapshot["deals"]}
+    assert "deal-too-old" not in {item["title"] for item in snapshot["deals"]}
+    assert [item["title"] for item in snapshot["open_tasks"]] == [
+        "task-tie-a",
+        "task-tie-b",
+        "task-02",
+        "task-03",
+        "task-null-a",
+    ]
+    assert {item["title"] for item in snapshot["open_tasks"]}.isdisjoint(
+        {"done", "other-contact", "task-null-b"}
+    )
+    assert [item["doc_date"] for item in snapshot["documents"]] == [
+        "2026-10-05",
+        "2026-10-05",
+        "2026-10-04",
+        "2026-10-03",
+        None,
+    ]
+    assert [item["total"] for item in snapshot["documents"]] == ["0.00"] * 5
+    assert [item["status"] for item in snapshot["documents"]] == [
+        "doc-tie-b",
+        "doc-tie-a",
+        "doc-04",
+        "doc-03",
+        "doc-null-b",
+    ]
+    assert [item["content"] for item in snapshot["activities"]] == [
+        *[f"activity-{index:02}" for index in range(1, 15)],
+        "activity-tie-a",
+        "activity-tie-b",
+    ][1:]
+    assert {"activity-too-old", "activity-01"}.isdisjoint(
+        {item["content"] for item in snapshot["activities"]}
+    )
+    assert [item["body"] for item in snapshot["messages"]] == [
+        *[f"message-{index:02}" for index in range(1, 9)],
+        "message-tie-a",
+        "message-tie-b",
+    ]
+    assert "message-too-old" not in {item["body"] for item in snapshot["messages"]}
     assert snapshot["contact"]["customer_since"] == "2026-10-15"
     assert snapshot["contact"]["last_contact"] is None
     assert snapshot["deals"][0]["amount"] == "0.00"
-    assert snapshot["deals"][0]["updated_at"].endswith("Z")
+    assert snapshot["deals"][0]["updated_at"] == "2026-10-15T10:01:40Z"
 
 
 @pytest.mark.asyncio
-async def test_snapshot_truncation_flags_and_size_discard(async_session_maker):
-    """Guards criteria 6 to 8: inference, field/count flags, and 16 KiB discard order."""
+async def test_snapshot_field_and_count_truncation_flags(async_session_maker):
+    """Guards criteria 6 and 7: inference and every field/count truncation trigger."""
     user = _user("sales")
     await _seed(
         async_session_maker,
         user,
-        _contact(tags=["tag"] * 11),
-        _deal("deal", assigned_to="sales", title="d" * 101),
-        _task("task", assigned_to="sales", title="t" * 101),
-        _document("quote", doc_type="quotation", validity="v" * 101),
-        _activity("activity", content="a" * 301),
-        _message("inbound", author_kind=None, body="m" * 301),
+        _contact(tags=["t" * 30], notes="n" * 500),
+        _deal("deal", assigned_to="sales", title="d" * 100),
+        _task("task", assigned_to="sales", title="t" * 100),
+        _document("quote", doc_type="quotation", validity="v" * 100),
+        _activity("activity", content="a" * 300),
+        _message("inbound", author_kind=None, body="m" * 300),
         _message(
-            "outbound", direction="outbound", author_kind=None, channel="email", subject="s" * 101
+            "outbound", direction="outbound", author_kind=None, channel="email", subject="s" * 100
         ),
     )
     async with async_session_maker() as session:
         snapshot = await build_contact_snapshot(session, user=user, contact_id="contact")
-    assert snapshot["truncated"] is True
+    assert snapshot["truncated"] is False
     assert snapshot["messages"][0]["author_kind"] == "customer"
     assert snapshot["messages"][1]["author_kind"] == "agent"
 
     async with async_session_maker() as session:
-        contact = await session.get(Contact, "contact")
-        contact.tags = []
-        contact.notes = "\x00" * 500
         session.add_all(
-            [
-                _message(
-                    f"large-{index}", created_at=NOW + timedelta(minutes=index), body="x" * 300
-                )
-                for index in range(10)
-            ]
-        )
-        session.add_all(
-            [
-                _activity(
-                    f"large-activity-{index}",
-                    follow_date=NOW + timedelta(minutes=index),
-                    content="\x00" * 300,
-                )
-                for index in range(15)
-            ]
+            [_deal(f"extra-deal-{index}", assigned_to="sales") for index in range(10)]
+            + [_task(f"extra-task-{index}", assigned_to="sales") for index in range(5)]
+            + [_document(f"extra-doc-{index}") for index in range(5)]
+            + [_activity(f"extra-activity-{index}") for index in range(15)]
+            + [_message(f"extra-message-{index}") for index in range(9)]
         )
         await session.commit()
         snapshot = await build_contact_snapshot(session, user=user, contact_id="contact")
     assert snapshot["truncated"] is True
-    assert len(snapshot["messages"]) >= 1 and snapshot["messages"][-1]["body"] == "x" * 300
-    assert len(snapshot["activities"]) >= 1
+
+
+@pytest.mark.asyncio
+async def test_snapshot_at_every_record_limit_is_not_truncated(async_session_maker):
+    """Guards criterion 7: short records exactly at each cap do not set truncated."""
+    user = _user("sales")
+    await _seed(
+        async_session_maker,
+        user,
+        _contact(),
+        *[_deal(f"deal-{index}", assigned_to="sales") for index in range(10)],
+        *[_task(f"task-{index}", assigned_to="sales") for index in range(5)],
+        *[_document(f"document-{index}") for index in range(5)],
+        *[_activity(f"activity-{index}") for index in range(15)],
+        *[_message(f"message-{index}") for index in range(10)],
+    )
+    async with async_session_maker() as session:
+        snapshot = await build_contact_snapshot(session, user=user, contact_id="contact")
+    assert snapshot["truncated"] is False
+    assert [
+        len(snapshot[key]) for key in ("deals", "open_tasks", "documents", "activities", "messages")
+    ] == [
+        10,
+        5,
+        5,
+        15,
+        10,
+    ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "kind",
+    [
+        "eleven_tags",
+        "long_tag",
+        "long_notes",
+        "long_deal_title",
+        "long_task_title",
+        "long_validity",
+        "long_activity",
+        "long_body",
+        "long_subject",
+        "extra_deal",
+        "extra_task",
+        "extra_document",
+        "extra_activity",
+        "extra_message",
+    ],
+)
+async def test_each_snapshot_truncation_trigger_is_independent(async_session_maker, kind):
+    """Guards criterion 7: each specified trigger alone sets truncated."""
+    user = _user("sales")
+    contact = _contact(tags=["t" * 30], notes="n" * 500)
+    deal = _deal("deal", assigned_to="sales", title="d" * 100)
+    task = _task("task", assigned_to="sales", title="t" * 100)
+    document = _document("quote", doc_type="quotation", validity="v" * 100)
+    activity = _activity("activity", content="a" * 300)
+    message = _message("message", channel="email", body="m" * 300, subject="s" * 100)
+    rows = [user, contact, deal, task, document, activity, message]
+    if kind == "eleven_tags":
+        contact.tags = ["tag"] * 11
+    elif kind == "long_tag":
+        contact.tags = ["t" * 31]
+    elif kind == "long_notes":
+        contact.notes = "n" * 501
+    elif kind == "long_deal_title":
+        deal.title = "d" * 101
+    elif kind == "long_task_title":
+        task.title = "t" * 101
+    elif kind == "long_validity":
+        document.validity = "v" * 101
+    elif kind == "long_activity":
+        activity.content = "a" * 301
+    elif kind == "long_body":
+        message.body = "m" * 301
+    elif kind == "long_subject":
+        message.subject = "s" * 101
+    elif kind == "extra_deal":
+        rows.extend(_deal(f"deal-{index}", assigned_to="sales") for index in range(10))
+    elif kind == "extra_task":
+        rows.extend(_task(f"task-{index}", assigned_to="sales") for index in range(5))
+    elif kind == "extra_document":
+        rows.extend(_document(f"document-{index}") for index in range(5))
+    elif kind == "extra_activity":
+        rows.extend(_activity(f"activity-{index}") for index in range(15))
+    else:
+        rows.extend(_message(f"message-{index}") for index in range(9))
+    await _seed(async_session_maker, *rows)
+    async with async_session_maker() as session:
+        snapshot = await build_contact_snapshot(session, user=user, contact_id="contact")
+    assert snapshot["truncated"] is True
+
+
+@pytest.mark.asyncio
+async def test_snapshot_discards_only_oldest_messages_until_within_size_limit(async_session_maker):
+    """Guards criterion 8a: message-only discards preserve all activities and newest messages."""
+    user = _user("sales")
+    await _seed(
+        async_session_maker,
+        user,
+        _contact(),
+        _activity("activity", content="activity"),
+        *[
+            _message(
+                f"message-{index}",
+                created_at=NOW + timedelta(seconds=index),
+                body=f"{index}:" + "\x00" * 298,
+            )
+            for index in range(10)
+        ],
+    )
+    async with async_session_maker() as session:
+        snapshot = await build_contact_snapshot(session, user=user, contact_id="contact")
+    remaining = [int(item["body"].split(":", 1)[0]) for item in snapshot["messages"]]
+    assert snapshot["truncated"] is True
+    assert len(snapshot["activities"]) == 1
+    assert 1 <= len(remaining) < 10
+    assert remaining == list(range(10 - len(remaining), 10))
 
 
 @pytest.mark.asyncio
 async def test_snapshot_keeps_minimum_records_when_still_oversized_and_missing_contact_errors(
     async_session_maker,
 ):
-    """Guards criteria 8b/c and 9: oversized minimum is returned and absent contact errors."""
+    """Guards criteria 8b and 9: discard reaches newest minima and absent contact errors."""
     user = _user("sales")
     await _seed(
         async_session_maker,
         user,
         _contact(company="\x00" * 4000),
-        _activity("activity", content="\x00" * 300),
-        _message("message", body="\x00" * 300),
+        *[
+            _activity(
+                f"activity-{index}",
+                follow_date=NOW + timedelta(seconds=index),
+                content=f"{index}:" + "\x00" * 298,
+            )
+            for index in range(15)
+        ],
+        *[
+            _message(
+                f"message-{index}",
+                created_at=NOW + timedelta(seconds=index),
+                body=f"{index}:" + "\x00" * 298,
+            )
+            for index in range(10)
+        ],
     )
     async with async_session_maker() as session:
         snapshot = await build_contact_snapshot(session, user=user, contact_id="contact")
         with pytest.raises(ValueError):
             await build_contact_snapshot(session, user=user, contact_id="missing")
+    assert len(snapshot["messages"]) == len(snapshot["activities"]) == 1
+    assert snapshot["messages"][0]["body"].startswith("9:")
+    assert snapshot["activities"][0]["content"].startswith("14:")
+    assert len(compact_json(snapshot).encode("utf-8")) > SNAPSHOT_LIMIT_BYTES
+    assert snapshot["truncated"] is True
+
+
+@pytest.mark.asyncio
+async def test_snapshot_allows_oversized_single_records_without_truncation(async_session_maker):
+    """Guards criterion 8c: already-minimal oversized snapshots are not marked truncated."""
+    user = _user("sales")
+    await _seed(
+        async_session_maker,
+        user,
+        _contact(company="\x00" * 4000),
+        _activity("activity", content="a"),
+        _message("message", body="m"),
+    )
+    async with async_session_maker() as session:
+        snapshot = await build_contact_snapshot(session, user=user, contact_id="contact")
     assert len(snapshot["messages"]) == len(snapshot["activities"]) == 1
     assert len(compact_json(snapshot).encode("utf-8")) > SNAPSHOT_LIMIT_BYTES
     assert snapshot["truncated"] is False

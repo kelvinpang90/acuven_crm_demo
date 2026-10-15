@@ -2265,6 +2265,7 @@ PRECHECK_RESULT: NOT_READY
 ### 验证到什么程度
 
 - 前端类型检查与构建由 PR 的必需检查 frontend 执行，检查结果由 Worker 和 CI 记录，不写在这里；没有在浏览器里实际操作过。
+
 ## CRM-TASK-027（2026-10-15）
 
 ### 做了什么
