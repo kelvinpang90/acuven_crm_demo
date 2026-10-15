@@ -12,7 +12,9 @@ from app.models.ai_request import AiRequest
 from app.models.contact import Contact
 from app.models.deal import Deal
 from app.models.message import Message
+from app.models.user import User
 from app.services import ai_api_client
+from app.services.access_service import owner_scope
 from app.services.ai_api_client import compact_json
 from app.services.ai_features import (
     BRIEF_FEATURE,
@@ -102,7 +104,7 @@ def _snapshot_message(message: Message, now: datetime) -> tuple[dict[str, Any], 
 
 
 async def build_conversation_snapshot(
-    db: AsyncSession, contact_id: str, *, now: datetime | None = None
+    db: AsyncSession, contact_id: str, *, user_id: str, now: datetime | None = None
 ) -> dict[str, Any]:
     """Build the bounded, model-safe conversation snapshot for a contact."""
     now = now or datetime.utcnow()
@@ -110,22 +112,26 @@ async def build_conversation_snapshot(
     if contact is None:
         raise ValueError("contact not found")
 
-    deals = (
-        (
-            await db.execute(
-                select(Deal)
-                .where(
-                    Deal.contact_id == contact_id,
-                    Deal.deleted_at.is_(None),
-                    Deal.status.not_in(("won", "lost")),
+    user = await db.get(User, user_id)
+    deals = []
+    if user is not None:
+        deals = (
+            (
+                await db.execute(
+                    select(Deal)
+                    .where(
+                        Deal.contact_id == contact_id,
+                        Deal.deleted_at.is_(None),
+                        Deal.status.not_in(("won", "lost")),
+                        *(await owner_scope(db, user, Deal.assigned_to)),
+                    )
+                    .order_by(Deal.updated_at.desc(), Deal.id.desc())
+                    .limit(5)
                 )
-                .order_by(Deal.updated_at.desc(), Deal.id.desc())
-                .limit(5)
             )
+            .scalars()
+            .all()
         )
-        .scalars()
-        .all()
-    )
     messages = (
         (
             await db.execute(
@@ -245,7 +251,7 @@ async def generate_conversation_brief(
         return AiAssistResult(INVALID_INPUT)
     if not ai_api_client.is_ai_configured():
         return AiAssistResult(NOT_CONFIGURED)
-    snapshot = await build_conversation_snapshot(db, contact_id)
+    snapshot = await build_conversation_snapshot(db, contact_id, user_id=user_id)
     if not snapshot["messages"]:
         return AiAssistResult(NO_MESSAGES)
     result = await ai_api_client.send_message(
@@ -319,7 +325,7 @@ async def generate_reply_draft(
             return AiAssistResult(INVALID_INPUT)
     if not ai_api_client.is_ai_configured():
         return AiAssistResult(NOT_CONFIGURED)
-    snapshot = await build_conversation_snapshot(db, contact_id)
+    snapshot = await build_conversation_snapshot(db, contact_id, user_id=user_id)
     if not snapshot["messages"]:
         return AiAssistResult(NO_MESSAGES)
     payload: dict[str, Any] = {
