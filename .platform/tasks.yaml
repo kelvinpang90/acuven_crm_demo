@@ -857,30 +857,62 @@ tasks:
 
   # 联系人 AI 客户摘要（docs/contact-ai-summary.md，Kelvin 2026-10-15 批准，第八节 Q1 至 Q4 均按建议，PR kelvinpang90/acuven_crm_demo#75）。
   # 不等 Billing Hub AI 模块上线，先登记实现（Q3）：未配置时按钮不显示、不调用 AI。030 是 Q4：收件箱快照的商机也只放本人可见的。
-  # 设计预审的完整输出在 tasks/todo.md「登记 CRM-TASK-027 至 030」。
+  # 设计预审的完整输出在 tasks/todo.md「登记 CRM-TASK-027 至 030」与「拆分 CRM-TASK-027」。
+  # 2026-10-15 拆分：原 027（快照、提示词、校验与业务函数一起做）的首个 run 以 review_repair_exhausted 失败，三轮评审都认为实现正确，
+  # 卡在「逐条覆盖」这类开放式测试标准上，每轮都能提出新的覆盖缺口。现拆为 027（范围函数与快照）与 031（提示词、校验与业务函数），
+  # 测试标准改为编号的用例清单，清单之外的补充覆盖只算非阻塞意见。
   - id: CRM-TASK-027
-    title: 联系人AI客户摘要的快照、提示词、输出校验与业务函数
+    title: 联系人AI客户摘要的可见范围函数与客户快照组装
     purpose: >-
-      按 docs/contact-ai-summary.md 第三节、4.1 至 4.3 节与第五节，组装发给模型的客户快照（商机与待办只放本人可见的），定义 crm.contact_summary 的系统提示、
-      JSON schema 与输出校验，并串成一个可调用的业务函数。复用 CRM-TASK-022、023 的 AI 客户端、审计写入与结果对象。只做业务规则层：
-      不加接口、不改前端、不加表与迁移、不改收件箱快照（CRM-TASK-030）；测试打桩 AI 客户端，不调真实模型、不写任何真实密钥与地址。
+      按 docs/contact-ai-summary.md 第三节与 4.2 节，在 access_service 加本人可见的范围函数，并在新文件 contact_summary_service 组装发给模型的客户快照
+      （商机与待办只放本人可见的）。提示词、输出校验与业务函数在 CRM-TASK-031。只做业务规则层：不调 AI、不加接口、不改前端、不加表与迁移、
+      不改收件箱快照（CRM-TASK-030）；不写任何真实密钥与地址。
     status: ready
     depends_on:
       - CRM-TASK-023
     acceptance_criteria:
-      - access_service 新增公开函数 owner_scope，给定用户与负责人列返回查询条件列表：管理员为空列表，经理为负责人在本人及直属下属之中（用同文件已引入的团队查询），其他角色为负责人等于本人；规则与同文件的 may_access_owner 一致（负责人为空的只有管理员看得到）；不改 deal_service、task_service 与 may_access_owner 现有的写法
-      - 新文件 contact_summary_service 按设计 4.2 组装快照（字符按码点数，日期为年月日，时间为 UTC 到秒带 Z，金额为两位小数的字符串）：contact 含名字、公司、行业、标签（最多 10 个、每个截到 30 字）、备注（截到 500 字）、customer_since（建档日期）、last_contact（可为 null）；deals 为本人可见（owner_scope）且未删除的商机、含赢单与输单、不加 deal_not_demo 条件，按更新时间、同一时间按 id 倒序取 10 个，从新到旧，每个含 title（空为空串、截到 100 字）、status、priority、amount、won_at（可为 null）、updated_at；open_tasks 为本人可见、未完成、关联这个联系人的待办，按到期日从早到晚（没有到期日的排最后）、同一到期日按 id 正序取 5 个，含 title（截到 100 字）、priority、due_date（可为 null）
+      - access_service 新增公开的异步函数 owner_scope(db, user, owner_column)，返回查询条件列表：管理员为空列表，经理为负责人在本人及直属下属之中（用同文件已引入的团队查询），其他角色为负责人等于本人；规则与同文件的 may_access_owner 一致（负责人为空的只有管理员看得到）；不改 deal_service、task_service 与 may_access_owner 现有的写法
+      - 新文件 contact_summary_service 新增公开的异步函数 build_contact_snapshot(db, *, user, contact_id, now=None)，联系人不存在时抛 ValueError，返回设计 4.2 的结构（contact、deals、open_tasks、documents、activities、messages 六块加顶层 truncated），字符按码点数，日期为年月日，时间为 UTC 到秒带 Z，金额为两位小数的字符串：contact 含名字、公司、行业、标签（最多 10 个、每个截到 30 字）、备注（截到 500 字）、customer_since（建档日期）、last_contact（可为 null）；deals 为本人可见（owner_scope）且未删除的商机、含赢单与输单、不加 deal_not_demo 条件，按更新时间、同一时间按 id 倒序取 10 个，从新到旧，每个含 title（空为空串、截到 100 字）、status、priority、amount、won_at（可为 null）、updated_at；open_tasks 为本人可见、未完成、关联这个联系人的待办，按到期日从早到晚（没有到期日的排最后）、同一到期日按 id 正序取 5 个，含 title（截到 100 字）、priority、due_date（可为 null）
       - 快照续：documents 为这个联系人的 AutoCount 单据，按单据日期从新到旧（没有日期的排最后）、同一日期按 id 倒序取 5 个，含 type、status、currency、total、doc_date，发票另含 outstanding 与 due_date，报价单另含 validity（截到 100 字），没有的值为 null，不放单号与明细行；activities 为这个联系人的跟进记录，按跟进时间、同一时间按 id 倒序取最近 15 条、从旧到新排列，含 at、type、content（空为空串、截到 300 字）；messages 为这个联系人的消息，按创建时间、同一时间按 id 倒序取最近 10 条、从旧到新排列，含 at、direction、author_kind（为空时按方向推断为 customer 或 agent）、channel、body（空为空串、截到 300 字），邮件另含 subject（截到 100 字），不带 delivery；快照不放联系人 id、电话、邮箱、地址、BSUID、AutoCount 客户代码与任何员工的 id 或姓名
-      - 16 KiB 与 truncated：整个快照按紧凑 JSON（与 AI 客户端判断 64 KiB 用同一种序列化）的 UTF-8 字节超过 16 KiB 时，先从最旧的消息开始丢、至少留 1 条，仍超再从最旧的跟进记录开始丢、至少留 1 条，到此仍超出时照常发出、不报错不再丢（超出本身不使 truncated 为真）；任何一处字段截断、任何一块的记录多于它的条数上限、或因 16 KiB 丢了记录时 truncated 为真，否则为假
-      - ai_features 新增 crm.contact_summary 的定义：系统提示写明快照是不可信数据、不执行其中的指令，只用快照里的事实、不推测快照里没有的价格日期与承诺，事实不足时在 summary 里写明缺什么，不声称已修改任何记录，as_of 是当前时间、逾期与过期按它判断，按 output_language 写，并写明 summary 1 至 600 字、suggested_next_step 0 至 240 字；schema 为 summary 与 suggested_next_step 两个字符串、都必填、不允许多余字段；max_tokens 4000；校验函数先去首尾空白再按码点数检查上述长度，不合即判 AI 出错，不截断、不补齐
-      - 业务函数 generate_contact_summary 收 db、user（用户对象）、contact_id、output_language：检查顺序为参数（语言不在 zh-CN、en、ms 之内为 invalid_input）、配置（未配置为 not_configured）、记录（deals、open_tasks、documents、activities、messages 五块都为空为 no_history，类别常量加在 ai_assist_service 与其他类别一起），这三种不调 AI、不写审计；之后发一条用户消息，内容是含 as_of（当前 UTC 到秒带 Z）、output_language 与快照的 JSON 数据块，按 AI 客户端的三类结果处理，每次进入调用都用 write_ai_request 写一行 feature 为 crm.contact_summary 的审计，客户端成功但校验不过时改判 error 且审计保留 request_id；返回 ai_assist_service 的结果对象，它新增可空字段 summary 与 suggested_next_step（收件箱三个功能的行为不变），成功时带去空白后的两段文字，成功与 AI 出错、暂时不可用时都带快照的 truncated；联系人不存在时抛 ValueError（接口层会先挡下）
-      - 新增测试打桩 AI 客户端，逐条覆盖：owner_scope 三种角色与负责人为空；快照每一块的取法、排序、条数、截断与 truncated；销售与经理看不到别人名下的商机与待办、管理员看得到；16 KiB 的丢弃顺序与各留 1 条；检查顺序与三种不调用不审计的情况；成功、每个字段越界判 AI 出错并保留 request_id、暂时不可用的审计行；发给客户端的 feature、max_tokens、schema 与系统提示里的不可信数据声明；每条测试写明守住的是哪一条验收标准；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
+      - 16 KiB 与 truncated：整个快照（含顶层 truncated）按紧凑 JSON（与 AI 客户端判断 64 KiB 用同一种序列化）的 UTF-8 字节超过 16 KiB 时，先从最旧的消息开始丢、至少留 1 条，仍超再从最旧的跟进记录开始丢、至少留 1 条，到此仍超出时照常返回、不报错不再丢（超出本身不使 truncated 为真）；任何一处字段截断、任何一块的记录多于它的条数上限、或因 16 KiB 丢了记录时 truncated 为真，否则为假
+      - 新测试文件 test_contact_summary_snapshot 覆盖下列用例（一个用例可以是一个参数化测试）：1 owner_scope：造管理员、经理、经理的一个直属下属、一个外人，以及负责人分别为这四人与为空的五个商机，按 owner_scope 查 Deal.id，断言管理员 5 个、经理为本人与下属的 2 个、下属只有自己的 1 个、外人只有自己的 1 个；2 可见范围：同一联系人下商机与待办各有属于销售本人、另一个销售与负责人为空的，销售的快照只有本人的，经理（下属为该销售）只有该销售的，管理员三者都有；3 每块每一项的键集合与设计 4.2 完全相等（发票、报价单、其他单据，邮件与 WhatsApp 消息分别断言），从而证明不放禁止的字段、发票与报价单各自的附加字段、消息不带 delivery，以及没有的值为 null；4 格式：金额两位小数字符串、日期、带 Z 的时间、customer_since、last_contact 为 null 与有值两种
+      - 测试续：5 排序与条数：每块造多于上限一条的记录（另加一条已删除商机、一条已完成待办、一条属于别的联系人的待办与单据），断言条数、顺序与被挡掉的是哪一条；每块各有两条同一时间或同一日期的记录断言按 id 的次序；待办与单据各有没有日期的排在最后；跟进与消息为从旧到新；6 author_kind 为空时入站推断为 customer、出站为 agent；正文与跟进内容为空时为空串；7 truncated：基准数据每块一条、每个字段正好在上限，断言为假；每块正好在条数上限、内容很短，断言为假；在基准上每次只加一个触发条件，各断言为真：标签 11 个、一个标签 31 字、备注 501 字、商机标题 101 字、待办标题 101 字、报价单 validity 101 字、跟进内容 301 字、消息正文 301 字、邮件主题 101 字，以及商机、待办、单据、跟进、消息各多出一条
+      - 测试续：8 16 KiB：a 只丢消息就够时，跟进记录一条不少、剩下的消息是最新的那几条、truncated 为真；b 丢到消息与跟进各剩 1 条仍超出时，剩下的是最新的一条、照常返回不报错；c 跟进与消息各 1 条、没有任何字段截断、没有一块多于条数上限，但快照超过 16 KiB（例如用不截断的公司名，或用紧凑 JSON 转义为 6 字节的控制字符），照常返回且 truncated 为假；9 联系人不存在抛 ValueError。测试只需覆盖本条与上两条列出的用例，每个测试写明守住的是哪一条验收标准；清单之外的补充覆盖只算非阻塞意见；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
       - tasks/todo.md 新增 CRM-TASK-027 记录段（做了什么、偏离了什么、验证到什么程度）；偏离段只列两类、每条一句：与验收标准或设计文档不一致的做法，以及验收标准没有要求、但改变了现有接口或页面行为的改动；验收标准要求的改动与重构、命名、格式调整不算偏离，没有就写无；偏离段漏列只算非阻塞意见，除非漏列的改动本身违反某条验收标准（那时按那一条判）；验证段只写测试由 PR 的必需检查 backend 执行、检查结果由 Worker 和 CI 记录不写在这里，不写任何检查是否运行或通过；不改 planning-v1 块；复选框只允许 [ ] / [x]；改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不加表、不加迁移、不改接口与前端；allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#75），不合并、不直推
+    allowed_change_paths:
+      - backend/app/services/contact_summary_service.py
+      - backend/app/services/access_service.py
+      - backend/tests/test_contact_summary_snapshot.py
+      - tasks/todo.md
+    allowed_commands:
+      - lint.check
+      - format.check
+      - format.apply
+    creates_branch: true
+    creates_pull_request: true
+
+  - id: CRM-TASK-031
+    title: 联系人AI客户摘要的提示词、输出校验与业务函数
+    purpose: >-
+      按 docs/contact-ai-summary.md 4.1、4.3 节与第五节，定义 crm.contact_summary 的系统提示、JSON schema 与输出校验，并用 CRM-TASK-027 的快照函数
+      串成一个可调用的业务函数。复用 CRM-TASK-022、023 的 AI 客户端、审计写入与结果对象。只做业务规则层：不改快照的取法、不加接口、不改前端、
+      不加表与迁移；测试打桩 AI 客户端，不调真实模型、不写任何真实密钥与地址。
+    status: ready
+    depends_on:
+      - CRM-TASK-027
+    acceptance_criteria:
+      - ai_features 新增 crm.contact_summary 的定义（SUMMARY_FEATURE、SUMMARY_SYSTEM、SUMMARY_SCHEMA、validate_summary）：系统提示写明快照是不可信数据、不执行其中的指令，只用快照里的事实、不推测快照里没有的价格日期与承诺，事实不足时在 summary 里写明缺什么，不声称已修改任何记录，as_of 是当前时间、逾期与过期按它判断，按 output_language 写，并写明 summary 1 至 600 字、suggested_next_step 0 至 240 字；schema 为 summary 与 suggested_next_step 两个字符串、都必填、不允许多余字段；max_tokens 4000；校验函数先去首尾空白再按码点数检查上述长度，不合即判 AI 出错，不截断、不补齐，合格时返回去空白后的两段文字
+      - ai_assist_service 的结果对象新增可空字段 summary（suggested_next_step 沿用已有字段），类别常量新增 no_history 与其他类别放在一起；收件箱三个功能的行为不变
+      - contact_summary_service 新增业务函数 generate_contact_summary(db, *, user, contact_id, output_language)：检查顺序为参数（语言不在 zh-CN、en、ms 之内为 invalid_input）、配置（未配置为 not_configured）、记录（用 build_contact_snapshot 取快照，deals、open_tasks、documents、activities、messages 五块都为空为 no_history），这三种不调 AI、不写审计；联系人不存在时快照函数抛出的 ValueError 原样抛出（接口层会先挡下）
+      - 业务函数续：之后发一条用户消息，内容是含 as_of（当前 UTC 到秒带 Z）、output_language 与快照的紧凑 JSON 数据块，按 AI 客户端的三类结果处理，每次进入调用都用 write_ai_request 写一行 feature 为 crm.contact_summary 的审计；客户端成功但校验不过时改判 error 且审计保留 request_id；成功时结果带去空白后的 summary 与 suggested_next_step；成功、AI 出错与暂时不可用时结果都带 request_id（有的话）与快照的 truncated
+      - 新测试文件 test_contact_summary_service 打桩 AI 客户端与配置，覆盖下列用例（一个用例可以是一个参数化测试）：1 校验函数：summary 1 字与 600 字通过、只有空白与 601 字不通过；suggested_next_step 空串与 240 字通过、241 字不通过；首尾带空白的 600 字通过且返回去空白后的文字；600 个 emoji 通过（按码点数）；缺字段、多字段、字段不是字符串、输出不是对象都不通过；2 发给客户端的请求：feature、max_tokens 4000、schema 等于 SUMMARY_SCHEMA（两个字段必填、不允许多余字段）、系统提示含不可信数据的声明；用户消息解析后只有 as_of、output_language、snapshot 三个键，as_of 为带 Z 的 UTC 时间，snapshot 等于 build_contact_snapshot 对同一用户与联系人的结果
+      - 测试续：3 检查顺序：语言不合法同时 AI 未配置且联系人没有记录时为 invalid_input；AI 未配置同时没有记录时为 not_configured；只有名字与公司的联系人为 no_history；以上三种断言客户端没被调用、审计表没有新行；只有一条跟进记录的联系人会调用客户端；联系人不存在抛 ValueError；4 结果与审计：成功时类别 ok、request_id、去空白后的两段文字，审计一行 outcome 为 ok、带 request_id 与 crm.contact_summary；校验不过（参数化：summary 为空、summary 601 字、suggested_next_step 241 字、缺字段、多字段）时类别 error、summary 为 null、保留 request_id，审计一行 outcome 为 error 且带同一 request_id；客户端返回 error 与 unavailable 时类别相同、审计一行同 outcome；5 truncated：成功、error、unavailable 三种结果在快照 truncated 为真与为假时都原样带出
+      - 测试只需覆盖上两条列出的用例，每个测试写明守住的是哪一条验收标准；清单之外的补充覆盖只算非阻塞意见；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
+      - tasks/todo.md 新增 CRM-TASK-031 记录段（做了什么、偏离了什么、验证到什么程度）；偏离段只列两类、每条一句：与验收标准或设计文档不一致的做法，以及验收标准没有要求、但改变了现有接口或页面行为的改动；验收标准要求的改动与重构、命名、格式调整不算偏离，没有就写无；偏离段漏列只算非阻塞意见，除非漏列的改动本身违反某条验收标准（那时按那一条判）；验证段只写测试由 PR 的必需检查 backend 执行、检查结果由 Worker 和 CI 记录不写在这里，不写任何检查是否运行或通过；不改 planning-v1 块；复选框只允许 [ ] / [x]；改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不加表、不加迁移、不改接口与前端；allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#75），不合并、不直推
     allowed_change_paths:
       - backend/app/services/contact_summary_service.py
       - backend/app/services/ai_features.py
       - backend/app/services/ai_assist_service.py
-      - backend/app/services/access_service.py
       - backend/tests/test_contact_summary_service.py
       - tasks/todo.md
     allowed_commands:
@@ -893,11 +925,11 @@ tasks:
   - id: CRM-TASK-028
     title: 联系人AI客户摘要的接口
     purpose: >-
-      按 docs/contact-ai-summary.md 第 4.4 节，把 CRM-TASK-027 的业务函数接成 POST /api/ai/contacts/{contact_id}/summary，供 CRM-TASK-029 的联系人面板使用。
+      按 docs/contact-ai-summary.md 第 4.4 节，把 CRM-TASK-031 的业务函数接成 POST /api/ai/contacts/{contact_id}/summary，供 CRM-TASK-029 的联系人面板使用。
       只做接口层：加在已有的 AI 路由里，不改 main.py、不改业务规则、不改表结构、不改前端。
     status: ready
     depends_on:
-      - CRM-TASK-027
+      - CRM-TASK-031
     acceptance_criteria:
       - 新增 POST /api/ai/contacts/{contact_id}/summary，请求体只有可选的 output_language，校验写在请求模型里（只能是 zh-CN、en、ms，否则 422）；缺省时取当前用户的界面语言（与简报接口相同：zh 映射为 zh-CN，其他为 en）
       - 要求登录；沿用同文件判断联系人存在、未删除且 may_access_contact 的函数，任一不过（含管理员请求不存在的联系人）返回同一个 403 NOT_ASSIGNED，不调用业务函数、不写审计
