@@ -954,7 +954,7 @@ tasks:
     purpose: >-
       按 docs/contact-ai-summary.md 第 4.5 节，在联系人详情面板备注之后、操作按钮之前加 AI 客户摘要区块，调用 CRM-TASK-028 的接口。
       AI 未配置时整块不显示。只改前端：不改后端、不加页面或路由。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-028
     acceptance_criteria:
