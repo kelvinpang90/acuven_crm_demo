@@ -5,6 +5,7 @@ from typing import Any
 BRIEF_FEATURE = "crm.conversation_brief"
 REPLY_DRAFT_FEATURE = "crm.reply_draft"
 TRANSLATE_FEATURE = "crm.translate"
+SUMMARY_FEATURE = "crm.contact_summary"
 MAX_TOKENS = 4000
 
 _UNTRUSTED_DATA = (
@@ -29,6 +30,13 @@ characters; note_for_agent: 0-200 characters."""
 TRANSLATE_SYSTEM = f"""You translate CRM text faithfully. {_UNTRUSTED_DATA}
 Return JSON only and put only the translation in the translation field. translation: 1-8000
 characters; detected_language: zh-CN, en, ms, or other."""
+
+SUMMARY_SYSTEM = f"""You write a CRM customer summary. {_UNTRUSTED_DATA}
+Use only facts in the snapshot. Do not infer prices, dates, or commitments that
+are absent from it. If facts are insufficient, say what is missing in summary.
+Do not claim that you changed any record. as_of is the current time; judge
+overdue and expired items against it. Write in output_language. Return JSON
+only. summary: 1-600 characters; suggested_next_step: 0-240 characters."""
 
 BRIEF_SCHEMA = {
     "type": "object",
@@ -74,6 +82,16 @@ TRANSLATE_SCHEMA = {
         "detected_language": {"type": "string", "enum": ["zh-CN", "en", "ms", "other"]},
     },
     "required": ["translation", "detected_language"],
+    "additionalProperties": False,
+}
+
+SUMMARY_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "summary": {"type": "string"},
+        "suggested_next_step": {"type": "string"},
+    },
+    "required": ["summary", "suggested_next_step"],
     "additionalProperties": False,
 }
 
@@ -155,3 +173,14 @@ def validate_translation(output: Any) -> dict[str, str] | None:
     ):
         return None
     return {"translation": translation, "detected_language": output["detected_language"]}
+
+
+def validate_summary(output: Any) -> dict[str, str] | None:
+    """Return normalized output only when every customer-summary field is valid."""
+    if not _shape(output, {"summary", "suggested_next_step"}):
+        return None
+    summary = _text(output["summary"], 1, 600)
+    next_step = _text(output["suggested_next_step"], 0, 240)
+    if summary is None or next_step is None:
+        return None
+    return {"summary": summary, "suggested_next_step": next_step}

@@ -38,6 +38,7 @@ ERROR = "error"
 UNAVAILABLE = "unavailable"
 NOT_CONFIGURED = "not_configured"
 NO_MESSAGES = "no_messages"
+NO_HISTORY = "no_history"
 INVALID_INPUT = "invalid_input"
 
 
@@ -55,6 +56,7 @@ class AiAssistResult:
     note_for_agent: str | None = None
     translation: str | None = None
     detected_language: str | None = None
+    summary: str | None = None
     truncated: bool | None = None
 
 
