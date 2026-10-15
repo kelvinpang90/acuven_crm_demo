@@ -4,6 +4,7 @@ import { useIsMobile } from '@/hooks/useBreakpoint';
 import Badge from '@/components/common/Badge';
 import Modal from '@/components/common/Modal';
 import ActivityTimeline from './ActivityTimeline';
+import ContactAiSummary from './ContactAiSummary';
 import { useAuthStore } from '@/store/authStore';
 import { dealsApi } from '@/services/deals';
 import { autocountApi } from '@/services/autocount';
@@ -152,6 +153,8 @@ export default function ContactDetailPanel({ contact, onClose, onEdit, onDelete,
               <p className="text-sm text-text-secondary">{contact.notes}</p>
             </div>
           )}
+
+          <ContactAiSummary contactId={contact.id} />
 
           {/* Actions */}
           <div className="flex gap-2 flex-wrap">

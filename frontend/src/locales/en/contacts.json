@@ -86,5 +86,17 @@
   "importStrategyWorkload": "Balance workload",
   "importStrategyWinRate": "Highest win rate",
   "importStrategyMe": "Assign them all to me",
-  "phoneConflict": "Phone conflict"
+  "phoneConflict": "Phone conflict",
+  "aiCustomerSummary": "AI Customer Summary",
+  "aiSummaryGenerate": "Generate summary",
+  "aiSummaryRegenerate": "Regenerate",
+  "aiSummaryLoading": "Generating...",
+  "aiGeneratedUnverified": "AI-generated, unverified",
+  "aiSummaryTruncated": "Only the most recent records were reviewed.",
+  "aiSuggestedNextStep": "Suggested next step",
+  "aiNotEnabled": "AI is not enabled",
+  "aiNoHistory": "This customer has no records to summarize yet",
+  "aiTemporarilyUnavailable": "AI is temporarily unavailable",
+  "aiError": "AI request failed",
+  "aiRequestFailed": "AI request failed"
 }

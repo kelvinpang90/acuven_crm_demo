@@ -266,6 +266,13 @@ export interface AiConversationBrief {
   truncated: boolean;
 }
 
+export interface AiContactSummary {
+  request_id: string | null;
+  summary: string;
+  suggested_next_step: string;
+  truncated: boolean;
+}
+
 export type AiLanguage = 'zh-CN' | 'en' | 'ms';
 
 export interface AiReplyDraft {
