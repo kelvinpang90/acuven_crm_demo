@@ -14,11 +14,13 @@
 <!-- openclaw:planning-v1:begin -->
 ### 当前计划
 
+1. `CRM-TASK-032` 跟进记录AI整理的提示词、输出校验与业务函数
+2. `CRM-TASK-033` 跟进记录AI整理的接口
+3. `CRM-TASK-034` 跟进表单加AI整理，预览后填入并可把任务草稿加为任务
 
 ### 已阻塞
 
-- 待登记：AI 功能上线：为 CRM 建 AI 客户端密钥、配四项环境变量、按两份设计做质量评测（收件箱三项与客户摘要）、Kelvin 打分认可｜阻塞：等 Billing Hub AI 模块上线（AIH-TASK-063 至 070）
-- 待登记：跟进记录 AI 整理成结构化记录并生成任务草稿（任务八）｜阻塞：设计草稿已写，待 Kelvin 批准
+- 待登记：AI 功能上线：为 CRM 建 AI 客户端密钥、配四项环境变量、按三份设计做质量评测（收件箱三项、客户摘要、跟进记录整理）、Kelvin 打分认可｜阻塞：等 Billing Hub AI 模块上线（AIH-TASK-063 至 070）
 - `CRM-TASK-017` 删掉 CRM 自己的 Meta webhook、网关入口与直连发送及其配置｜阻塞：等第 2 阶段真机验收通过（chatbot 侧 C3、C4 上线并配好第二把密钥）
 
 ### 后续计划
@@ -1844,7 +1846,7 @@ PRECHECK_RESULT: READY
 |---|---|---|---|
 | 1 | 收件箱 | 会话简报、起草回复、翻译 | 第一版已批准（PR kelvinpang90/acuven_crm_demo#29）；AI 分工改了，第二版 2026-10-13 已批准：`docs/inbox-ai-assist.md`（PR kelvinpang90/acuven_crm_demo#34） |
 | 2 | 联系人 | 客户摘要（`crm.contact_summary`；原为 AI API 的契约 v1，按 ai_billing_hub 设计 #281 改为 CRM 自己的内部设计） | 设计 `docs/contact-ai-summary.md` 2026-10-15 已批准（PR kelvinpang90/acuven_crm_demo#75），登记为 CRM-TASK-027 至 029；Q4 的收件箱快照收窄为 CRM-TASK-030 |
-| 3 | 跟进记录 / 任务 | 把员工的速记整理成结构化跟进记录，并生成任务草稿（E-09 原定的「任务草稿」） | 设计草稿 `docs/followup-ai-draft.md`（2026-10-15），待 Kelvin 批准后登记 |
+| 3 | 跟进记录 / 任务 | 把员工的速记整理成结构化跟进记录，并生成任务草稿（E-09 原定的「任务草稿」） | 设计 `docs/followup-ai-draft.md` 2026-10-15 已批准（PR kelvinpang90/acuven_crm_demo#89），登记为 CRM-TASK-032 至 034 |
 | 4 | 商机 | 下一步建议、商机停滞的原因说明（只给文字，不改状态） | 想法 |
 | 4 | 仪表盘 | 经理看板的数据解读：数字由 CRM 算好，AI 只写解读 | 想法 |
 | 5 | 联系人 | 从聊天里提取客户资料作为建议填入；表格导入时识别列名；疑似重复客户提示（不自动合并，B-05） | 想法 |
@@ -1857,7 +1859,8 @@ PRECHECK_RESULT: READY
 - [x] 设计第二版（AI 分工改了，并补与第 2 阶段 CRM-TASK-012 至 020 的衔接，第八节）获 Kelvin 批准（2026-10-13，PR kelvinpang90/acuven_crm_demo#34，第十节 Q7 至 Q10 均按建议：共用一个 `AI_MODEL`、评测样例用 demo 数据、客户摘要另写设计、归档 ai_billing_hub 起草契约的会话）
 - [x] 按设计第七节拆分并登记 CRM-TASK-021 至 026（Kelvin 2026-10-13 定不等 AI 模块上线、按 A 排在 016 之后，见下「登记 CRM-TASK-021 至 026」）
 - [x] 客户摘要设计获 Kelvin 批准（2026-10-15，PR kelvinpang90/acuven_crm_demo#75，第八节 Q1 至 Q4 均按建议），登记 CRM-TASK-027 至 030（见下「登记 CRM-TASK-027 至 030」）
-- [ ] AI 模块上线后：建客户端密钥、配四项环境变量、按两份设计（收件箱第五节、客户摘要第五节）用 demo 数据做质量评测，Kelvin 打分认可（planning-v1「已阻塞」里的待登记行，管理员操作，不是 Worker 任务）
+- [x] 跟进记录 AI 整理设计获 Kelvin 批准（2026-10-15，PR kelvinpang90/acuven_crm_demo#89，Q1 至 Q3 按建议），登记 CRM-TASK-032 至 034（见下「登记 CRM-TASK-032 至 034」）
+- [ ] AI 模块上线后：建客户端密钥、配四项环境变量、按三份设计（收件箱、客户摘要、跟进记录整理各自的第五节）用 demo 数据做质量评测，Kelvin 打分认可（planning-v1「已阻塞」里的待登记行，管理员操作，不是 Worker 任务）
 
 ## 拆分 CRM-TASK-027（2026-10-15）
 
@@ -1898,6 +1901,48 @@ session verdict: READY
 PRECHECK_RESULT: READY
 用量：Claude 会话 1 次，共 23.9 万 token（其中缓存读取 20.1 万），折合 API 价约 $0.38；周额度读数 52%。
 退出码 0
+```
+
+## 登记 CRM-TASK-032 至 034（2026-10-15）
+
+Kelvin 2026-10-15 批准跟进记录 AI 整理设计（kelvinpang90/acuven_crm_demo#89，第八节 Q1 至 Q3 按建议），原话「批准」。本段是登记 PR 的记录。
+
+### 做了什么
+
+- `.platform/tasks.yaml`：登记 032–034，全部 `ready`。依赖：032 依赖 031（复用结果对象、`owner_scope` 与客户摘要的待办取法）；033 依赖 032；034 依赖 033。
+- 测试标准按 027 拆分的教训（kelvinpang90/acuven_crm_demo#78）写成编号的用例清单，清单之外的补充覆盖只算非阻塞意见。
+- planning-v1：「当前计划」为 032、033、034；「已阻塞」删掉「待登记：跟进记录 AI 整理……」一行；「AI 功能上线」一行的评测范围加上跟进记录整理。
+- `docs/followup-ai-draft.md` 加第九节「登记预审后的补充」（3 条，Kelvin 2026-10-15 在本 PR 批准，原话「批准」）。
+
+### 设计闸门与预审
+
+- 设计闸门：三个都适用，都引用 #89（032 把速记与客户、商机、待办发给模型；033 是收发这些内容的接口；034 展示 AI 输出并经员工确认后保存）。
+- `contract_check`：ready to register，三个任务都没有拆分 WARN。
+- 预审（设计文件 `docs/followup-ai-draft.md`，登记分支的干净检出）：第 1 轮 033 READY 无发现，032 READY 带两条 UNDECIDED，034 NOT_READY；改后第 2 轮只复跑 032、034，都 READY，034 报的两条 UNDECIDED 已写进第九节与验收标准，之后没有再跑。
+
+| 轮次 / 任务 | 发现 | 处理 |
+|---|---|---|
+| 1 / 032 | UNDECIDED：联系人不存在的 `ValueError` 在检查顺序里的位置；软删除算不算不存在 | 第九节第 1 条：第一步读联系人，不存在或已软删除抛 `ValueError` |
+| 1 / 034 | DESIGN_DEFECT：换联系人时跟进表单不重新挂载，带着旧联系人的商机 | 照原文不成立（面板带全屏遮罩，点别的客户先关面板、组件卸载）；但同一问题在删掉选中的商机后真实存在（列表重新加载不改选，只剩一个商机时下拉框隐藏），第九节第 2 条：不在列表里就改选第一个 |
+| 1 / 034 | UNDECIDED：再点一次 AI 整理时卡片、还原速记、已加标记怎么处理；改选商机要不要丢卡片 | 第九节第 3 条 |
+| 2 / 034 | UNDECIDED：商机列表变空时怎么办 | 第九节第 2 条：收起表单 |
+| 2 / 034 | UNDECIDED：换了新卡片后显不显示还原速记 | 第九节第 3 条：这次打开表单以来填入过就显示 |
+
+```
+第 1 轮
+CRM-TASK-032: PRECHECK_FINDING: UNDECIDED backend/app/services/followup_draft_service.py :: The ValueError for a missing contact has no stated place in the check order; checked after the deal_id check, a missing contact yields invalid_input, so the contact must be looked up first.
+CRM-TASK-032: PRECHECK_FINDING: UNDECIDED 4.2 :: Whether a soft-deleted contact counts as nonexistent (ValueError) in the business function is not stated; contact_summary_service treats it as not found.
+CRM-TASK-032: session verdict: READY / PRECHECK_RESULT: READY
+CRM-TASK-033: (no findings) / session verdict: READY / PRECHECK_RESULT: READY
+CRM-TASK-034: PRECHECK_FINDING: DESIGN_DEFECT 4.5 :: ActivityTimeline is not remounted on contact switch and keeps the old contact's selectedDealId (hidden selector for one-deal contacts), so "表单选中的 deal_id" always yields INVALID_INPUT; the design must say to reset the selected deal on contact change.
+CRM-TASK-034: PRECHECK_FINDING: UNDECIDED 4.5 :: Clicking AI 整理 again with a card open (after 填入 the box holds AI text): replace the card or not, which note 还原速记 restores, whether 已加 marks are kept, and whether a deal change drops the card are not decided.
+CRM-TASK-034: session verdict: NOT_READY / PRECHECK_RESULT: NOT_READY
+
+第 2 轮
+CRM-TASK-032: (no findings) / session verdict: READY / PRECHECK_RESULT: READY
+CRM-TASK-034: PRECHECK_FINDING: UNDECIDED 4.5 :: When a deal-list reload leaves no deals while the form is open, there is no first deal to switch to; the design does not say whether the AI button is hidden or disabled, or sends an empty deal_id.
+CRM-TASK-034: PRECHECK_FINDING: UNDECIDED 9 :: After filling from one card and running AI again, it is unclear whether the replacing card shows the restore-note button (to the text before the earlier fill) or hides it because that card was never filled.
+CRM-TASK-034: session verdict: READY / PRECHECK_RESULT: READY
 ```
 
 ## 登记 CRM-TASK-027 至 030（2026-10-15）
