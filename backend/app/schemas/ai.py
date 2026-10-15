@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 Language = Literal["zh-CN", "en", "ms"]
 Channel = Literal["whatsapp", "email"]
@@ -12,6 +12,20 @@ class ConversationBriefRequest(BaseModel):
 
 class ContactSummaryRequest(BaseModel):
     output_language: Language | None = None
+
+
+class FollowupDraftRequest(BaseModel):
+    deal_id: str = Field(min_length=1)
+    note: str
+    today: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
+    output_language: Language | None = None
+
+    @field_validator("note")
+    @classmethod
+    def note_length(cls, value: str) -> str:
+        if not 1 <= len(value.strip()) <= 2000:
+            raise ValueError("note must contain 1 to 2000 non-whitespace characters")
+        return value
 
 
 class ReplyDraftRequest(BaseModel):
