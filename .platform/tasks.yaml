@@ -1107,7 +1107,7 @@ tasks:
       按 docs/deal-next-step.md 第三节、4.2 与 4.3 节，组装发给模型的商机快照，并由 CRM 算出多少天没有进展、在当前阶段多少天与是否停滞。
       复用 CRM-TASK-027 的 owner_scope 与客户摘要快照的取法。只做业务规则层的快照函数：不调 AI、不写审计、不加接口、不改前端、不加表与迁移；
       测试不调真实模型、不写任何真实密钥与地址。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-031
     acceptance_criteria:
