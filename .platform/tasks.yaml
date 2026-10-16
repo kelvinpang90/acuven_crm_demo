@@ -1166,7 +1166,7 @@ tasks:
     purpose: >-
       按 docs/deal-next-step.md 第三节与 4.5 节，把 CRM-TASK-036 的业务函数接成 POST /api/ai/deals/{deal_id}/next-step，供 CRM-TASK-038 的漏斗弹窗使用。
       只做接口层：加在已有的 AI 路由里，不改 main.py、不改业务规则、不改表结构、不改前端、不改现有的商机、漏斗与跟进接口。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-036
     acceptance_criteria:
