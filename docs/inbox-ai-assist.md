@@ -61,7 +61,7 @@
 - 配置（环境变量，不进仓库）：`AI_API_BASE_URL`、`AI_CLIENT_ID`（`aic_` 开头，非机密）、`AI_CLIENT_TOKEN`（机密）、`AI_MODEL`（必须是 AI 模块模型目录里 `ACTIVE` 的模型或别名）。
   任一为空，三个按钮在界面上不显示（接口返回 `AI_NOT_CONFIGURED`）。
 - 请求：`POST {AI_API_BASE_URL}/v1/messages`，头 `X-Acuven-Client-Id` 与 `Authorization: Bearer <token>`；体是 `feature`、`model`、`system`、`messages`、`max_tokens`、
-  `output_config`（`format` 为 `json_schema`，schema 用第五节的；`effort` 为 `low`）。请求体不超过 64 KiB（AI 模块的上限），`max_tokens` 按功能取第五节的值。
+  `output_config`（`format` 为 `{"type": "json_schema", "schema": <第五节的 schema>}`；`effort` 为 `low`）。请求体不超过 64 KiB（AI 模块的上限），`max_tokens` 按功能取第五节的值。
 - 结果三类，**都不自动重试**（每次重试都可能多花一次 token 费用）：
   - **成功**：200 且 `stop_reason` 为 `end_turn`，模型文本能解析成 JSON 并通过第五节的输出校验。
   - **AI 出错**（`error`）：200 但拒答、被截断（`max_tokens`）、解析失败或校验不过；401、403（含计费阻断 `BLOCK_AI`）、422（含 `MODEL_NOT_ALLOWED`、

@@ -86,7 +86,10 @@ async def test_request_shape_headers_and_success_follow_acceptance_criteria(monk
         "system": "system instruction",
         "messages": [{"role": "user", "content": "input body"}],
         "max_tokens": 12,
-        "output_config": {"format": "json_schema", "schema": {"type": "object"}, "effort": "low"},
+        "output_config": {
+            "format": {"type": "json_schema", "schema": {"type": "object"}},
+            "effort": "low",
+        },
     }
 
 

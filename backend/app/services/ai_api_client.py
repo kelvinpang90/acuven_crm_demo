@@ -73,7 +73,7 @@ async def send_message(
         "system": system,
         "messages": messages,
         "max_tokens": max_tokens,
-        "output_config": {"format": "json_schema", "schema": schema, "effort": "low"},
+        "output_config": {"format": {"type": "json_schema", "schema": schema}, "effort": "low"},
     }
     content = compact_json(payload)
     if len(content.encode("utf-8")) > REQUEST_LIMIT_BYTES:
