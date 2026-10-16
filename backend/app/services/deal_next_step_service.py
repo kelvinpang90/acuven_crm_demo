@@ -13,8 +13,27 @@ from app.models.deal import Deal
 from app.models.message import Message
 from app.models.task import Task
 from app.models.user import User
+from app.services import ai_api_client
 from app.services.access_service import owner_scope
 from app.services.ai_api_client import compact_json
+from app.services.ai_assist_service import (
+    DEAL_CLOSED,
+    ERROR,
+    INVALID_INPUT,
+    LANGUAGES,
+    NO_HISTORY,
+    NOT_CONFIGURED,
+    OK,
+    AiAssistResult,
+    write_ai_request,
+)
+from app.services.ai_features import (
+    DEAL_NEXT_STEP_FEATURE,
+    DEAL_NEXT_STEP_SCHEMA,
+    DEAL_NEXT_STEP_SYSTEM,
+    MAX_TOKENS,
+    validate_deal_next_step,
+)
 from app.services.contact_summary_service import (
     SNAPSHOT_LIMIT_BYTES,
     _amount,
@@ -190,3 +209,92 @@ async def build_deal_snapshot(
         snapshot["activities"].pop(0)
         snapshot["truncated"] = True
     return snapshot
+
+
+def _as_of(now: datetime) -> str:
+    return now.astimezone(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+async def generate_deal_next_step(
+    db: AsyncSession, *, user: User, deal_id: str, output_language: str
+) -> AiAssistResult:
+    """Generate a validated next-step suggestion and audit every AI client call."""
+    deal = (
+        await db.execute(select(Deal).where(Deal.id == deal_id, Deal.deleted_at.is_(None)))
+    ).scalar_one_or_none()
+    if deal is None:
+        raise ValueError("deal not found")
+    contact = (
+        await db.execute(
+            select(Contact).where(Contact.id == deal.contact_id, Contact.deleted_at.is_(None))
+        )
+    ).scalar_one_or_none()
+    if contact is None:
+        raise ValueError("contact not found")
+    if not isinstance(output_language, str) or output_language not in LANGUAGES:
+        return AiAssistResult(INVALID_INPUT)
+    if deal.status in {"won", "lost"}:
+        return AiAssistResult(DEAL_CLOSED)
+    if not ai_api_client.is_ai_configured():
+        return AiAssistResult(NOT_CONFIGURED)
+    has_activity = (
+        await db.execute(
+            select(Activity.id)
+            .where(Activity.deal_id == deal.id, Activity.type != "status change")
+            .limit(1)
+        )
+    ).scalar_one_or_none() is not None
+    has_message = (
+        await db.execute(select(Message.id).where(Message.contact_id == contact.id).limit(1))
+    ).scalar_one_or_none() is not None
+    if not has_activity and not has_message:
+        return AiAssistResult(NO_HISTORY)
+
+    now = datetime.now(timezone.utc)
+    snapshot = await build_deal_snapshot(db, user=user, deal=deal, contact=contact, now=now)
+    result = await ai_api_client.send_message(
+        feature=DEAL_NEXT_STEP_FEATURE,
+        system=DEAL_NEXT_STEP_SYSTEM,
+        messages=[
+            {
+                "role": "user",
+                "content": compact_json(
+                    {"as_of": _as_of(now), "output_language": output_language, "snapshot": snapshot}
+                ),
+            }
+        ],
+        max_tokens=MAX_TOKENS,
+        schema=DEAL_NEXT_STEP_SCHEMA,
+    )
+    if result.outcome == ai_api_client.OK:
+        output = validate_deal_next_step(result.output, snapshot["deal"]["stalled"])
+        if output is not None:
+            await write_ai_request(
+                db,
+                user_id=user.id,
+                contact_id=contact.id,
+                feature=DEAL_NEXT_STEP_FEATURE,
+                request_id=result.request_id,
+                outcome=OK,
+            )
+            return AiAssistResult(
+                OK,
+                request_id=result.request_id,
+                idle_days=snapshot["deal"]["idle_days"],
+                days_in_status=snapshot["deal"]["days_in_status"],
+                stalled=snapshot["deal"]["stalled"],
+                truncated=snapshot["truncated"],
+                **output,
+            )
+        outcome = ERROR
+    else:
+        outcome = result.outcome
+    await write_ai_request(
+        db,
+        user_id=user.id,
+        contact_id=contact.id,
+        feature=DEAL_NEXT_STEP_FEATURE,
+        request_id=result.request_id,
+        outcome=outcome,
+    )
+    return AiAssistResult(outcome, request_id=result.request_id, truncated=snapshot["truncated"])
