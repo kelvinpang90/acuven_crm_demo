@@ -1136,7 +1136,7 @@ tasks:
     purpose: >-
       按 docs/deal-next-step.md 4.1、4.4 节与第五节，定义 crm.deal_next_step 的系统提示、JSON schema 与输出校验，并用 CRM-TASK-035 的快照函数串成一个可调用的业务函数。
       复用 CRM-TASK-022、023 的 AI 客户端、审计写入与结果对象。只做业务规则层：不加接口、不改前端、不加表与迁移、不改商机；测试打桩 AI 客户端，不调真实模型、不写任何真实密钥与地址。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-035
     acceptance_criteria:
