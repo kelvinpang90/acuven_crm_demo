@@ -5,6 +5,7 @@ import { usersApi } from '@/services/users';
 import { useAuthStore } from '@/store/authStore';
 import type { PipelineStageDeal } from '@/services/pipeline';
 import type { User, DealStatus } from '@/types';
+import DealAiNextStep from './DealAiNextStep';
 
 const STATUSES: DealStatus[] = ['lead', 'following', 'negotiating', 'won', 'lost'];
 const PRIORITIES = ['high', 'mid', 'low'];
@@ -151,6 +152,8 @@ export default function DealEditModal({ deal, onClose, onSave }: Props) {
               </div>
             )}
           </div>
+
+          <DealAiNextStep dealId={deal.id} status={deal.status as DealStatus} />
 
           {/* Footer */}
           <div className="flex justify-end gap-2 p-4 border-t border-dark-border">

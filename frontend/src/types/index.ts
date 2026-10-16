@@ -273,6 +273,17 @@ export interface AiContactSummary {
   truncated: boolean;
 }
 
+export interface AiDealNextStep {
+  request_id: string | null;
+  assessment: string;
+  stall_reason: string;
+  next_steps: string[];
+  idle_days: number;
+  days_in_status: number;
+  stalled: boolean;
+  truncated: boolean;
+}
+
 export type AiLanguage = 'zh-CN' | 'en' | 'ms';
 
 export interface AiReplyDraft {
