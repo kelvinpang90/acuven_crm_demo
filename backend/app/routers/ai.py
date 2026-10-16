@@ -7,10 +7,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.models.contact import Contact
+from app.models.deal import Deal
 from app.models.user import User
 from app.schemas.ai import (
     ContactSummaryRequest,
     ConversationBriefRequest,
+    DealNextStepRequest,
     FollowupDraftRequest,
     ReplyDraftRequest,
     TranslateRequest,
@@ -20,6 +22,7 @@ from app.services import (
     ai_api_client,
     ai_assist_service,
     contact_summary_service,
+    deal_next_step_service,
     followup_draft_service,
 )
 from app.utils.response import fail, ok
@@ -41,6 +44,22 @@ async def _may_use_ai_for_contact(db: AsyncSession, user: User, contact_id: str)
     ).scalar_one_or_none()
     return contact_exists is not None and await access_service.may_access_contact(
         db, user, contact_id
+    )
+
+
+async def _may_use_ai_for_deal(db: AsyncSession, user: User, deal_id: str) -> bool:
+    deal = (
+        await db.execute(select(Deal).where(Deal.id == deal_id, Deal.deleted_at.is_(None)))
+    ).scalar_one_or_none()
+    if deal is None or not await access_service.may_access_deal(db, user, deal_id):
+        return False
+    contact_exists = (
+        await db.execute(
+            select(Contact.id).where(Contact.id == deal.contact_id, Contact.deleted_at.is_(None))
+        )
+    ).scalar_one_or_none()
+    return contact_exists is not None and await access_service.may_access_contact(
+        db, user, deal.contact_id
     )
 
 
@@ -109,6 +128,40 @@ async def create_contact_summary(
     if result.category == ai_assist_service.NO_HISTORY:
         return fail("Contact has no history.", code="NO_HISTORY", status_code=400)
     return _result_response(result, ("request_id", "summary", "suggested_next_step", "truncated"))
+
+
+@router.post("/deals/{deal_id}/next-step")
+async def create_deal_next_step(
+    deal_id: str,
+    body: DealNextStepRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    if not await _may_use_ai_for_deal(db, current_user, deal_id):
+        return _not_assigned()
+    result = await deal_next_step_service.generate_deal_next_step(
+        db,
+        user=current_user,
+        deal_id=deal_id,
+        output_language=body.output_language or _default_output_language(current_user),
+    )
+    if result.category == ai_assist_service.DEAL_CLOSED:
+        return fail("Deal is closed.", code="DEAL_CLOSED", status_code=400)
+    if result.category == ai_assist_service.NO_HISTORY:
+        return fail("Deal has no history.", code="NO_HISTORY", status_code=400)
+    return _result_response(
+        result,
+        (
+            "request_id",
+            "assessment",
+            "stall_reason",
+            "next_steps",
+            "idle_days",
+            "days_in_status",
+            "stalled",
+            "truncated",
+        ),
+    )
 
 
 @router.post("/contacts/{contact_id}/followup-draft")
