@@ -14,7 +14,6 @@
 <!-- openclaw:planning-v1:begin -->
 ### 当前计划
 
-1. `CRM-TASK-038` 漏斗商机弹窗加AI下一步建议卡片，显示停滞天数
 
 ### 已阻塞
 

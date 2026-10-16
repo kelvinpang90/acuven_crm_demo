@@ -1193,7 +1193,7 @@ tasks:
     purpose: >-
       按 docs/deal-next-step.md 第 4.6 节，在销售漏斗的商机编辑弹窗里加 AI 下一步建议，调用 CRM-TASK-037 的接口，显示 CRM 算出的停滞天数与 AI 的现状判断、停滞原因和下一步。
       只给文字，不改商机。AI 未配置时不显示。只改前端：不改后端、不加页面或路由、不改 services/deals.ts 与 services/pipeline.ts。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-037
     acceptance_criteria:
