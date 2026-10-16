@@ -42,6 +42,7 @@ NOT_CONFIGURED = "not_configured"
 NO_MESSAGES = "no_messages"
 NO_HISTORY = "no_history"
 INVALID_INPUT = "invalid_input"
+DEAL_CLOSED = "deal_closed"
 
 
 @dataclass(frozen=True)
@@ -62,6 +63,12 @@ class AiAssistResult:
     activity_type: str | None = None
     content: str | None = None
     tasks: list[dict[str, Any]] | None = None
+    assessment: str | None = None
+    stall_reason: str | None = None
+    next_steps: list[str] | None = None
+    idle_days: int | None = None
+    days_in_status: int | None = None
+    stalled: bool | None = None
     truncated: bool | None = None
 
 
