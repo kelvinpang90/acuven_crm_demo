@@ -144,7 +144,10 @@ async def test_request_uses_next_step_contract_and_snapshot(async_session_maker,
 
 
 @pytest.mark.asyncio
-async def test_preflight_order_and_history_skip_client_and_audit(async_session_maker, monkeypatch):
+@pytest.mark.parametrize("closed_status", ["won", "lost"])
+async def test_preflight_order_and_history_skip_client_and_audit(
+    async_session_maker, monkeypatch, closed_status
+):
     """Guards criterion 3: ordered preflight cases do not call AI or write an audit row."""
     user, deal, contact = _user(), _deal(), _contact()
     await _seed(async_session_maker, user, deal, contact)
@@ -158,7 +161,7 @@ async def test_preflight_order_and_history_skip_client_and_audit(async_session_m
     )
     async with async_session_maker() as session:
         deal_record = await session.get(Deal, "deal")
-        deal_record.status = "won"
+        deal_record.status = closed_status
         _configured(monkeypatch, False)
         invalid = await generate_deal_next_step(
             session, user=user, deal_id="deal", output_language="fr"
@@ -179,13 +182,13 @@ async def test_preflight_order_and_history_skip_client_and_audit(async_session_m
         status_only = await generate_deal_next_step(
             session, user=user, deal_id="deal", output_language="en"
         )
+        audits = (await session.execute(select(AiRequest))).scalars().all()
+        assert calls == [] and audits == []
         session.add(_activity(record_id="phone"))
         await session.flush()
         phone_history = await generate_deal_next_step(
             session, user=user, deal_id="deal", output_language="en"
         )
-        await session.rollback()
-        audits = (await session.execute(select(AiRequest))).scalars().all()
     assert [item.category for item in (invalid, closed, unconfigured, no_history, status_only)] == [
         "invalid_input",
         DEAL_CLOSED,
@@ -193,7 +196,7 @@ async def test_preflight_order_and_history_skip_client_and_audit(async_session_m
         "no_history",
         "no_history",
     ]
-    assert phone_history.category == "ok" and calls and audits == []
+    assert phone_history.category == "ok" and len(calls) == 1
 
 
 @pytest.mark.asyncio
