@@ -1863,7 +1863,7 @@ PRECHECK_RESULT: READY
 | 2 | 联系人 | 客户摘要（`crm.contact_summary`；原为 AI API 的契约 v1，按 ai_billing_hub 设计 #281 改为 CRM 自己的内部设计） | 设计 `docs/contact-ai-summary.md` 2026-10-15 已批准（PR kelvinpang90/acuven_crm_demo#75），登记为 CRM-TASK-027 至 029；Q4 的收件箱快照收窄为 CRM-TASK-030 |
 | 3 | 跟进记录 / 任务 | 把员工的速记整理成结构化跟进记录，并生成任务草稿（E-09 原定的「任务草稿」） | 设计 `docs/followup-ai-draft.md` 2026-10-15 已批准（PR kelvinpang90/acuven_crm_demo#89），登记为 CRM-TASK-032 至 034 |
 | 4 | 商机 | 下一步建议、商机停滞的原因说明（只给文字，不改状态） | 设计 `docs/deal-next-step.md` 2026-10-15 已批准（PR kelvinpang90/acuven_crm_demo#97，Q5 定固定 7 天，其余按建议），登记为 CRM-TASK-035 至 038 |
-| 4 | 仪表盘 | 经理看板的数据解读：数字由 CRM 算好，AI 只写解读 | 想法 |
+| 4 | 仪表盘 | 经理看板的数据解读：数字由 CRM 算好，AI 只写解读 | 设计 `docs/dashboard-ai-insight.md` 2026-10-18 起草，待批准 |
 | 5 | 联系人 | 从聊天里提取客户资料作为建议填入；表格导入时识别列名；疑似重复客户提示（不自动合并，B-05） | 想法 |
 | 5 | 收件箱 | 意图和紧急度标签、按紧急度排序（每条入站消息都要调一次 AI，成本另议） | 想法 |
 | 6 | 分配规则、屋顶项目、AutoCount | 建议分配给谁；根据勘察和完工照片起草报告；汇总客户的单据 | 想法 |
