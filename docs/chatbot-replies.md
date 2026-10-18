@@ -222,7 +222,7 @@ Kelvin 手工（不在仓库里）：
 ## 九、表结构
 
 - 迁移 014（CRM-TASK-012）：`messages.sent_by`，字符串 36，可空，不加外键（与 `assigned_to` 一致）、不加索引（不按它查询）。旧数据留空。
-- 迁移 016（CRM-TASK-020）：删 `contacts.is_gateway` 与 `idx_contacts_is_gateway`。原为 015，登记收件箱 AI 的 CRM-TASK-021 时 015 给了 `ai_requests` 建表，按 [inbox-ai-assist.md](inbox-ai-assist.md) 第八节第 4 条顺延。
+- 迁移 017（CRM-TASK-020）：删 `contacts.is_gateway` 与 `idx_contacts_is_gateway`。原为 015，登记收件箱 AI 的 CRM-TASK-021 时 015 给了 `ai_requests` 建表，按 [inbox-ai-assist.md](inbox-ai-assist.md) 第八节第 4 条顺延为 016；登记经理看板 AI 解读的 CRM-TASK-039 时 016 给了 `ai_requests.contact_id` 改可空，按 [dashboard-ai-insight.md](dashboard-ai-insight.md) 第七节再顺延为 017。
 - 013 号已给 CRM-TASK-009 的存量号码迁移。
 
 **个人数据**：新增存储的只有 `sent_by`（员工 id）。客服写的正文发给 chatbot 与 Meta（发送本身必需），chatbot 把它连同员工显示名
