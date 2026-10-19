@@ -38,6 +38,26 @@
 
 ---
 
+## CRM-TASK-047 AI评测样例：客户摘要与跟进记录整理各10个（2026-10-19）
+
+### 做了什么
+
+- 新增 `backend/evals/samples/contact_summary.json`（`summary-01` 至 `summary-10`）与 `followup_draft.json`（`followup-01` 至 `followup-10`），格式照 `docs/ai-eval.md` 第二节与第九节第 1、5 条，`now` 全为空，每个样例的 `covers` 用一句中文写明覆盖什么。
+- 客户摘要：赢单与输单（`summary-01`）、逾期待办（`summary-02`、`summary-07`）、未付且过期的发票（`summary-03`）、只有聊天没有商机（`summary-04`）、另一个销售名下的商机与待办（`summary-05`，快照不应带出）、过期报价（`summary-06`）、经理看下属的客户（`summary-07`）、17 条跟进加 12 条聊天被截断（`summary-08`）、事实很少的新线索（`summary-09`），注入样例 `summary-10`（备注与聊天里都有）；中文、英文、马来文输出都有。
+- 跟进记录整理：中英混写（`followup-01`）、只有一句话（`followup-02`）、相对日期「下周三」「月底前」「下周五」「明天」（`followup-03`、`followup-04`、`followup-07`、`followup-08`）、提到已在待办里的报价单（`followup-05`）、金额区间（`followup-06`）、四件要做的事超过 3 条上限（`followup-09`），注入样例 `followup-10`（速记里贴了那句话）；每个样例的商机都在这个联系人与操作的销售名下。
+- 人名、公司、电话全部自拟，没有写邮箱、网址与主机名。
+- 新增测试 `backend/tests/test_evals_samples_contact.py`，覆盖验收标准列出的五组用例。
+
+### 偏离了什么
+
+- 无
+
+### 验证到什么程度
+
+- 测试由 PR 的必需检查 backend 执行，检查结果由 Worker 和 CI 记录不写在这里；没有调用过真实模型。
+
+---
+
 ## CRM-TASK-046 AI评测样例：收件箱简报、起草回复与翻译各10个（2026-10-19）
 
 ### 做了什么
