@@ -31,6 +31,26 @@
 
 ---
 
+## CRM-TASK-044 经理看板加AI解读卡片（2026-10-19）
+
+### 做了什么
+
+- 新组件 `Dashboard/DashboardAiInsight.tsx`，放在 `ManagerDashboard` 的 KPI 卡片之后、漏斗与排行榜之前：用已有的 `aiApi.getStatus()` 读 AI 状态，未启用或读取失败时不显示；区块注明按本月到现在的数字、上月作对比；请求中按钮置灰并显示加载中。
+- 结果卡片带「AI 生成，未核实」，显示一句话总结、看到的情况逐条、建议逐条，`truncated` 为真时注明团队超过 30 人只看了前 30 人；卡片上的「重新生成」再调一次，成功后新结果替换整张卡片。
+- 组件卸载（离开看板，或换排行榜月份导致整页重新加载）时作废进行中的请求，之后才回来的响应不再更新界面；看板原有的 KPI、漏斗、排行榜与加载方式未改。
+- `services/ai.ts` 新增 `createDashboardInsight`，58 秒超时，按界面语言映射 `output_language`（`zh*` 为 `zh-CN`，`en*` 为 `en`，其他不带）；`types/index.ts` 新增 `AiDashboardInsight`（`request_id`、`headline`、`observations`、`suggestions`、`truncated`）。
+- 错误按错误码提示：`AI_NOT_CONFIGURED`、`NO_DATA`、`AI_UNAVAILABLE` 与超时网络错误、`AI_ERROR` 与其他；新文案加在 en 与 zh 的 dashboard 命名空间。
+
+### 偏离了什么
+
+- 无
+
+### 验证到什么程度
+
+- 前端类型检查与构建由 PR 的必需检查 frontend 执行，检查结果由 Worker 和 CI 记录不写在这里；没有在浏览器里实际操作过。
+
+---
+
 ## CRM-TASK-043 经理看板AI解读的接口（2026-10-19）
 
 ### 做了什么
