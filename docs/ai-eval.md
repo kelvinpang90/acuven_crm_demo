@@ -1,6 +1,7 @@
 # AI 功能质量评测脚本
 
 > 状态：**已批准**（Kelvin 2026-10-19，原话「都按你的建议」：第八节 Q1 至 Q4 均按建议，PR kelvinpang90/acuven_crm_demo#111）。做法（B，写脚本）与打分标准（第六节）Kelvin 同日先定，原话「B，打分标准按你的建议」。
+> 第一至八节如上已批准；**第九节**是登记 CRM-TASK-045 至 049 时按设计预审补的，Kelvin 2026-10-19 在登记 PR kelvinpang90/acuven_crm_demo#112 上批准（原话「批准第九节，绿了就合并」）；与正文冲突处以第九节为准。
 > 设计闸门：不适用。样例全部是自拟的 demo 数据，不碰生产库、不碰真实客户，不改表结构、不改业务代码与接口。按 Kelvin 的要求先出设计再登记。
 > 来由：五份 AI 设计（[inbox-ai-assist.md](inbox-ai-assist.md)、[contact-ai-summary.md](contact-ai-summary.md)、[followup-ai-draft.md](followup-ai-draft.md)、
 > [deal-next-step.md](deal-next-step.md)、[dashboard-ai-insight.md](dashboard-ai-insight.md)）第五节都要求「上线前用 demo 样例评测、Kelvin 打分认可」，
@@ -159,3 +160,25 @@ CI（必需检查 `backend`）里的测试都不调真实模型：
 | Q2 | 样例谁写 | A Worker 按第二节的覆盖清单写，你在 PR 里看；B 你自己提供 | A：68 个样例量不小；覆盖清单已经很具体，你只看像不像真的、有没有漏 |
 | Q3 | 排在哪 | A 第 1 至 4 项排在当前计划最前面（039 若已开启就排在它后面），第 5 项排在 042 之后；B 全部排在 039 至 044 之后 | A：前四个功能已经部署、配了密钥，线上就能点到，越早评测越好；看板那批反正要等 042 |
 | Q4 | 每个样例跑几次 | A 一次；B 三次，看输出稳不稳 | A：先看一次的质量，打分量也小（68 个）；某个功能结果摇摆再对它多跑几次 |
+
+## 九、登记时按设计预审补的（2026-10-19）
+
+登记 CRM-TASK-045 至 049 前跑了设计预审（输出在 `tasks/todo.md`「登记 CRM-TASK-045 至 049」），下面几条照原文走不通或没写死，按这里补；对应任务的验收标准已按这里写。
+
+1. **注入样例用显式标记**：样例加一个键 `injection`（布尔，缺省为假），每个文件恰好一个为真；打分表在 `auto_flags` 之后加一列 `injection_sample`（脚本填 `Y` 或 `N`）。
+   `injected` 只对 `injection_sample` 为 `Y` 的行要求填 `Y` 或 `N`，其他行留空、填了也不看。原写法里非注入行的 `injected` 留空会被判为「未评完」，任何功能都过不了。
+2. **AI 出错的行怎么算**：一个功能只要有 `error` 的行就判「不通过」（原因写 AI 出错的样例 id），不再看其他行有没有填完；`error` 行不参与「未评完」的判断与各项平均。
+   没有 `error` 时，才看有没有没填的分数（有则「未评完」），都填了再按第六节第 2 至 4 条判。
+3. **只有看板样例能给 `now`**：其他功能的样例 `now` 必须为空，否则建数据时报错（跟进整理的 `today` 按运行日期填，与固定的 `now` 对不上会被业务函数拒绝）。
+4. **固定时钟的行为**：替换用的 `datetime` 子类里，`utcnow()` 返回不带时区的固定 UTC 时间；`now(tz)` 给了时区时返回带时区的固定时间（换算到该时区），不给时区时返回不带时区的固定 UTC 时间。
+5. **时间字段的写法**：任何记录都可以用「列名加 `_days_ago` 或 `_minutes_ago`」给该列一个相对 `now` 的时间（如 `won_at_days_ago`、`due_date_days_ago`、`doc_date_days_ago`），日期列取那一刻的日期，负数为将来；
+   简写 `days_ago` / `minutes_ago` 指这类记录的主时间：消息的 `created_at`、跟进记录的 `follow_date`、AutoCount 单据的 `doc_date`（单据表没有 `created_at`），其他记录的 `created_at`。
+   销售目标用 `month_offset`（0 为 `now` 所在的月，-1 为上月），由建数据换成年与月。第二节例子里的 `days_ago` 照此理解。
+6. **数字比对**：先取出 `YYYY-MM-DD` 日期按原样比对，并从文字里去掉；再取数字，去掉千分位逗号，小数去掉末尾的 0 与小数点（`48000.00` 与 `48000` 相同，`3.50` 与 `3.5` 相同），
+   用户消息里的数字同样处理后，按整个数比对（不是子串）。
+7. **自动标记扫哪些字段**：只扫模型写的自由文字，按功能列死：简报 `customer_need`、`conversation_state`、`open_questions`（每条）、`suggested_next_step`；起草 `draft`、`subject`、`note_for_agent`；
+   翻译 `translation`；客户摘要 `summary`、`suggested_next_step`；跟进整理 `content` 与每条任务草稿的 `title`；商机建议 `assessment`、`stall_reason`、`next_steps`（每条）；看板解读 `headline`、`observations`、`suggestions`（每条）。
+   不扫枚举（`customer_mood`、`detected_language`、`activity_type`、任务优先级）、任务草稿的到期日（本来就是 AI 按今天推算的，报告里照样显示）与 CRM 算的数（`idle_days`、`days_in_status`、`stalled`、`truncated`）。
+8. **重跑后合并打分**：`summarize` 接受多个打分表，按给出的顺序读，同一个 `sample_id` 以后面的为准；所以用 `--only` 重跑的那一批，接在原来那份后面一起给 `summarize` 即可。每次运行仍各自出一份报告。
+9. **几处细节写死**：样例的 `now` 必须是以 `Z` 结尾的 UTC 时间，日期列与 `month_offset` 都按 UTC 算；每类记录只有 `key` 与引用别的记录的字段（如 `contact`、`deal`、`assigned_to`、`manager`）必填，其余字段都给默认值；
+   `run` 的结果只有 `ok`、`error`、`unavailable` 时退出码为 0。
