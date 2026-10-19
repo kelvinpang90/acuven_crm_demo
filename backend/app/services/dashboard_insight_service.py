@@ -13,6 +13,25 @@ from app.models.deal import Deal
 from app.models.message import Message
 from app.models.sales_target import SalesTarget
 from app.models.user import User
+from app.services import ai_api_client
+from app.services.ai_api_client import compact_json
+from app.services.ai_assist_service import (
+    ERROR,
+    INVALID_INPUT,
+    LANGUAGES,
+    NO_DATA,
+    NOT_CONFIGURED,
+    OK,
+    AiAssistResult,
+    write_ai_request,
+)
+from app.services.ai_features import (
+    DASHBOARD_INSIGHT_FEATURE,
+    DASHBOARD_INSIGHT_SCHEMA,
+    DASHBOARD_INSIGHT_SYSTEM,
+    MAX_TOKENS,
+    validate_dashboard_insight,
+)
 from app.services.deal_next_step_service import STALL_DAYS
 
 OPEN_STATUSES = ("lead", "following", "negotiating")
@@ -283,3 +302,71 @@ async def build_team_snapshot(db: AsyncSession, *, manager: User, now: datetime)
         "members": members,
         "truncated": len(candidates) > MEMBER_LIMIT,
     }
+
+
+def _as_of(now: datetime) -> str:
+    return now.astimezone(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _has_data(team: dict[str, Any]) -> bool:
+    return any(
+        team[period]["won_count"] > 0 or team[period]["created_count"] > 0
+        for period in ("this_month", "last_month")
+    ) or any(values["count"] > 0 for values in team["open_deals"].values())
+
+
+async def generate_dashboard_insight(
+    db: AsyncSession, *, user: User, output_language: str
+) -> AiAssistResult:
+    """Generate a validated team insight for a manager and audit every AI client call."""
+    if user.role != "manager":
+        raise ValueError("manager role required")
+    if not isinstance(output_language, str) or output_language not in LANGUAGES:
+        return AiAssistResult(INVALID_INPUT)
+    if not ai_api_client.is_ai_configured():
+        return AiAssistResult(NOT_CONFIGURED)
+    now = datetime.now(timezone.utc)
+    snapshot = await build_team_snapshot(db, manager=user, now=now)
+    if not _has_data(snapshot["team"]):
+        return AiAssistResult(NO_DATA)
+
+    result = await ai_api_client.send_message(
+        feature=DASHBOARD_INSIGHT_FEATURE,
+        system=DASHBOARD_INSIGHT_SYSTEM,
+        messages=[
+            {
+                "role": "user",
+                "content": compact_json(
+                    {"as_of": _as_of(now), "output_language": output_language, "snapshot": snapshot}
+                ),
+            }
+        ],
+        max_tokens=MAX_TOKENS,
+        schema=DASHBOARD_INSIGHT_SCHEMA,
+    )
+    if result.outcome == ai_api_client.OK:
+        output = validate_dashboard_insight(result.output)
+        if output is not None:
+            await write_ai_request(
+                db,
+                user_id=user.id,
+                contact_id=None,
+                feature=DASHBOARD_INSIGHT_FEATURE,
+                request_id=result.request_id,
+                outcome=OK,
+            )
+            return AiAssistResult(
+                OK, request_id=result.request_id, truncated=snapshot["truncated"], **output
+            )
+        outcome = ERROR
+    else:
+        outcome = result.outcome
+    await write_ai_request(
+        db,
+        user_id=user.id,
+        contact_id=None,
+        feature=DASHBOARD_INSIGHT_FEATURE,
+        request_id=result.request_id,
+        outcome=outcome,
+    )
+    return AiAssistResult(outcome, request_id=result.request_id, truncated=snapshot["truncated"])

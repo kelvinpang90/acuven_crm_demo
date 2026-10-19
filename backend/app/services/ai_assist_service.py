@@ -43,6 +43,7 @@ NO_MESSAGES = "no_messages"
 NO_HISTORY = "no_history"
 INVALID_INPUT = "invalid_input"
 DEAL_CLOSED = "deal_closed"
+NO_DATA = "no_data"
 
 
 @dataclass(frozen=True)
@@ -69,6 +70,9 @@ class AiAssistResult:
     idle_days: int | None = None
     days_in_status: int | None = None
     stalled: bool | None = None
+    headline: str | None = None
+    observations: list[str] | None = None
+    suggestions: list[str] | None = None
     truncated: bool | None = None
 
 
@@ -209,7 +213,7 @@ async def write_ai_request(
     db: AsyncSession,
     *,
     user_id: str,
-    contact_id: str,
+    contact_id: str | None,
     feature: str,
     request_id: str | None,
     outcome: str,
@@ -237,7 +241,7 @@ async def _record_result(
     db: AsyncSession,
     *,
     user_id: str,
-    contact_id: str,
+    contact_id: str | None,
     feature: str,
     api_result: ai_api_client.AiApiResult,
 ) -> AiAssistResult:
