@@ -1,7 +1,7 @@
 # AI 功能质量评测脚本
 
 > 状态：**已批准**（Kelvin 2026-10-19，原话「都按你的建议」：第八节 Q1 至 Q4 均按建议，PR kelvinpang90/acuven_crm_demo#111）。做法（B，写脚本）与打分标准（第六节）Kelvin 同日先定，原话「B，打分标准按你的建议」。
-> 第一至八节如上已批准；**第九节**是登记 CRM-TASK-045 至 049 时按设计预审补的，待 Kelvin 在登记 PR 上批准；与正文冲突处以第九节为准。
+> 第一至八节如上已批准；**第九节**是登记 CRM-TASK-045 至 049 时按设计预审补的，Kelvin 2026-10-19 在登记 PR kelvinpang90/acuven_crm_demo#112 上批准（原话「批准第九节，绿了就合并」）；与正文冲突处以第九节为准。
 > 设计闸门：不适用。样例全部是自拟的 demo 数据，不碰生产库、不碰真实客户，不改表结构、不改业务代码与接口。按 Kelvin 的要求先出设计再登记。
 > 来由：五份 AI 设计（[inbox-ai-assist.md](inbox-ai-assist.md)、[contact-ai-summary.md](contact-ai-summary.md)、[followup-ai-draft.md](followup-ai-draft.md)、
 > [deal-next-step.md](deal-next-step.md)、[dashboard-ai-insight.md](dashboard-ai-insight.md)）第五节都要求「上线前用 demo 样例评测、Kelvin 打分认可」，
