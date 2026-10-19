@@ -1283,7 +1283,7 @@ tasks:
       按 docs/dashboard-ai-insight.md 4.2 节的 stalled_deals 与 4.2.1 节，在 CRM-TASK-040 的团队快照里给团队与每个成员加停滞商机的单数与金额，
       规则与商机下一步建议（docs/deal-next-step.md 4.3）相同、按团队全部在途商机批量算。只做业务规则层：不调 AI、不写审计、不加接口、不改前端、不加表与迁移；
       不改 deal_next_step_service 与 dashboard_service；测试不调真实模型、不写任何真实密钥与地址。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-040
     acceptance_criteria:
