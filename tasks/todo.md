@@ -35,6 +35,25 @@
 
 ---
 
+## CRM-TASK-040 经理看板AI解读的团队快照组装，不含停滞（2026-10-19）
+
+### 做了什么
+
+- 新增 `backend/app/services/dashboard_insight_service.py`，提供 `build_team_snapshot(db, *, manager, now)`：团队为 manager 本人加 `manager_id` 指向他的用户；查一次本月与上月的 `sales_targets`、一次团队未删除的商机（在途、或 `won_at`/`created_at` 落在需要的时间窗内），其余全部在 Python 里按 UTC 自然月汇总；返回 `period`、`team`、`members`、`truncated` 四个键。
+- `team` 的数是团队全部成员（含没放进 `members` 的停用账号与第 30 人以后的人）相加，比率按合计重算；`avg_sales_cycle_days` 取 `won_at` 在 `now` 之前 90 天内的赢单，按 UTC 日期差在 Python 里平均；比率与平均用 `ROUND_HALF_UP` 保留一位小数。
+- 不调 AI、不写审计、不写库，不导入 `dashboard_service`，不用 `is_gateway` 与 `demo_scope`。
+- 新增 `backend/tests/test_dashboard_insight_snapshot.py`，覆盖验收标准列出的用例 1 至 8，每个测试在 docstring 写明守住的验收标准。
+
+### 偏离了什么
+
+- 用例 4「两条目标相加」写成同一团队两名成员各一条本月目标相加，因为 `sales_targets` 对同一人同一月有唯一约束，同一人放不进两条。
+
+### 验证到什么程度
+
+- 测试由 PR 的必需检查 backend 执行，检查结果由 Worker 和 CI 记录不写在这里。
+
+---
+
 ## CRM-TASK-039 AI审计表的客户字段改为可空，供没有客户的AI功能记审计（2026-10-19）
 
 ### 做了什么
