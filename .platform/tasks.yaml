@@ -1404,7 +1404,7 @@ tasks:
       按 docs/ai-eval.md 第三至六节，在 backend/evals 写一个本机运行的评测脚本：把每个 demo 样例建进独立的内存 SQLite，调用现有的 AI 业务函数，
       输出 HTML 报告与 CSV 打分表，再按打分标准汇总。只写评测脚本与它的测试：不改 app 下任何文件、不改提示词与接口、不加表与迁移、不加依赖；
       测试打桩 AI 客户端，不调真实模型、不写任何真实密钥与地址。样例文件由 CRM-TASK-046 至 049 提供。
-    status: ready
+    status: done
     depends_on: []
     acceptance_criteria:
       - backend/evals 是一个包，在 backend 下运行 python -m evals run --out 目录（可选 --features 逗号分隔的功能名、--only 逗号分隔的样例 id）与 python -m evals summarize 一个或多个打分表路径（按顺序读，同一 sample_id 以后面的为准，设计第九节第 8 条）；功能名为 conversation_brief、reply_draft、translate、contact_summary、followup_draft、deal_next_step、dashboard_insight，样例从 backend/evals/samples 下同名的 JSON 文件读，文件不存在的功能跳过并说明；不改 backend/app 下任何文件，不加依赖（建库用 requirements-dev 里已有的 aiosqlite）
