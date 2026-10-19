@@ -1255,7 +1255,7 @@ tasks:
       按 docs/dashboard-ai-insight.md 第三节与 4.2 节（stalled_deals 与 4.2.1 除外），组装发给模型的团队快照：本月与上月的成交、目标、完成率、按创建月的批次成交率，
       在途商机按状态，平均销售周期，距目标差额，按成员列出。只做业务规则层的快照函数：不调 AI、不写审计、不加接口、不改前端、不加表与迁移；
       不改 dashboard_service（CRM-TASK-018 要改它），不引入 is_gateway 与 demo_scope；测试不调真实模型、不写任何真实密钥与地址。
-    status: ready
+    status: done
     depends_on: []
     acceptance_criteria:
       - 新文件 dashboard_insight_service 新增 build_team_snapshot(db, *, manager, now)，manager 是调用方已读出的用户，now 是带时区的 UTC 时间（库里不带时区的时间按 UTC 处理）；返回的字典恰好含 period、team、members、truncated 四个键；不调 AI、不写审计、不写库；不导入也不修改 dashboard_service，不读写 is_gateway、不用 demo_scope
