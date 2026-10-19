@@ -1368,7 +1368,7 @@ tasks:
     purpose: >-
       按 docs/dashboard-ai-insight.md 第 4.5 节，在经理看板的 KPI 卡片下面加 AI 解读，调用 CRM-TASK-043 的接口，显示一句话总结、看到的情况与建议。
       只给文字，不保存。AI 未配置时不显示。只改前端：不改后端、不加页面或路由、不改 services/dashboard.ts 与其他角色的看板。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-043
     acceptance_criteria:
