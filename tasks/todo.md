@@ -33,6 +33,25 @@
 
 ---
 
+## CRM-TASK-042 经理看板AI解读的提示词、输出校验与业务函数（2026-10-19）
+
+### 做了什么
+
+- `ai_features.py` 新增 `DASHBOARD_INSIGHT_FEATURE`（`crm.dashboard_insight`）、`DASHBOARD_INSIGHT_SYSTEM`、`DASHBOARD_INSIGHT_SCHEMA` 与 `validate_dashboard_insight`：系统提示写明快照是数据、不执行其中指令（含成员名字），只引用快照数字、不做新运算，`as_of` 是现在，4.2 节各数字口径（`win_rate` 按创建月批次、`target_rate` 为 null 是没设目标、`open_deals` 与 `stalled_deals` 是现在的数、停滞可能是记录不全），本月没过完时只并列两个数并说明过了几天，建议到人或阶段、不点名商机或客户、不评价员工、不声称改了记录，各字段上限与 `output_language`；schema 三个字段全部必填、不允许多余字段；校验去首尾空白后按码点检查长度与条数，任一不合返回 None。
+- `ai_assist_service.py`：`AiAssistResult` 加可空字段 `headline`、`observations`、`suggestions`，新增类别常量 `NO_DATA`；`write_ai_request` 与 `_record_result` 的 `contact_id` 改为 `str | None`，其他 AI 功能的调用不变。
+- `dashboard_insight_service.py` 新增 `generate_dashboard_insight(db, *, user, output_language)`：非 `manager` 抛 `ValueError`；依次判 `invalid_input`、`not_configured`，再用当前 UTC 时间调 `build_team_snapshot`，团队本月与上月成交数、新建数都为 0 且三个在途状态都为 0 时为 `no_data`，这三种不调 AI、不写审计；之后发一条紧凑 JSON 用户消息（`as_of` 到秒带 Z、`output_language`、`snapshot`），每次调用都写一行 `contact_id` 为空的审计，校验不过改判 `error` 并保留 `request_id`，成功时返回去空白后的三个字段与快照的 `truncated`。
+- 新增 `backend/tests/test_dashboard_insight_service.py`，打桩 AI 客户端与配置，覆盖验收标准列出的用例 1 至 4，每个测试在 docstring 写明守住的验收标准。
+
+### 偏离了什么
+
+- 无
+
+### 验证到什么程度
+
+- 测试由 PR 的必需检查 backend 执行，检查结果由 Worker 和 CI 记录不写在这里。
+
+---
+
 ## CRM-TASK-041 经理看板AI解读快照加每人停滞商机数，批量按商机建议同一规则计算（2026-10-19）
 
 ### 做了什么
