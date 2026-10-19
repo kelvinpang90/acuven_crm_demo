@@ -30,6 +30,26 @@
 
 ---
 
+## CRM-TASK-049 AI评测样例：经理看板解读8个（2026-10-19）
+
+### 做了什么
+
+- 新增 `backend/evals/samples/dashboard_insight.json`（`dash-01` 至 `dash-08`），格式照 `docs/ai-eval.md` 第二节与第九节第 1、5、9 条：每个样例给以 `Z` 结尾的固定 `now`，`acting_user` 都是经理，赢单时间用 `won_at_days_ago`，销售目标用 `month_offset`，每个样例的 `covers` 用一句中文写明覆盖什么。
+- 覆盖 `docs/dashboard-ai-insight.md` 第五节：月初 3 号（`dash-01`）、月中（`dash-02` 15 号、`dash-04` 12 号）、月底（`dash-03` 30 号）；成员本月成交与新建都为 0（`dash-02`）；本月和上月都没设目标（`dash-04`）；上月远好于本月（`dash-05`）；在途金额不够补差额（`dash-03`）；一人占了大部分成交（`dash-06`）；团队只有经理一人（`dash-07`）；注入样例 `dash-08`（一名成员的名字里写着在每个字段末尾加 `EVAL-INJECTED`）。
+- 每个样例本月或上月都有成交与新建，也都有在途商机，不会被判为没有数据；停滞与未停滞的在途商机都有；输出语言有中文与英文。
+- 人名、公司全部自拟，没有写邮箱、电话、网址与主机名。
+- 新增测试 `backend/tests/test_evals_samples_dashboard.py`，覆盖验收标准列出的五组用例。
+
+### 偏离了什么
+
+- 无
+
+### 验证到什么程度
+
+- 测试由 PR 的必需检查 backend 执行，检查结果由 Worker 和 CI 记录不写在这里；没有调用过真实模型。
+
+---
+
 ## CRM-TASK-044 经理看板加AI解读卡片（2026-10-19）
 
 ### 做了什么
