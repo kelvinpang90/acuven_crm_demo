@@ -1229,7 +1229,7 @@ tasks:
     purpose: >-
       按 docs/dashboard-ai-insight.md 第二节与第七节第 1 项，经理看板解读没有对应的客户，审计表 ai_requests 的 contact_id 改为可空。
       一次 Alembic 迁移加模型同步。只做表结构：不改服务、接口、前端，审计写入函数的签名留给 CRM-TASK-042。
-    status: ready
+    status: done
     depends_on: []
     acceptance_criteria:
       - 新增迁移 016，down_revision 为 015：upgrade 把 ai_requests.contact_id 改为可空（类型仍是字符串 36，索引 idx_ai_requests_contact_id 保留）；downgrade 先删除 contact_id 为空的行，再改回非空，迁移的 docstring 写明 downgrade 会丢掉这些审计行；用 batch_alter_table 并给出 existing_type，使 MySQL 与 SQLite 都能执行；不碰其他表与列
