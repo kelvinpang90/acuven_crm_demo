@@ -14,9 +14,8 @@
 <!-- openclaw:planning-v1:begin -->
 ### 当前计划
 
-1. `CRM-TASK-043` 经理看板AI解读的接口
-2. `CRM-TASK-044` 经理看板加AI解读卡片
-3. `CRM-TASK-049` AI评测样例：经理看板解读8个
+1. `CRM-TASK-044` 经理看板加AI解读卡片
+2. `CRM-TASK-049` AI评测样例：经理看板解读8个
 
 ### 已阻塞
 

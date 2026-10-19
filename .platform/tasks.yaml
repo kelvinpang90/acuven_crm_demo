@@ -1341,7 +1341,7 @@ tasks:
     purpose: >-
       按 docs/dashboard-ai-insight.md 第 4.4 节，把 CRM-TASK-042 的业务函数接成 POST /api/ai/dashboard/insight，供 CRM-TASK-044 的经理看板使用。
       只做接口层：加在已有的 AI 路由里，不改 main.py、不改业务规则、不改表结构、不改前端、不改现有的看板接口。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-042
     acceptance_criteria:
