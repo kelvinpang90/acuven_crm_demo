@@ -5,13 +5,14 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, require_role
 from app.models.contact import Contact
 from app.models.deal import Deal
 from app.models.user import User
 from app.schemas.ai import (
     ContactSummaryRequest,
     ConversationBriefRequest,
+    DashboardInsightRequest,
     DealNextStepRequest,
     FollowupDraftRequest,
     ReplyDraftRequest,
@@ -22,6 +23,7 @@ from app.services import (
     ai_api_client,
     ai_assist_service,
     contact_summary_service,
+    dashboard_insight_service,
     deal_next_step_service,
     followup_draft_service,
 )
@@ -203,6 +205,24 @@ async def create_reply_draft(
         output_language=body.output_language or _default_output_language(current_user),
     )
     return _result_response(result, ("request_id", "draft", "subject", "note_for_agent"))
+
+
+@router.post("/dashboard/insight")
+async def create_dashboard_insight(
+    body: DashboardInsightRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_role("manager"))],
+):
+    result = await dashboard_insight_service.generate_dashboard_insight(
+        db,
+        user=current_user,
+        output_language=body.output_language or _default_output_language(current_user),
+    )
+    if result.category == ai_assist_service.NO_DATA:
+        return fail("Team has no dashboard data.", code="NO_DATA", status_code=400)
+    return _result_response(
+        result, ("request_id", "headline", "observations", "suggestions", "truncated")
+    )
 
 
 @router.post("/translate")
