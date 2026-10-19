@@ -18,6 +18,10 @@ class DealNextStepRequest(BaseModel):
     output_language: Language | None = None
 
 
+class DashboardInsightRequest(BaseModel):
+    output_language: Language | None = None
+
+
 class FollowupDraftRequest(BaseModel):
     deal_id: str = Field(min_length=1)
     note: str

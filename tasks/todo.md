@@ -32,6 +32,24 @@
 
 ---
 
+## CRM-TASK-043 经理看板AI解读的接口（2026-10-19）
+
+### 做了什么
+
+- `schemas/ai.py` 新增 `DashboardInsightRequest`：`output_language` 可选，只能是 `zh-CN`、`en`、`ms`，其他值由请求模型返回 422。
+- `routers/ai.py` 新增 `POST /api/ai/dashboard/insight`：用 `require_role("manager")` 挡非经理（它的 403，不调用业务函数、不写审计）；`output_language` 缺省时按当前用户界面语言（`zh` 为 `zh-CN`，其他为 `en`）；调用 `dashboard_insight_service.generate_dashboard_insight` 时传当前用户与 `output_language`；`no_data` 返回 400 `NO_DATA`，其余类别沿用已有的 `_result_response`（成功返回 `request_id`、`headline`、`observations`、`suggestions`、`truncated`）。其他 AI 接口与 status 接口未改，`main.py` 未改。
+- 新增 `backend/tests/test_ai_dashboard_insight_api.py`，打桩业务函数，覆盖验收标准列出的用例 1 至 5，每个测试在 docstring 写明守住的用例。
+
+### 偏离了什么
+
+- 无
+
+### 验证到什么程度
+
+- 测试由 PR 的必需检查 backend 执行，检查结果由 Worker 和 CI 记录不写在这里。
+
+---
+
 ## CRM-TASK-042 经理看板AI解读的提示词、输出校验与业务函数（2026-10-19）
 
 ### 做了什么
