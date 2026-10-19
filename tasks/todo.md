@@ -34,6 +34,26 @@
 
 ---
 
+## CRM-TASK-041 经理看板AI解读快照加每人停滞商机数，批量按商机建议同一规则计算（2026-10-19）
+
+### 做了什么
+
+- `build_team_snapshot` 的 `team` 与每个成员加 `stalled_deals`（`lead` / `following` / `negotiating` 各给 `count` 与两位小数的 `amount`），是 `open_deals` 里停滞的那部分；`team` 为团队全部成员相加，含没放进 `members` 的人。其他键不变。
+- 新增 `_latest_progress`：两次分组查询，一次取团队在途商机各自最新跟进时间（`max(follow_date)`，不分类型），一次取这些商机所属联系人各自最新消息时间（`max(created_at)`，不分方向），范围都用在途商机的子查询限定，查询次数不随商机数变。
+- 新增 `_is_stalled`：最后进展取商机创建时间、最新跟进、最新消息中最晚的一个，`now` 减它的整天数（负数按 0）不小于导入的 `deal_next_step_service.STALL_DAYS` 即停滞。没改 `deal_next_step_service.py` 与 `dashboard_service.py`。
+- 新增 `backend/tests/test_dashboard_insight_stalled.py`，覆盖验收标准列出的用例 1 至 6，每个测试在 docstring 写明守住的验收标准；一致性用例用 2 的幂作商机金额，从停滞金额反推批量判定的商机，与逐个调用 `build_deal_snapshot` 的 `stalled` 比较。
+- `backend/tests/test_dashboard_insight_snapshot.py` 只在成员与 `team` 键集合的断言里加上 `stalled_deals`。
+
+### 偏离了什么
+
+- 无
+
+### 验证到什么程度
+
+- 测试由 PR 的必需检查 backend 执行，检查结果由 Worker 和 CI 记录不写在这里。
+
+---
+
 ## CRM-TASK-040 经理看板AI解读的团队快照组装，不含停滞（2026-10-19）
 
 ### 做了什么

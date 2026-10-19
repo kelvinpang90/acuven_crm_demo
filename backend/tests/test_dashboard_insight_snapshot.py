@@ -266,7 +266,14 @@ async def test_members_include_zero_active_and_exact_keys(async_session_maker):
     await _seed(async_session_maker, _manager(), _user("zed", "Zed"))
     snapshot = await _snapshot(async_session_maker)
     zed = _member(snapshot, "Zed")
-    assert set(zed) == {"name", "is_manager", "this_month", "last_month", "open_deals"}
+    assert set(zed) == {
+        "name",
+        "is_manager",
+        "this_month",
+        "last_month",
+        "open_deals",
+        "stalled_deals",
+    }
     assert zed["this_month"] == {
         "won_amount": "0.00",
         "won_count": 0,
@@ -288,6 +295,7 @@ async def test_members_include_zero_active_and_exact_keys(async_session_maker):
         "this_month",
         "last_month",
         "open_deals",
+        "stalled_deals",
         "avg_sales_cycle_days",
         "remaining_to_target",
     }
