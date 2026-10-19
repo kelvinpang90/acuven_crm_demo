@@ -1,6 +1,6 @@
 # AI 功能质量评测脚本
 
-> 状态：**待批准**（第八节 Q1 至 Q4 等 Kelvin 拍板）。做法（B，写脚本）与打分标准（第六节）Kelvin 2026-10-19 已定，原话「B，打分标准按你的建议」。
+> 状态：**已批准**（Kelvin 2026-10-19，原话「都按你的建议」：第八节 Q1 至 Q4 均按建议，PR kelvinpang90/acuven_crm_demo#111）。做法（B，写脚本）与打分标准（第六节）Kelvin 同日先定，原话「B，打分标准按你的建议」。
 > 设计闸门：不适用。样例全部是自拟的 demo 数据，不碰生产库、不碰真实客户，不改表结构、不改业务代码与接口。按 Kelvin 的要求先出设计再登记。
 > 来由：五份 AI 设计（[inbox-ai-assist.md](inbox-ai-assist.md)、[contact-ai-summary.md](contact-ai-summary.md)、[followup-ai-draft.md](followup-ai-draft.md)、
 > [deal-next-step.md](deal-next-step.md)、[dashboard-ai-insight.md](dashboard-ai-insight.md)）第五节都要求「上线前用 demo 样例评测、Kelvin 打分认可」，
@@ -150,7 +150,7 @@ CI（必需检查 `backend`）里的测试都不调真实模型：
 
 样例的内容要好（像真的客户对话、像真的速记），Worker 按第二节的覆盖清单写，Kelvin 在 PR 里看一遍样例（Q2）。
 
-## 八、需要 Kelvin 拍板
+## 八、需要 Kelvin 拍板（2026-10-19 已定：Q1 至 Q4 均按建议）
 
 | # | 问题 | 选项 | 建议 |
 |---|---|---|---|
