@@ -14,10 +14,16 @@
 <!-- openclaw:planning-v1:begin -->
 ### 当前计划
 
+1. `CRM-TASK-039` AI审计表的客户字段改为可空，供没有客户的AI功能记审计
+2. `CRM-TASK-040` 经理看板AI解读的团队快照组装，不含停滞
+3. `CRM-TASK-041` 经理看板AI解读快照加每人停滞商机数，批量按商机建议同一规则计算
+4. `CRM-TASK-042` 经理看板AI解读的提示词、输出校验与业务函数
+5. `CRM-TASK-043` 经理看板AI解读的接口
+6. `CRM-TASK-044` 经理看板加AI解读卡片
 
 ### 已阻塞
 
-- 待登记：AI 功能上线：为 CRM 建 AI 客户端密钥、配四项环境变量、按四份设计做质量评测（收件箱三项、客户摘要、跟进记录整理、商机下一步建议）、Kelvin 打分认可｜阻塞：等 Billing Hub AI 模块上线（AIH-TASK-063 至 070）
+- 待登记：AI 功能上线：为 CRM 建 AI 客户端密钥、配四项环境变量、按五份设计做质量评测（收件箱三项、客户摘要、跟进记录整理、商机下一步建议、经理看板解读）、Kelvin 打分认可｜阻塞：等 Billing Hub AI 模块上线（AIH-TASK-063 至 070）
 - `CRM-TASK-017` 删掉 CRM 自己的 Meta webhook、网关入口与直连发送及其配置｜阻塞：等第 2 阶段真机验收通过（chatbot 侧 C3、C4 上线并配好第二把密钥）
 
 ### 后续计划
@@ -1863,7 +1869,7 @@ PRECHECK_RESULT: READY
 | 2 | 联系人 | 客户摘要（`crm.contact_summary`；原为 AI API 的契约 v1，按 ai_billing_hub 设计 #281 改为 CRM 自己的内部设计） | 设计 `docs/contact-ai-summary.md` 2026-10-15 已批准（PR kelvinpang90/acuven_crm_demo#75），登记为 CRM-TASK-027 至 029；Q4 的收件箱快照收窄为 CRM-TASK-030 |
 | 3 | 跟进记录 / 任务 | 把员工的速记整理成结构化跟进记录，并生成任务草稿（E-09 原定的「任务草稿」） | 设计 `docs/followup-ai-draft.md` 2026-10-15 已批准（PR kelvinpang90/acuven_crm_demo#89），登记为 CRM-TASK-032 至 034 |
 | 4 | 商机 | 下一步建议、商机停滞的原因说明（只给文字，不改状态） | 设计 `docs/deal-next-step.md` 2026-10-15 已批准（PR kelvinpang90/acuven_crm_demo#97，Q5 定固定 7 天，其余按建议），登记为 CRM-TASK-035 至 038 |
-| 4 | 仪表盘 | 经理看板的数据解读：数字由 CRM 算好，AI 只写解读 | 设计 `docs/dashboard-ai-insight.md` 2026-10-18 已批准（PR kelvinpang90/acuven_crm_demo#108，Q4 选 B 放每人停滞商机数，其余按建议） |
+| 4 | 仪表盘 | 经理看板的数据解读：数字由 CRM 算好，AI 只写解读 | 设计 `docs/dashboard-ai-insight.md` 2026-10-18 已批准（PR kelvinpang90/acuven_crm_demo#108，Q4 选 B 放每人停滞商机数，其余按建议），登记为 CRM-TASK-039 至 044 |
 | 5 | 联系人 | 从聊天里提取客户资料作为建议填入；表格导入时识别列名；疑似重复客户提示（不自动合并，B-05） | 想法 |
 | 5 | 收件箱 | 意图和紧急度标签、按紧急度排序（每条入站消息都要调一次 AI，成本另议） | 想法 |
 | 6 | 分配规则、屋顶项目、AutoCount | 建议分配给谁；根据勘察和完工照片起草报告；汇总客户的单据 | 想法 |
@@ -1876,6 +1882,7 @@ PRECHECK_RESULT: READY
 - [x] 客户摘要设计获 Kelvin 批准（2026-10-15，PR kelvinpang90/acuven_crm_demo#75，第八节 Q1 至 Q4 均按建议），登记 CRM-TASK-027 至 030（见下「登记 CRM-TASK-027 至 030」）
 - [x] 跟进记录 AI 整理设计获 Kelvin 批准（2026-10-15，PR kelvinpang90/acuven_crm_demo#89，Q1 至 Q3 按建议），登记 CRM-TASK-032 至 034（见下「登记 CRM-TASK-032 至 034」）
 - [x] 商机下一步建议设计获 Kelvin 批准（2026-10-15，PR kelvinpang90/acuven_crm_demo#97，Q5 定固定 7 天，其余按建议），登记 CRM-TASK-035 至 038（见下「登记 CRM-TASK-035 至 038」）
+- [x] 经理看板 AI 解读设计获 Kelvin 批准（2026-10-18，PR kelvinpang90/acuven_crm_demo#108，Q4 选 B，其余按建议），登记 CRM-TASK-039 至 044（见下「登记 CRM-TASK-039 至 044」）
 - [ ] AI 模块上线后：建客户端密钥、配四项环境变量、按四份设计（收件箱、客户摘要、跟进记录整理、商机下一步建议各自的第五节）用 demo 数据做质量评测，Kelvin 打分认可（planning-v1「已阻塞」里的待登记行，管理员操作，不是 Worker 任务）
 
 ## 拆分 CRM-TASK-027（2026-10-15）
@@ -1917,6 +1924,56 @@ session verdict: READY
 PRECHECK_RESULT: READY
 用量：Claude 会话 1 次，共 23.9 万 token（其中缓存读取 20.1 万），折合 API 价约 $0.38；周额度读数 52%。
 退出码 0
+```
+
+## 登记 CRM-TASK-039 至 044（2026-10-18）
+
+Kelvin 2026-10-18 批准经理看板 AI 解读设计（kelvinpang90/acuven_crm_demo#108），原话「Q4放每人停滞的商机数，其他按照建议」：Q4 选 B，Q1 至 Q3、Q5 按建议。本段是登记 PR 的记录。
+
+### 做了什么
+
+- `.platform/tasks.yaml`：登记 039–044，全部 `ready`。依赖：039、040 无依赖；041 依赖 040；042 依赖 039、041；043 依赖 042；044 依赖 043。
+- 停滞单独成 041（Q4 选 B）；测试标准都写成编号的用例清单，清单之外的补充覆盖只算非阻塞意见（027 拆分的教训，kelvinpang90/acuven_crm_demo#78）。
+- 迁移编号：039 取 016（审计表 `contact_id` 改可空）；被 017 阻塞的 CRM-TASK-020 改为 017（文件名、`down_revision` 016、测试文件名，依赖由 021 改为 039），`docs/chatbot-replies.md` 第九节同步记一句。
+- planning-v1：「当前计划」为 039 至 044；「AI 功能上线」一行的评测范围加上经理看板解读。
+- 设计按预审补了第九节（三条，见下），正文相应处同步改；Kelvin 2026-10-19 在本 PR 上批准（原话「绿了」，回复的是请他批准第九节、CI 全绿后合并的那条消息）。
+- 与 017 至 020 的文件冲突：018 改 `dashboard_service.py`，本组任务都不改它；020 只改迁移编号。
+
+### 设计闸门与预审
+
+- 设计闸门：六个都适用，都引用 #108（039 改审计表结构加迁移；040、041 组装含员工姓名与业绩的快照；042 把快照发给模型；043 是收发这些内容的接口；044 展示 AI 输出）。
+- `contract_check`：ready to register，六个任务都没有拆分 WARN；planning-v1 `ok, next: CRM-TASK-039`。WARN 只有原有的四条，与本次无关。
+- 预审（设计文件 `docs/dashboard-ai-insight.md`，对登记分支的干净检出）：第 1 轮 039、040、042 READY；041、043 NOT_READY，044 有一个未定项。按设计第九节补了之后，第 2 轮 041、043、044 都 READY。它调模型、不是确定性的，READY 不保证没有缺陷。
+  - 041 的 SCOPE_GAP 与 DESIGN_DEFECT（同一件事）：040 规定成员键恰好五个，041 加 `stalled_deals` 会和它冲突。补：041 可以改 040 的测试文件，只改成员与 `team` 两处键集合的断言（第九节第 1 条）。
+  - 043 的 SCOPE_GAP：FastAPI 0.111 的 `HTTPBearer` 对不带 token 的请求返回 403，「未登录返回 401」过不了。补：照现有 AI 接口测试写「401 或 403」（第九节第 2 条）。
+  - 044 的 UNDECIDED：排行榜换月份时整页回到骨架屏、卡片被卸载，设计写的「不影响卡片」与「看板现有行为不变」矛盾。补：不改看板的加载方式，换月份后卡片清掉（第九节第 3 条）。
+
+```text
+第 1 轮 CRM-TASK-039: (no findings) / session verdict: READY / PRECHECK_RESULT: READY / 退出码 0
+用量：Claude 会话 1 次，共 19.2 万 token（其中缓存读取 16.2 万），折合 API 价约 $0.31；周额度读数 4%。
+第 1 轮 CRM-TASK-040: (no findings) / session verdict: READY / PRECHECK_RESULT: READY / 退出码 0
+用量：Claude 会话 1 次，共 8.6 万 token（其中缓存读取 6.5 万），折合 API 价约 $0.21；周额度读数 4%。
+第 1 轮 CRM-TASK-041:
+PRECHECK_FINDING: SCOPE_GAP backend/tests/test_dashboard_insight_snapshot.py :: CRM-TASK-040 requires member keys to be exactly five and its test case 8 asserts this; adding stalled_deals to members breaks that test, which this task forbids changing and must keep passing.
+PRECHECK_FINDING: DESIGN_DEFECT 4.2 :: The design adds stalled_deals to each member, but CRM-TASK-040's registered criteria fix member keys as exactly five, so the two tasks' acceptance criteria contradict each other.
+session verdict: NOT_READY / PRECHECK_RESULT: NOT_READY / 退出码 1
+用量：Claude 会话 1 次，共 18 万 token（其中缓存读取 15.3 万），折合 API 价约 $0.29；周额度读数 4%。
+第 1 轮 CRM-TASK-042: (no findings) / session verdict: READY / PRECHECK_RESULT: READY / 退出码 0
+用量：Claude 会话 1 次，共 17.9 万 token（其中缓存读取 14.7 万），折合 API 价约 $0.32；周额度读数 4%。
+第 1 轮 CRM-TASK-043:
+PRECHECK_FINDING: SCOPE_GAP backend/app/dependencies.py :: With fastapi==0.111.0, HTTPBearer() rejects a request with no token with 403, not 401, so the required "not logged in returns 401" test can't pass without changing dependencies.py or upgrading FastAPI; existing AI tests accept {401, 403}.
+session verdict: NOT_READY / PRECHECK_RESULT: NOT_READY / 退出码 1
+用量：Claude 会话 1 次，共 22.9 万 token（其中缓存读取 19.6 万），折合 API 价约 $0.35；周额度读数 4%。
+第 1 轮 CRM-TASK-044:
+PRECHECK_FINDING: UNDECIDED 4.5 :: Changing the leaderboard month re-runs load() and swaps the whole page for the Skeleton (ManagerDashboard.tsx:39-55), unmounting the AI card; the design doesn't say how to keep the card while leaving existing dashboard behaviour unchanged.
+session verdict: NOT_READY / judged from the findings, not the session's verdict: READY / PRECHECK_RESULT: READY / 退出码 0
+用量：Claude 会话 1 次，共 10.8 万 token（其中缓存读取 8.4 万），折合 API 价约 $0.25；周额度读数 4%。
+第 2 轮 CRM-TASK-041: (no findings) / session verdict: READY / PRECHECK_RESULT: READY / 退出码 0
+用量：Claude 会话 1 次，共 10.4 万 token（其中缓存读取 8.2 万），折合 API 价约 $0.22；周额度读数 4%。
+第 2 轮 CRM-TASK-043: (no findings) / session verdict: READY / PRECHECK_RESULT: READY / 退出码 0
+用量：Claude 会话 1 次，共 15.6 万 token（其中缓存读取 12.6 万），折合 API 价约 $0.29；周额度读数 4%。
+第 2 轮 CRM-TASK-044: (no findings) / session verdict: READY / PRECHECK_RESULT: READY / 退出码 0
+用量：Claude 会话 1 次，共 15.7 万 token（其中缓存读取 13.3 万），折合 API 价约 $0.24；周额度读数 4%。
 ```
 
 ## 登记 CRM-TASK-035 至 038（2026-10-15）
