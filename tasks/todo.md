@@ -14,16 +14,21 @@
 <!-- openclaw:planning-v1:begin -->
 ### 当前计划
 
-1. `CRM-TASK-039` AI审计表的客户字段改为可空，供没有客户的AI功能记审计
-2. `CRM-TASK-040` 经理看板AI解读的团队快照组装，不含停滞
-3. `CRM-TASK-041` 经理看板AI解读快照加每人停滞商机数，批量按商机建议同一规则计算
-4. `CRM-TASK-042` 经理看板AI解读的提示词、输出校验与业务函数
-5. `CRM-TASK-043` 经理看板AI解读的接口
-6. `CRM-TASK-044` 经理看板加AI解读卡片
+1. `CRM-TASK-045` AI功能质量评测脚本的框架：建数据、调用、报告、打分表与汇总
+2. `CRM-TASK-046` AI评测样例：收件箱简报、起草回复与翻译各10个
+3. `CRM-TASK-047` AI评测样例：客户摘要与跟进记录整理各10个
+4. `CRM-TASK-048` AI评测样例：商机下一步建议10个
+5. `CRM-TASK-039` AI审计表的客户字段改为可空，供没有客户的AI功能记审计
+6. `CRM-TASK-040` 经理看板AI解读的团队快照组装，不含停滞
+7. `CRM-TASK-041` 经理看板AI解读快照加每人停滞商机数，批量按商机建议同一规则计算
+8. `CRM-TASK-042` 经理看板AI解读的提示词、输出校验与业务函数
+9. `CRM-TASK-043` 经理看板AI解读的接口
+10. `CRM-TASK-044` 经理看板加AI解读卡片
+11. `CRM-TASK-049` AI评测样例：经理看板解读8个
 
 ### 已阻塞
 
-- 待登记：AI 功能上线：按五份设计用 demo 数据做质量评测（收件箱三项、客户摘要、跟进记录整理、商机下一步建议、经理看板解读）、Kelvin 打分认可｜阻塞：等 Kelvin 评测打分（Billing Hub AI 模块已上线，CRM 的密钥与四项环境变量已配好）
+- 待登记：AI 功能上线：按五份设计用 demo 数据做质量评测（收件箱三项、客户摘要、跟进记录整理、商机下一步建议、经理看板解读）、Kelvin 打分认可｜阻塞：等评测脚本与样例（CRM-TASK-045 至 049）完成后由 Kelvin 运行打分（Billing Hub AI 模块已上线，CRM 的密钥与四项环境变量已配好）
 - `CRM-TASK-017` 删掉 CRM 自己的 Meta webhook、网关入口与直连发送及其配置｜阻塞：等第 2 阶段真机验收通过（chatbot 侧 C3、C4 上线并配好第二把密钥）
 
 ### 后续计划
@@ -1883,6 +1888,7 @@ PRECHECK_RESULT: READY
 - [x] 跟进记录 AI 整理设计获 Kelvin 批准（2026-10-15，PR kelvinpang90/acuven_crm_demo#89，Q1 至 Q3 按建议），登记 CRM-TASK-032 至 034（见下「登记 CRM-TASK-032 至 034」）
 - [x] 商机下一步建议设计获 Kelvin 批准（2026-10-15，PR kelvinpang90/acuven_crm_demo#97，Q5 定固定 7 天，其余按建议），登记 CRM-TASK-035 至 038（见下「登记 CRM-TASK-035 至 038」）
 - [x] 经理看板 AI 解读设计获 Kelvin 批准（2026-10-18，PR kelvinpang90/acuven_crm_demo#108，Q4 选 B，其余按建议），登记 CRM-TASK-039 至 044（见下「登记 CRM-TASK-039 至 044」）
+- [x] AI 质量评测脚本设计获 Kelvin 批准（2026-10-19，PR kelvinpang90/acuven_crm_demo#111，Q1 至 Q4 按建议），登记 CRM-TASK-045 至 049（见下「登记 CRM-TASK-045 至 049」）
 - [ ] AI 模块上线后：建客户端密钥、配四项环境变量、按四份设计（收件箱、客户摘要、跟进记录整理、商机下一步建议各自的第五节）用 demo 数据做质量评测，Kelvin 打分认可（planning-v1「已阻塞」里的待登记行，管理员操作，不是 Worker 任务）
 
 ## 拆分 CRM-TASK-027（2026-10-15）
@@ -1923,6 +1929,92 @@ PRECHECK_RESULT: READY
 session verdict: READY
 PRECHECK_RESULT: READY
 用量：Claude 会话 1 次，共 23.9 万 token（其中缓存读取 20.1 万），折合 API 价约 $0.38；周额度读数 52%。
+退出码 0
+```
+
+## 登记 CRM-TASK-045 至 049（2026-10-19）
+
+Kelvin 2026-10-19 批准评测脚本设计（kelvinpang90/acuven_crm_demo#111），原话「都按你的建议」：第八节 Q1 至 Q4 均按建议（本机跑、Worker 写样例、前四项排最前、每个样例跑一次）；做法与打分标准同日先定。本段是登记 PR 的记录。
+
+### 做了什么
+
+- `.platform/tasks.yaml`：登记 045–049，全部 `ready`。依赖：045 无依赖；046、047、048 依赖 045；049 依赖 045 与 CRM-TASK-042。
+- planning-v1：「当前计划」改为 045、046、047、048、039、040、041、042、043、044、049（Q3：039 还没开启，评测前四项排最前；049 排在看板任务之后）；
+  「AI 功能上线」一行的阻塞原因改为等 045 至 049 完成后由 Kelvin 运行打分。
+- 设计按预审补了第九节（九条），正文冲突处以第九节为准，待 Kelvin 在本 PR 上批准。
+- 与 017 至 020、039 至 044 没有文件冲突：本组只加 `backend/evals/` 与新测试文件，不改 `backend/app/`。
+
+### 设计闸门与预审
+
+- 设计闸门：不适用（样例全部自拟 demo 数据，不碰生产库与真实客户，不改表结构、业务代码与接口）；按 Kelvin 的要求先出了设计。
+- 预审理由：没有设计闸门，但 045 框架逻辑多、样例任务的行数可能接近拆分线，五个都跑。
+- `contract_check`：ready to register，五个任务都没有拆分 WARN；planning-v1 `ok, next: CRM-TASK-045`。WARN 只有原有的四条，与本次无关。
+- 预审（设计文件 `docs/ai-eval.md`，对登记分支的干净检出）：第 1 轮 046、047、048 READY，045、049 NOT_READY；按第九节第 1 至 6 条补后第 2 轮 049 READY、045 还有三条；
+  按第 7、8 条补后第 3 轮 045 READY，余下三个未定项按第 9 条写死。它调模型、不是确定性的，READY 不保证没有缺陷。
+  - 第 1 轮 045：注入列留空会让所有功能「未评完」→ 第 1 条；error 行与未评完的先后 → 第 2 条；跟进样例给 `now` 会被拒 → 第 3 条；固定时钟的 `now(tz)` → 第 4 条；多个时间字段的写法 → 第 5 条；数字比对方式 → 第 6 条。
+  - 第 1 轮 049：赢单时间与销售目标月份写不出来 → 第 5 条（`won_at_days_ago`、`month_offset`）。
+  - 第 2 轮 045：单据没有 `created_at` → 第 5 条简写改指 `doc_date`；扫哪些字段 → 第 7 条；重跑后合并 → 第 8 条。
+  - 第 3 轮 045 的三个未定项（`now` 的时区、必填字段、退出码）→ 第 9 条。
+
+```text
+第 1 轮 CRM-TASK-045:
+PRECHECK_FINDING: DESIGN_DEFECT 4 :: Non-injection rows must leave injected blank, yet summarize marks a feature unfinished whenever injected is not Y/N, so no feature can ever pass; a blank injection row is also indistinguishable.
+PRECHECK_FINDING: DESIGN_DEFECT 6 :: An error row has blank scores by design, so it triggers both "unfilled score → unfinished" and "error → fail"; precedence, and whether error rows count toward averages, is unstated.
+PRECHECK_FINDING: DESIGN_DEFECT 3 :: If a followup sample sets now, the patched utcnow differs from the runtime-date today and generate_followup_draft returns invalid_input, which is then reported as a broken sample.
+PRECHECK_FINDING: UNDECIDED 5 :: Number matching is unspecified: substring or whole-token comparison (48000 vs snapshot 48000.00), and whether YYYY-MM-DD dates are removed before numbers are extracted.
+PRECHECK_FINDING: UNDECIDED 2 :: Which column days_ago/minutes_ago sets per record type is unspecified, and records needing several times (deal won_at, task due_date, invoice doc_date and due_date) have no notation.
+PRECHECK_FINDING: UNDECIDED 3 :: The fixed-clock subclass's behaviour for now(tz) is unspecified, yet generate_deal_next_step needs aware datetime.now(timezone.utc) while ai_assist_service uses naive utcnow.
+session verdict: NOT_READY
+PRECHECK_RESULT: NOT_READY
+用量：Claude 会话 1 次，共 19.8 万 token（其中缓存读取 14.4 万），折合 API 价约 $0.54；周额度读数 9%。
+退出码 1
+第 1 轮 CRM-TASK-046:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 12.6 万 token（其中缓存读取 10.1 万），折合 API 价约 $0.26；周额度读数 9%。
+退出码 0
+第 1 轮 CRM-TASK-047:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 16.5 万 token（其中缓存读取 13.5 万），折合 API 价约 $0.31；周额度读数 9%。
+退出码 0
+第 1 轮 CRM-TASK-048:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 7.8 万 token（其中缓存读取 5.4 万），折合 API 价约 $0.24；周额度读数 9%。
+退出码 0
+第 1 轮 CRM-TASK-049:
+PRECHECK_FINDING: DESIGN_DEFECT 二 :: The deal sample format has only one days_ago and no key for won_at, but the snapshot counts won deals by won_at; this task can't change seed.py, so cases like last month far better than this month may not be buildable.
+PRECHECK_FINDING: UNDECIDED 二 :: sales_targets uses absolute year and month, but the design says every time is relative to now and doesn't say how a sample names a target month (absolute value or relative offset).
+session verdict: NOT_READY
+PRECHECK_RESULT: NOT_READY
+用量：Claude 会话 1 次，共 18.6 万 token（其中缓存读取 15.3 万），折合 API 价约 $0.34；周额度读数 9%。
+退出码 1
+第 2 轮 CRM-TASK-045:
+PRECHECK_FINDING: DESIGN_DEFECT 第九节第5条 :: The days_ago shorthand means created_at for other records, but documents map to AutocountDocument, which has no created_at (only synced_at, doc_date, due_date), so the shorthand has no target column there.
+PRECHECK_FINDING: UNDECIDED 第三节 :: The design never lists each feature's output fields or which ones the auto-flags scan; AiAssistResult mixes model text with server-computed idle_days, days_in_status and stalled, and followup tasks are dicts.
+PRECHECK_FINDING: UNDECIDED 第三节第4条 :: Re-running unavailable samples with --only writes a new folder whose scores.csv holds only those samples, and summarize reads one CSV; how the sheets are merged is not decided.
+session verdict: READY
+judged from the findings, not the session's verdict: NOT_READY
+PRECHECK_RESULT: NOT_READY
+用量：Claude 会话 1 次，共 30 万 token（其中缓存读取 25.4 万），折合 API 价约 $0.51；周额度读数 10%。
+退出码 1
+第 2 轮 CRM-TASK-049:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 16.2 万 token（其中缓存读取 12.4 万），折合 API 价约 $0.37；周额度读数 10%。
+退出码 0
+第 3 轮 CRM-TASK-045:
+PRECHECK_FINDING: UNDECIDED §9.5 :: When a sample's now has a non-UTC offset, the design doesn't say which timezone gives the date for date columns and the month for month_offset; the answer differs near day and month boundaries.
+PRECHECK_FINDING: UNDECIDED §9.5 :: Records get defaults for unwritten fields, but missing required fields must fail; the design never says which fields per record type are required and which are defaulted.
+PRECHECK_FINDING: UNDECIDED §3 :: The exit code for a run with only ok, error and unavailable results is implied (zero) but not stated, and test 4 checks each category's exit code.
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 33.6 万 token（其中缓存读取 29.5 万），折合 API 价约 $0.49；周额度读数 10%。
 退出码 0
 ```
 
