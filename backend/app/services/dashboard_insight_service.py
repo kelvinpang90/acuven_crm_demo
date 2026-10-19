@@ -5,12 +5,15 @@ from datetime import datetime, timedelta, timezone
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.activity import Activity
 from app.models.deal import Deal
+from app.models.message import Message
 from app.models.sales_target import SalesTarget
 from app.models.user import User
+from app.services.deal_next_step_service import STALL_DAYS
 
 OPEN_STATUSES = ("lead", "following", "negotiating")
 MEMBER_LIMIT = 30
@@ -89,6 +92,34 @@ def _team_month(stats: dict[str, Any]) -> dict[str, Any]:
     return item
 
 
+async def _latest_progress(
+    db: AsyncSession, team_ids: list[str]
+) -> tuple[dict[str, datetime], dict[str, datetime]]:
+    """Latest follow-up per open deal and latest message per their contacts, two grouped queries."""
+    open_filter = (
+        Deal.deleted_at.is_(None),
+        Deal.assigned_to.in_(team_ids),
+        Deal.status.in_(OPEN_STATUSES),
+    )
+    activities = await db.execute(
+        select(Activity.deal_id, func.max(Activity.follow_date))
+        .where(Activity.deal_id.in_(select(Deal.id).where(*open_filter)))
+        .group_by(Activity.deal_id)
+    )
+    messages = await db.execute(
+        select(Message.contact_id, func.max(Message.created_at))
+        .where(Message.contact_id.in_(select(Deal.contact_id).where(*open_filter)))
+        .group_by(Message.contact_id)
+    )
+    return dict(activities.all()), dict(messages.all())
+
+
+def _is_stalled(now: datetime, created_at: datetime, *progress: datetime | None) -> bool:
+    """Same rule as deal_next_step_service: whole idle days since the latest progress."""
+    last = max(_as_utc(value) for value in (created_at, *progress) if value is not None)
+    return max(0, (now - last).days) >= STALL_DAYS
+
+
 async def build_team_snapshot(db: AsyncSession, *, manager: User, now: datetime) -> dict[str, Any]:
     """Build the manager's team figures for this and last UTC month; no AI, no writes."""
     if now.tzinfo is None:
@@ -120,6 +151,7 @@ async def build_team_snapshot(db: AsyncSession, *, manager: User, now: datetime)
             "this_month": _empty_month(),
             "last_month": _empty_month(),
             "open_deals": _empty_open(),
+            "stalled_deals": _empty_open(),
         }
         for user in team
     }
@@ -143,7 +175,15 @@ async def build_team_snapshot(db: AsyncSession, *, manager: User, now: datetime)
             stats[user_id][period]["target_amount"] += Decimal(str(target_amount or 0))
 
     deals = await db.execute(
-        select(Deal.assigned_to, Deal.status, Deal.amount, Deal.won_at, Deal.created_at).where(
+        select(
+            Deal.id,
+            Deal.contact_id,
+            Deal.assigned_to,
+            Deal.status,
+            Deal.amount,
+            Deal.won_at,
+            Deal.created_at,
+        ).where(
             Deal.deleted_at.is_(None),
             Deal.assigned_to.in_(team_ids),
             or_(
@@ -153,13 +193,19 @@ async def build_team_snapshot(db: AsyncSession, *, manager: User, now: datetime)
             ),
         )
     )
+    latest_activity, latest_message = await _latest_progress(db, team_ids)
     cycle_days: list[int] = []
-    for assigned_to, status, amount, won_at, created_at in deals.all():
+    for deal_id, contact_id, assigned_to, status, amount, won_at, created_at in deals.all():
         person = stats[assigned_to]
         amount = Decimal(str(amount or 0))
         if status in OPEN_STATUSES:
             person["open_deals"][status]["count"] += 1
             person["open_deals"][status]["amount"] += amount
+            if _is_stalled(
+                now, created_at, latest_activity.get(deal_id), latest_message.get(contact_id)
+            ):
+                person["stalled_deals"][status]["count"] += 1
+                person["stalled_deals"][status]["amount"] += amount
         if status == "won" and won_at is not None:
             period = months.get(_month_key(won_at))
             if period is not None:
@@ -176,13 +222,15 @@ async def build_team_snapshot(db: AsyncSession, *, manager: User, now: datetime)
 
     team_totals = {"this_month": _empty_month(), "last_month": _empty_month()}
     team_open = _empty_open()
+    team_stalled = _empty_open()
     for person in stats.values():
         for period in team_totals:
             for key, value in person[period].items():
                 team_totals[period][key] += value
-        for status, values in person["open_deals"].items():
-            team_open[status]["count"] += values["count"]
-            team_open[status]["amount"] += values["amount"]
+        for team_counts, key in ((team_open, "open_deals"), (team_stalled, "stalled_deals")):
+            for status, values in person[key].items():
+                team_counts[status]["count"] += values["count"]
+                team_counts[status]["amount"] += values["amount"]
 
     def listed(user: User) -> bool:
         if user.is_active:
@@ -204,6 +252,7 @@ async def build_team_snapshot(db: AsyncSession, *, manager: User, now: datetime)
             "this_month": _member_month(stats[user.id]["this_month"], with_created=True),
             "last_month": _member_month(stats[user.id]["last_month"], with_created=False),
             "open_deals": _format_open(stats[user.id]["open_deals"]),
+            "stalled_deals": _format_open(stats[user.id]["stalled_deals"]),
         }
         for user in candidates[:MEMBER_LIMIT]
     ]
@@ -227,6 +276,7 @@ async def build_team_snapshot(db: AsyncSession, *, manager: User, now: datetime)
             "this_month": _team_month(this_month),
             "last_month": _team_month(team_totals["last_month"]),
             "open_deals": _format_open(team_open),
+            "stalled_deals": _format_open(team_stalled),
             "avg_sales_cycle_days": avg_cycle,
             "remaining_to_target": remaining,
         },
