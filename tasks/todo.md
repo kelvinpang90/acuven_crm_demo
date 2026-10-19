@@ -36,6 +36,24 @@
 
 ---
 
+## CRM-TASK-039 AI审计表的客户字段改为可空，供没有客户的AI功能记审计（2026-10-19）
+
+### 做了什么
+
+- 新增迁移 `backend/alembic/versions/016_ai_requests_contact_nullable.py`（`down_revision` 为 015）：`upgrade` 用 `batch_alter_table` 把 `ai_requests.contact_id` 改为可空，`existing_type` 为 `String(36)`，索引 `idx_ai_requests_contact_id` 保留；`downgrade` 先删除 `contact_id` 为空的行再改回非空，docstring 写明会丢掉这些审计行。不碰其他表与列。
+- 模型 `AiRequest.contact_id` 改为 `Mapped[str | None]`、`nullable=True`，其他列与索引不变。
+- 新增测试 `backend/tests/test_migration_016_ai_requests.py`，覆盖验收标准列出的三个用例；`test_migration_015` 未改。服务、接口、前端与审计写入函数的签名都没改（留给 CRM-TASK-042）。
+
+### 偏离了什么
+
+- 无
+
+### 验证到什么程度
+
+- 测试由 PR 的必需检查 backend 执行，检查结果由 Worker 和 CI 记录不写在这里。
+
+---
+
 ## CRM-TASK-048 AI评测样例：商机下一步建议10个（2026-10-19）
 
 ### 做了什么
