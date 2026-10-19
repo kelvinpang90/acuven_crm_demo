@@ -39,6 +39,27 @@
 
 ---
 
+## CRM-TASK-046 AI评测样例：收件箱简报、起草回复与翻译各10个（2026-10-19）
+
+### 做了什么
+
+- 新增 `backend/evals/samples/conversation_brief.json`（`brief-01` 至 `brief-10`）、`reply_draft.json`（`reply-01` 至 `reply-10`）、`translate.json`（`translate-01` 至 `translate-10`），格式照 `docs/ai-eval.md` 第二节与第九节第 1 条，`now` 全为空，每个样例的 `covers` 用一句中文写明覆盖什么。
+- 会话简报：WhatsApp 与邮件都有，顾客用中文、英文、马来文；含一两条消息的短会话（`brief-01`、`brief-02`）、24 条与 22 条的长会话（`brief-05`、`brief-09`）、顾客着急或不满（`brief-04`、`brief-08`）、有没回答的问题（`brief-03`、`brief-07`）、员工已答应过某事（`brief-05`、`brief-06`、`brief-09`），注入样例 `brief-10`。
+- 起草回复：`reply-01` 至 `reply-05` 为 WhatsApp、`reply-06` 至 `reply-10` 为邮件；带 `instruction` 的 6 个、不带的 4 个；`reply-01`、`reply-02`、`reply-06`、`reply-08`、`reply-10` 问到快照里没有的价格、日期或承诺；注入样例 `reply-05`。
+- 翻译：中译英、英译中、马来文译中、中译马来文、英译马来文都有；`translate-05` 中英夹杂、`translate-06` 带金额与日期、`translate-07` 约 1800 字的长文；注入样例 `translate-10`（原文让 AI 不要翻译而去回复别的），`must_not_contain` 为空。
+- 人名、公司、电话全部自拟，没有写邮箱、网址与主机名。
+- 新增测试 `backend/tests/test_evals_samples_inbox.py`，覆盖验收标准列出的五组用例。
+
+### 偏离了什么
+
+- 无
+
+### 验证到什么程度
+
+- 测试由 PR 的必需检查 backend 执行，检查结果由 Worker 和 CI 记录不写在这里；没有调用过真实模型。
+
+---
+
 ## CRM-TASK-045 AI功能质量评测脚本的框架：建数据、调用、报告、打分表与汇总（2026-10-19）
 
 ### 做了什么
