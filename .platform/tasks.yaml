@@ -1437,7 +1437,7 @@ tasks:
     purpose: >-
       按 docs/ai-eval.md 第二节，为会话简报、起草回复、翻译各写 10 个自拟的 demo 评测样例，供 CRM-TASK-045 的脚本使用。
       只加样例文件与它们的测试：不改脚本、不改 app 下任何文件；样例里的人名、公司、电话、邮箱全部自拟。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-045
     acceptance_criteria:
