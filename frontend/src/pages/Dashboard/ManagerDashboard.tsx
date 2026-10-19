@@ -6,6 +6,7 @@ import KpiCard from '@/components/charts/KpiCard';
 import FunnelChart from '@/components/charts/FunnelChart';
 import LeaderboardTable from '@/components/charts/LeaderboardTable';
 import Skeleton from '@/components/common/Skeleton';
+import DashboardAiInsight from './DashboardAiInsight';
 
 const KPI_LABELS: Record<string, string> = {
   team_monthly_gmv: 'teamMonthlyGmv',
@@ -68,6 +69,8 @@ export default function ManagerDashboard() {
           />
         ))}
       </div>
+
+      <DashboardAiInsight />
 
       {/* Funnel + Leaderboard */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

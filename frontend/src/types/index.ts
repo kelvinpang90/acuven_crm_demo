@@ -284,6 +284,14 @@ export interface AiDealNextStep {
   truncated: boolean;
 }
 
+export interface AiDashboardInsight {
+  request_id: string | null;
+  headline: string;
+  observations: string[];
+  suggestions: string[];
+  truncated: boolean;
+}
+
 export type AiLanguage = 'zh-CN' | 'en' | 'ms';
 
 export interface AiReplyDraft {

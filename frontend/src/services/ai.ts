@@ -1,5 +1,5 @@
 import api from './api';
-import type { AiContactSummary, AiConversationBrief, AiDealNextStep, AiFollowUpDraft, AiLanguage, AiReplyDraft, AiStatus, AiTranslation, ApiResponse } from '@/types';
+import type { AiContactSummary, AiConversationBrief, AiDashboardInsight, AiDealNextStep, AiFollowUpDraft, AiLanguage, AiReplyDraft, AiStatus, AiTranslation, ApiResponse } from '@/types';
 
 let aiStatusPromise: Promise<AiStatus> | null = null;
 
@@ -28,6 +28,13 @@ export const aiApi = {
   createDealNextStep: (dealId: string, outputLanguage?: 'zh-CN' | 'en') =>
     api.post<ApiResponse<AiDealNextStep>>(
       `/ai/deals/${dealId}/next-step`,
+      outputLanguage ? { output_language: outputLanguage } : {},
+      { timeout: 58000 },
+    ),
+
+  createDashboardInsight: (outputLanguage?: 'zh-CN' | 'en') =>
+    api.post<ApiResponse<AiDashboardInsight>>(
+      '/ai/dashboard/insight',
       outputLanguage ? { output_language: outputLanguage } : {},
       { timeout: 58000 },
     ),
