@@ -40,6 +40,26 @@
 
 ---
 
+## CRM-TASK-045 AI功能质量评测脚本的框架：建数据、调用、报告、打分表与汇总（2026-10-19）
+
+### 做了什么
+
+- 新增 `backend/evals` 包与 `python -m evals run` / `summarize` 两条命令：`seed.py` 把每个样例建进独立的内存 SQLite（八类记录、相对 `now` 的时间写法、`month_offset`、key 换 id、只有看板样例能给 `now`）；
+  `features.py` 是七个功能的适配、`send_message` 的记录包装与固定时钟；`flags.py` 是 `NUM` 与 `INJECTED` 两种自动标记；`report.py` 写自包含的 `report.html` 与带 BOM 的 `scores.csv`；`summarize.py` 按设计第六节与第九节第 2 条判每个功能。
+- `run` 先检查 AI 配置与 `--out` 位置，再把所有选中的样例先建一遍数据、建不出来就列出样例 id 并退出（这时还没有调用 AI），之后逐个串行调用；看板的业务函数导入失败时跳过该功能并说明。
+- `summarize` 收多份打分表时，`summary.md` 写在最后一份打分表的旁边。
+- 新增测试 `backend/tests/test_evals_framework.py`，用测试文件自带的小样例、打桩 `send_message`，覆盖验收标准列出的八组用例。
+
+### 偏离了什么
+
+- 只有 users、contacts、deals 的 `key` 必填，其他记录的 `key` 可省（设计第二节的例子里跟进记录与消息就没有 `key`），给了照样换成 id。
+
+### 验证到什么程度
+
+- 测试由 PR 的必需检查 backend 执行，检查结果由 Worker 和 CI 记录不写在这里；没有调用过真实模型。
+
+---
+
 ## CRM-TASK-038 漏斗商机弹窗加AI下一步建议卡片，显示停滞天数（2026-10-16）
 
 ### 做了什么
