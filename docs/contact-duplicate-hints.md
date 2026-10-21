@@ -1,6 +1,6 @@
 # 疑似重复客户提示
 
-> 状态：**待批准**（第八节 Q1 至 Q5 等 Kelvin 拍板）。批准后登记的任务，设计闸门引用本文件所在的 PR。
+> 状态：**已批准**（Kelvin 2026-10-21，原话「按建议」：第八节 Q1 至 Q5 均按建议，PR kelvinpang90/acuven_crm_demo#135）。登记的任务，设计闸门引用 kelvinpang90/acuven_crm_demo#135。
 > 设计闸门的理由：要把其他客户的姓名、公司、电话、邮箱展示给员工（个人数据的展示范围），并改变导入的行为。不新增表、不加迁移。
 > 上位决定：`acuven_hub` 的 `DECISIONS.md` B-05（手机号或聊天身份相同**不能自动合并**）、A-18。
 > 来由：任务八优先 5 的「联系人：疑似重复客户提示（不自动合并，B-05）」。
@@ -86,7 +86,7 @@ AI 能多抓的是「Tan Hardware Sdn Bhd」与「TAN HARDWARE」、「陈先生
 - **导入变慢**：每行两次等值查询，有索引（电话有，邮箱没有：邮箱按小写比较用不上索引，Q5 一并决定是否给 `email` 加索引）。导入本来就是同步一次请求，几千行内可以接受。
 - **并发**：两人同时建同一个客户都会通过查重，事后在详情面板里会互相显示为重复。
 
-## 八、登记时怎么拆、需要拍板
+## 八、登记时怎么拆、需要拍板（2026-10-21 已定：Q1 至 Q5 均按建议）
 
 1. 业务：`duplicate_service`（6.1）与测试。路径：`backend/app/services/duplicate_service.py`（新）、`backend/tests/test_duplicate_service.py`（新）、`tasks/todo.md`
 2. 接口：6.2。路径：`backend/app/routers/contacts.py`、`backend/app/schemas/contact.py`、`backend/tests/test_contact_duplicates_api.py`（新）、`tasks/todo.md`；依赖 1

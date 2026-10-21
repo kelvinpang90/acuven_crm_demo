@@ -1,6 +1,6 @@
 # 从聊天里提取客户资料（`crm.contact_extract`）
 
-> 状态：**待批准**（第八节 Q1 至 Q4 等 Kelvin 拍板）。批准后登记的任务，设计闸门引用本文件所在的 PR。
+> 状态：**已批准**（Kelvin 2026-10-21，原话「按建议」：第八节 Q1 至 Q4 均按建议，PR kelvinpang90/acuven_crm_demo#135）。登记的任务，设计闸门引用 kelvinpang90/acuven_crm_demo#135。
 > 设计闸门的理由：要把客户的聊天正文与现有资料发给模型，并把模型找到的电话、邮箱、地址等个人数据展示给员工、经员工确认后写回客户资料。不新增表，审计沿用 `ai_requests`。
 > 上位决定：`acuven_hub` 的 `DECISIONS.md` E-12（发给模型的字段不设限制）、E-14、E-16、E-17、A-18（CRM 定为 demo）、B-05（不自动合并客户）。
 > 来由：任务八（`tasks/todo.md`「CRM 里可以加 AI 辅助的地方」）优先 5 的「联系人：从聊天里提取客户资料作为建议填入」。基础沿用 [inbox-ai-assist.md](inbox-ai-assist.md) 与 [contact-ai-summary.md](contact-ai-summary.md)。
@@ -123,7 +123,7 @@ chatbot 访客进来时，CRM 只知道 WhatsApp 号码和头像名，公司、�
 
 全部有设计闸门（引用本设计的 PR），登记前跑设计预审。不改表结构、不加迁移，不改现有的联系人接口。
 
-## 八、需要 Kelvin 拍板
+## 八、需要 Kelvin 拍板（2026-10-21 已定：Q1 至 Q4 均按建议）
 
 | # | 问题 | 选项 | 建议 |
 |---|---|---|---|
