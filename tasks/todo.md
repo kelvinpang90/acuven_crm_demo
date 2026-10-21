@@ -14,14 +14,35 @@
 <!-- openclaw:planning-v1:begin -->
 ### 当前计划
 
+1. `CRM-TASK-050` 从聊天提取客户资料的快照组装与行业常量
+2. `CRM-TASK-051` 从聊天提取客户资料的提示词、出处校验与业务函数
+3. `CRM-TASK-052` 从聊天提取客户资料的接口
+4. `CRM-TASK-053` 联系人详情面板加从聊天提取资料，勾选后填入
+5. `CRM-TASK-054` AI评测样例：从聊天提取客户资料10个
+6. `CRM-TASK-055` 导入客户接口支持列对应表，并修正导入结果的返回结构
+7. `CRM-TASK-056` 导入表格识别列名的提示词、输出校验与业务函数
+8. `CRM-TASK-057` 导入表格识别列名的接口
+9. `CRM-TASK-058` 导入页加列对应表与AI识别列，修正结果卡片与预览计数
+10. `CRM-TASK-059` AI评测样例：导入表格识别列名10个
+11. `CRM-TASK-060` 疑似重复客户的判定规则与查询，按可见范围分组
+12. `CRM-TASK-061` 疑似重复客户的查询接口：新建前检查与客户的疑似重复
+13. `CRM-TASK-062` 导入客户时按电话或邮箱跳过疑似重复，可选择照导
+14. `CRM-TASK-063` 新建客户表单与详情面板显示疑似重复提示
+15. `CRM-TASK-064` 导入页加疑似重复的也导入勾选框
+16. `CRM-TASK-065` 会话意图与紧急度标签表，以及AI审计表的员工字段改为可空
+17. `CRM-TASK-066` 会话意图与紧急度的快照、提示词、校验与打标签函数
+18. `CRM-TASK-067` chatbot顾客消息进来后在后台触发会话意图与紧急度标注
+19. `CRM-TASK-068` 收件箱消息列表返回会话标签，未读页可按紧急度排序
+20. `CRM-TASK-069` 收件箱显示会话意图与紧急度标签，未读页可按紧急度排序
 
 ### 已阻塞
 
-- 待登记：AI 功能上线：按五份设计用 demo 数据做质量评测（收件箱三项、客户摘要、跟进记录整理、商机下一步建议、经理看板解读）、Kelvin 打分认可｜阻塞：等评测脚本与样例（CRM-TASK-045 至 049）完成后由 Kelvin 运行打分（Billing Hub AI 模块已上线，CRM 的密钥与四项环境变量已配好）
+- 待登记：AI 功能上线：按五份设计用 demo 数据做质量评测（收件箱三项、客户摘要、跟进记录整理、商机下一步建议、经理看板解读）、Kelvin 打分认可｜阻塞：等 Kelvin 在本机运行评测脚本并打分（评测脚本与样例 CRM-TASK-045 至 049 已完成，Billing Hub AI 模块已上线，CRM 的密钥与四项环境变量已配好）
 - `CRM-TASK-017` 删掉 CRM 自己的 Meta webhook、网关入口与直连发送及其配置｜阻塞：等第 2 阶段真机验收通过（chatbot 侧 C3、C4 上线并配好第二把密钥）
 
 ### 后续计划
 
+- `CRM-TASK-070` AI评测样例：会话意图与紧急度12个
 - `CRM-TASK-018` 去掉 is_gateway 的全部用处，原有网关联系人回到列表与统计
 - `CRM-TASK-019` 联系人模型取消 is_gateway 映射，列先留在库里
 - `CRM-TASK-020` 删除联系人表的 is_gateway 列
@@ -2093,6 +2114,7 @@ PRECHECK_RESULT: READY
 - [x] 商机下一步建议设计获 Kelvin 批准（2026-10-15，PR kelvinpang90/acuven_crm_demo#97，Q5 定固定 7 天，其余按建议），登记 CRM-TASK-035 至 038（见下「登记 CRM-TASK-035 至 038」）
 - [x] 经理看板 AI 解读设计获 Kelvin 批准（2026-10-18，PR kelvinpang90/acuven_crm_demo#108，Q4 选 B，其余按建议），登记 CRM-TASK-039 至 044（见下「登记 CRM-TASK-039 至 044」）
 - [x] AI 质量评测脚本设计获 Kelvin 批准（2026-10-19，PR kelvinpang90/acuven_crm_demo#111，Q1 至 Q4 按建议），登记 CRM-TASK-045 至 049（见下「登记 CRM-TASK-045 至 049」）
+- [x] 优先 5 的四份设计获 Kelvin 批准（2026-10-21，PR kelvinpang90/acuven_crm_demo#135，均按建议），登记 CRM-TASK-050 至 070（见下「登记 CRM-TASK-050 至 070」）
 - [ ] AI 模块上线后：建客户端密钥、配四项环境变量、按四份设计（收件箱、客户摘要、跟进记录整理、商机下一步建议各自的第五节）用 demo 数据做质量评测，Kelvin 打分认可（planning-v1「已阻塞」里的待登记行，管理员操作，不是 Worker 任务）
 
 ## 拆分 CRM-TASK-027（2026-10-15）
@@ -2133,6 +2155,340 @@ PRECHECK_RESULT: READY
 session verdict: READY
 PRECHECK_RESULT: READY
 用量：Claude 会话 1 次，共 23.9 万 token（其中缓存读取 20.1 万），折合 API 价约 $0.38；周额度读数 52%。
+退出码 0
+```
+
+## 登记 CRM-TASK-050 至 070（2026-10-21）
+
+Kelvin 2026-10-21 批准优先 5 的四份设计（kelvinpang90/acuven_crm_demo#135），原话「按建议」：四份设计第八节的问题全部按建议。本段是登记 PR 的记录。
+
+### 做了什么
+
+- `.platform/tasks.yaml`：登记 050–070，全部 `ready`：050–054 从聊天提取客户资料，055–059 导入识别列名，060–064 疑似重复提示（不用 AI），065–070 收件箱意图与紧急度。
+- 依赖：同一功能内按层串起来；跨功能按改同一批文件排先后（061、062 依赖 055；063 依赖 053；064 依赖 058；059 依赖 054；070 依赖 059）。
+- 迁移编号：065 取 017（会话标签表、`ai_requests.user_id` 改可空）；被 017 阻塞的 CRM-TASK-020 删列迁移顺延为 018（依赖由 039 改为 065）。
+- planning-v1：「当前计划」为 050 至 069（20 项上限），070 放「后续计划」第一项；「AI 功能上线」一行的阻塞原因改为等 Kelvin 运行评测打分（045–049 已完成）。
+- 四份设计各补了第九节（拆分时写死的细节与预审补的），待 Kelvin 在本 PR 上批准；与正文冲突处以第九节为准。
+
+### 设计闸门与预审
+
+- 设计闸门：都引用 #135（提取与识别列名把个人数据发给模型；查重展示其他客户的个人数据并改变导入；意图紧急度自动外发聊天、存 AI 标签并加迁移；评测样例任务按所属设计算）。
+- `contract_check`：ready to register，21 个任务都没有拆分 WARN；planning-v1 `ok, next: CRM-TASK-050`。WARN 只有原有的四条，与本次无关。
+- 预审（各任务对应的设计文件，对登记分支的干净检出）：第 1 轮 21 个里 9 个无发现或只有未定项、12 个 NOT_READY 或有未定项；按发现补设计第九节与验收标准后，第 2 至 6 轮只重跑有发现的任务，最后一轮全部 READY；
+  余下的未定项（050 不按 now 过滤、060 号码名字两边都看、063 新建页不可点、053 提交前去空白、058 第一行与预览计数）直接写进验收标准。它调模型、不是确定性的，READY 不保证没有缺陷。
+- 主要的真缺陷与处理（详见各设计第九节）：公司名规范化先去空白导致后缀去不掉、且不按整词去后缀会误伤（060）；连发合并不起来，后台任务改为先等 20 秒（066、067）；写入前不再查一次会让旧结果覆盖新结果（066）；
+  未来时间的消息会冻结标签（066）；导入列对应表前后端对表头的读法、去空白与工作表不一致（055、058）；只加商机的表格被「必须有名字列」挡住（055、058）；电话出处比对会和相邻数字连在一起（051）；评测样例引用不了消息（070）。
+
+```text
+第 1 轮 CRM-TASK-050:
+PRECHECK_FINDING: DESIGN_DEFECT 三 :: With body ≤1000, subject ≤100 and name ≤100, a one-message snapshot is at most ~7.5 KB even with   escapes, so the required test "only 1 message left and still over 16 KiB" can't be built from real data.
+PRECHECK_FINDING: UNDECIDED backend/tests/test_contact_extract_snapshot.py :: Neither the design nor the criteria say whether the test may lower the 16 KiB limit (patch a module constant) to reach the single-message-still-oversized case; this needs to be stated explicitly.
+session verdict: NOT_READY
+PRECHECK_RESULT: NOT_READY
+用量：Claude 会话 1 次，共 18.9 万 token（其中缓存读取 15.9 万），折合 API 价约 $0.33；周额度读数 32%。
+退出码 1
+第 1 轮 CRM-TASK-051:
+PRECHECK_FINDING: DESIGN_DEFECT 第五节 :: Address value is allowed 1-300 chars but must appear inside evidence capped at 200, so 201-300 is unreachable and a long address fails the whole call as AI error.
+PRECHECK_FINDING: DESIGN_DEFECT 第九节 :: The phone-fragment pattern of digits, spaces, dashes and brackets merges a number with adjacent digits (e.g. "012-3456789 10 am"), so a correct phone suggestion fails and the whole call is rejected.
+PRECHECK_FINDING: UNDECIDED backend/app/services/ai_assist_service.py :: AiAssistResult already has suggestions typed list[str] for dashboard insight; the contract says add it but does not say to reuse it and widen its type for the extract's dicts.
+PRECHECK_FINDING: UNDECIDED 4.1 :: Unclear whether no_messages checks all stored inbound messages or only the snapshot; if no inbound message is in the last 40 or survives the 16 KiB trim, the model is called with nothing to extract from.
+session verdict: READY
+judged from the findings, not the session's verdict: NOT_READY
+PRECHECK_RESULT: NOT_READY
+用量：Claude 会话 1 次，共 39.1 万 token（其中缓存读取 33.9 万），折合 API 价约 $0.57；周额度读数 32%。
+退出码 1
+第 1 轮 CRM-TASK-052:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 6.3 万 token（其中缓存读取 4.6 万），折合 API 价约 $0.17；周额度读数 32%。
+退出码 0
+第 1 轮 CRM-TASK-053:
+PRECHECK_FINDING: UNDECIDED frontend/src/pages/Contacts/ContactDetailPanel.tsx :: onRefresh only reloads the list while index.tsx keeps the stale selected contact, so refreshing the panel and the re-check need local contact state in the panel (index.tsx is not an allowed path).
+PRECHECK_FINDING: UNDECIDED 4.3 :: The design does not say what happens when an employee clears an editable suggested value to an empty string (untick, block, or submit it; an empty email fails the PUT with 422).
+PRECHECK_FINDING: UNDECIDED 4.3 :: The design does not say whether the editable industry value is free text or a select limited to the existing INDUSTRIES list.
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 20.5 万 token（其中缓存读取 16.9 万），折合 API 价约 $0.37；周额度读数 32%。
+退出码 0
+第 1 轮 CRM-TASK-054:
+PRECHECK_FINDING: UNDECIDED backend/evals/samples/contact_extract.json :: A customer-email sample is required, but the criteria ban any hostname and every email has a domain; they must say which email domain form is allowed (e.g. a reserved test domain) or exempt email domains.
+session verdict: NOT_READY
+judged from the findings, not the session's verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 55.9 万 token（其中缓存读取 48.9 万），折合 API 价约 $0.77；周额度读数 32%。
+退出码 0
+第 1 轮 CRM-TASK-055:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 9.7 万 token（其中缓存读取 7.6 万），折合 API 价约 $0.21；周额度读数 32%。
+退出码 0
+第 1 轮 CRM-TASK-056:
+PRECHECK_FINDING: UNDECIDED backend/app/services/import_columns_service.py :: The task does not say whether the user message sends trimmed or original header text, or which form validate_import_columns compares, so the header-set equality check depends on the implementer's choice.
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 16.4 万 token（其中缓存读取 12.6 万），折合 API 价约 $0.37；周额度读数 32%。
+退出码 0
+第 1 轮 CRM-TASK-057:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 13.1 万 token（其中缓存读取 10.9 万），折合 API 价约 $0.23；周额度读数 32%。
+退出码 0
+第 1 轮 CRM-TASK-058:
+PRECHECK_FINDING: DESIGN_DEFECT 4.4 :: Filling AI suggestions only into 不导入 columns can assign a field already hand-picked for another column, violating the one-column-per-field rule from section 2; the design does not say to drop such suggestions.
+PRECHECK_FINDING: DESIGN_DEFECT 3 :: Sending every column to AI includes repeated, blank, or truncation-collided headers, which section 9.2 makes the backend reject as invalid_input, so such sheets always fail AI identify; excluding them and mapping truncated headers back is unspecified.
+PRECHECK_FINDING: UNDECIDED 2 :: SheetJS keys rename repeated and blank headers (电话_1, __EMPTY), so the raw header row must be read for duplicate detection and column_map keys; how a blank-header column appears in column_map is not decided.
+PRECHECK_FINDING: UNDECIDED 4.4 :: Dropdowns must show 中文字段名 yet the text goes into both en and zh locales; whether the English UI shows Chinese or English field labels is not decided.
+PRECHECK_FINDING: UNDECIDED 4.4 :: A column the user explicitly set to 不导入 cannot be told apart from the default, so the design does not say whether AI may overwrite it.
+session verdict: READY
+judged from the findings, not the session's verdict: NOT_READY
+PRECHECK_RESULT: NOT_READY
+用量：Claude 会话 1 次，共 13.7 万 token（其中缓存读取 10.3 万），折合 API 价约 $0.36；周额度读数 33%。
+退出码 1
+第 1 轮 CRM-TASK-059:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 24.9 万 token（其中缓存读取 20.1 万），折合 API 价约 $0.47；周额度读数 32%。
+退出码 0
+第 1 轮 CRM-TASK-060:
+PRECHECK_FINDING: DESIGN_DEFECT 6.1 :: normalize_company strips whitespace before suffixes, so "sdn bhd" can never match (Tan Hardware Sdn Bhd ≠ TAN HARDWARE), and word-boundary-free stripping turns Zinc→z, Mexico→mexi, giving false name_company hits.
+PRECHECK_FINDING: DESIGN_DEFECT 9 :: The raw 3-char ILIKE prefix filter drops pairs the name_company rule calls duplicates (T.A.N. Hardware vs Tan Hardware, A-1 vs A1, leading space), and the 200 cap has no order, so results contradict section 3.
+PRECHECK_FINDING: UNDECIDED 3 :: The email rule does not say that blank or whitespace-only emails are skipped (as unnormalizable phones are), nor whether the stored side is trimmed when the query only applies lower().
+PRECHECK_FINDING: UNDECIDED 9 :: How to strip suffixes from the raw company text before taking the prefix (case, punctuation like "Sdn. Bhd.") and whether to escape % and _ in the ILIKE pattern are left open.
+session verdict: NOT_READY
+PRECHECK_RESULT: NOT_READY
+用量：Claude 会话 1 次，共 11.4 万 token（其中缓存读取 8.8 万），折合 API 价约 $0.30；周额度读数 33%。
+退出码 1
+第 1 轮 CRM-TASK-061:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 17.2 万 token（其中缓存读取 14.4 万），折合 API 价约 $0.29；周额度读数 33%。
+退出码 0
+第 1 轮 CRM-TASK-062:
+PRECHECK_FINDING: UNDECIDED 九.3 :: The reason's "row N" numbering is undefined: error rows count spreadsheet rows from 2 (header is row 1), but test case 3 expects the first data row to be "row 1", so the reason and the error's row field cannot both match.
+PRECHECK_FINDING: DESIGN_DEFECT 6.3 :: Contacts from earlier rows are flushed before later rows are checked, so they already count as existing non-deleted customers and the "same as existing customer" reason always fires before "same as row N"; precedence or exclusion is not specified.
+PRECHECK_FINDING: UNDECIDED 6.3 :: No rule says which single reason to record when phone and email both match, or what the error's field key and message language should be (existing messages are English, the required reason text is Chinese).
+session verdict: NOT_READY
+PRECHECK_RESULT: NOT_READY
+用量：Claude 会话 1 次，共 21.1 万 token（其中缓存读取 18.3 万），折合 API 价约 $0.33；周额度读数 33%。
+退出码 1
+第 1 轮 CRM-TASK-063:
+PRECHECK_FINDING: SCOPE_GAP frontend/src/pages/Contacts/index.tsx :: Switching the detail panel to a clicked duplicate needs a new parent callback in index.tsx, which owns `selected` and binds Edit/Delete/Archive to it; switching inside the panel alone would make those actions hit the wrong contact.
+PRECHECK_FINDING: UNDECIDED 6.4 :: The design does not say whether duplicate-check is sent, or the hint is cleared, when name, company, email and phone are all empty after a blur.
+session verdict: NOT_READY
+PRECHECK_RESULT: NOT_READY
+用量：Claude 会话 1 次，共 15.3 万 token（其中缓存读取 12 万），折合 API 价约 $0.33；周额度读数 33%。
+退出码 1
+第 1 轮 CRM-TASK-064:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 9.5 万 token（其中缓存读取 7 万），折合 API 价约 $0.24；周额度读数 33%。
+退出码 0
+第 1 轮 CRM-TASK-065:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 16 万 token（其中缓存读取 13.4 万），折合 API 价约 $0.27；周额度读数 33%。
+退出码 0
+第 1 轮 CRM-TASK-066:
+PRECHECK_FINDING: DESIGN_DEFECT §6 :: The newer-message check runs only before the AI call, so a slow run for an older message can overwrite a newer run's label; §6's claim that the later write reflects the latest message is false without a check at write time.
+PRECHECK_FINDING: UNDECIDED §9 :: Nothing says what classify_conversation does when message_id is an outbound message from the same customer: skip it or tag it.
+session verdict: NOT_READY
+PRECHECK_RESULT: NOT_READY
+用量：Claude 会话 1 次，共 21.6 万 token（其中缓存读取 18 万），折合 API 价约 $0.38；周额度读数 33%。
+退出码 1
+第 1 轮 CRM-TASK-067:
+PRECHECK_FINDING: DESIGN_DEFECT 第二节 :: BackgroundTasks run right after the response, so each burst message's task finds no newer message and calls AI; bursts aren't merged, contradicting §2 cost claim and the DEPLOY.md text the acceptance criteria require.
+PRECHECK_FINDING: DESIGN_DEFECT 第九节 :: "Newer" uses created_at taken from the chatbot's unbounded occurred_at, so one future-dated inbound message marks every later real message superseded and freezes the label until that time passes.
+session verdict: NOT_READY
+PRECHECK_RESULT: NOT_READY
+用量：Claude 会话 1 次，共 12.5 万 token（其中缓存读取 9.9 万），折合 API 价约 $0.28；周额度读数 33%。
+退出码 1
+第 1 轮 CRM-TASK-068:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 17.9 万 token（其中缓存读取 14.8 万），折合 API 价约 $0.32；周额度读数 33%。
+退出码 0
+第 1 轮 CRM-TASK-069:
+PRECHECK_FINDING: UNDECIDED 4.4 :: For normal and low urgency, the design says the text appears only on hover, while the acceptance criterion only says no colour; it is unclear whether the urgency word shows in the row or only in a tooltip.
+PRECHECK_FINDING: UNDECIDED frontend/src/pages/Inbox/index.tsx :: Not specified whether the time/urgency sort choice is kept or reset when leaving and returning to the Unread tab, or whether sort is sent on other tabs.
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 12.5 万 token（其中缓存读取 10.3 万），折合 API 价约 $0.24；周额度读数 33%。
+退出码 0
+第 1 轮 CRM-TASK-070:
+PRECHECK_FINDING: SCOPE_GAP backend/evals/seed.py :: The message param must become a message id, but only seed.py's PARAM_REFERENCES (contact, deal) does key-to-id replacement and the adapter has no key map; seed.py is not in allowed_change_paths.
+session verdict: NOT_READY
+PRECHECK_RESULT: NOT_READY
+用量：Claude 会话 1 次，共 21.7 万 token（其中缓存读取 17.6 万），折合 API 价约 $0.42；周额度读数 33%。
+退出码 1
+第 2 轮 CRM-TASK-050:
+PRECHECK_FINDING: UNDECIDED §4.1 :: build_extract_snapshot takes now but nothing says whether messages created after now are excluded from the latest 40; the summary service ignores now, which is the likely intent.
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 12 万 token（其中缓存读取 9.3 万），折合 API 价约 $0.27；周额度读数 33%。
+退出码 0
+第 2 轮 CRM-TASK-051:
+PRECHECK_FINDING: DESIGN_DEFECT 五 :: Validation accepts a name value of 1§200 characters, but contacts.name is String(100) and ContactUpdate has no max_length, so a valid 150-character name suggestion passes but cannot be saved; limit name to 1§100.
+session verdict: NOT_READY
+PRECHECK_RESULT: NOT_READY
+用量：Claude 会话 1 次，共 26.3 万 token（其中缓存读取 22.4 万），折合 API 价约 $0.44；周额度读数 33%。
+退出码 1
+第 2 轮 CRM-TASK-053:
+PRECHECK_FINDING: DESIGN_DEFECT 4.3 :: Pre-fill "still empty" check compares against the panel's stale contact prop, which nothing refreshes, so a colleague's edit after extraction is never detected and gets overwritten; re-fetch the contact before checking.
+PRECHECK_FINDING: UNDECIDED 4.3 :: Fill-failure "reason" unspecified: invalid email returns FastAPI default 422 detail without error.code, and no locale keys or mapping are given for update failures, nor whether to pre-validate email client-side.
+session verdict: NOT_READY
+PRECHECK_RESULT: NOT_READY
+用量：Claude 会话 1 次，共 21.2 万 token（其中缓存读取 16.8 万），折合 API 价约 $0.46；周额度读数 33%。
+退出码 1
+第 2 轮 CRM-TASK-054:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 39.6 万 token（其中缓存读取 34.4 万），折合 API 价约 $0.55；周额度读数 33%。
+退出码 0
+第 2 轮 CRM-TASK-056:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 17.6 万 token（其中缓存读取 14.6 万），折合 API 价约 $0.31；周额度读数 33%。
+退出码 0
+第 2 轮 CRM-TASK-058:
+PRECHECK_FINDING: DESIGN_DEFECT 九.6 :: Untouched auto-matched or earlier AI-filled columns can be overwritten; filling in column order with an occupied-field check then drops valid suggestions (B→phone dropped while A still holds phone and moves to company), and whether null clears is unspecified.
+PRECHECK_FINDING: UNDECIDED 九.5 :: For a repeated header group, unclear whether the first (manually mappable) column is sent to the AI or the whole group is excluded as not mutually distinct.
+PRECHECK_FINDING: UNDECIDED 二 :: No rule for turning number or date header cells into column_map keys; SheetJS formatted text can differ from backend openpyxl str(cell), which causes a 422.
+PRECHECK_FINDING: UNDECIDED 4.4 :: The preview's problem-row count and red highlight read r['姓名']/r['name']; neither design nor AC says whether they switch to the column mapped to name.
+session verdict: NOT_READY
+PRECHECK_RESULT: NOT_READY
+用量：Claude 会话 1 次，共 12.5 万 token（其中缓存读取 9.6 万），折合 API 价约 $0.32；周额度读数 33%。
+退出码 1
+第 2 轮 CRM-TASK-060:
+PRECHECK_FINDING: UNDECIDED 3 :: The rule that a name made only of digits, plus, spaces and dashes skips name_company does not say whether it applies to the input only or to both sides, and punctuation stripping makes the two choices give different matches.
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 9.9 万 token（其中缓存读取 8.1 万），折合 API 价约 $0.21；周额度读数 33%。
+退出码 0
+第 2 轮 CRM-TASK-062:
+PRECHECK_FINDING: DESIGN_DEFECT §9.3 :: "Sheet rows first" and "both match, record phone" conflict when a row's email matches an earlier inserted row and its phone matches an existing contact: one gives field email "as row N", the other field phone "an existing contact".
+PRECHECK_FINDING: UNDECIDED §6.3 :: The design doesn't say whether a new-customer row that already fails validation (name, email format, assignee) is still checked for duplicates and gets a second error, or keeps only its existing errors.
+session verdict: NOT_READY
+PRECHECK_RESULT: NOT_READY
+用量：Claude 会话 1 次，共 12.5 万 token（其中缓存读取 10.3 万），折合 API 价约 $0.25；周额度读数 33%。
+退出码 1
+第 2 轮 CRM-TASK-063:
+PRECHECK_FINDING: UNDECIDED 6.4 :: Criterion 1 makes every visible duplicate clickable, but only the panel's click is defined; on the new-contact page there is no detail route and no new routes are allowed, so what the click does there is undecided.
+session verdict: NOT_READY
+judged from the findings, not the session's verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 21.3 万 token（其中缓存读取 16.8 万），折合 API 价约 $0.44；周额度读数 34%。
+退出码 0
+第 2 轮 CRM-TASK-066:
+PRECHECK_FINDING: DESIGN_DEFECT §9 :: The pre-write check on whether the existing row covers a newer message has no now+5min cap, so after a future-dated message is tagged every later message is judged superseded until that time passes, the outcome rule 9.5 meant to prevent.
+session verdict: NOT_READY
+PRECHECK_RESULT: NOT_READY
+用量：Claude 会话 1 次，共 16.5 万 token（其中缓存读取 13.5 万），折合 API 价约 $0.33；周额度读数 33%。
+退出码 1
+第 2 轮 CRM-TASK-067:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 7.3 万 token（其中缓存读取 5.5 万），折合 API 价约 $0.18；周额度读数 34%。
+退出码 0
+第 2 轮 CRM-TASK-069:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 10.2 万 token（其中缓存读取 8.4 万），折合 API 价约 $0.20；周额度读数 34%。
+退出码 0
+第 2 轮 CRM-TASK-070:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 41.7 万 token（其中缓存读取 35.1 万），折合 API 价约 $0.68；周额度读数 34%。
+退出码 0
+第 3 轮 CRM-TASK-051:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 14.1 万 token（其中缓存读取 10.7 万），折合 API 价约 $0.36；周额度读数 34%。
+退出码 0
+第 3 轮 CRM-TASK-053:
+PRECHECK_FINDING: UNDECIDED 9.8 :: The design does not say whether an edited suggestion value is trimmed before it is sent in the update, although blank-after-trim already decides whether a row can be checked.
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 18.6 万 token（其中缓存读取 13.9 万），折合 API 价约 $0.45；周额度读数 34%。
+退出码 0
+第 3 轮 CRM-TASK-058:
+PRECHECK_FINDING: DESIGN_DEFECT §9 :: Formula header cells count as text in SheetJS (cached value) but openpyxl without data_only reads the formula string, so column_map keys will not match and the backend rejects the whole import with 422; item 9 does not cover formulas.
+PRECHECK_FINDING: UNDECIDED §9 :: Items 5 and 8 overlap: exact duplicate headers send their first column, but whether headers that only collide after cutting to 100 characters are all dropped or also send their first is not stated.
+PRECHECK_FINDING: UNDECIDED §3 :: The 40-column cap does not say whether it applies to the first 40 sheet columns before filtering or to the first 40 columns that pass the filter.
+PRECHECK_FINDING: UNDECIDED §9 :: Item 10 marks blank-name rows red, but rows with a mapped customer id are valid add-deal rows needing no name (template example row 2); whether to exempt them is not decided.
+session verdict: READY
+judged from the findings, not the session's verdict: NOT_READY
+PRECHECK_RESULT: NOT_READY
+用量：Claude 会话 1 次，共 15 万 token（其中缓存读取 12.1 万），折合 API 价约 $0.33；周额度读数 34%。
+退出码 1
+第 3 轮 CRM-TASK-062:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 13.3 万 token（其中缓存读取 10.9 万），折合 API 价约 $0.27；周额度读数 34%。
+退出码 0
+第 3 轮 CRM-TASK-066:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 21.3 万 token（其中缓存读取 18.1 万），折合 API 价约 $0.37；周额度读数 34%。
+退出码 0
+第 4 轮 CRM-TASK-058:
+PRECHECK_FINDING: DESIGN_DEFECT §9.12 :: Frontend cuts the trimmed header to 100 characters but the backend trims again, so a cut ending in whitespace no longer matches the sent header, and two cuts differing only in trailing whitespace become a duplicate that fails the whole AI request.
+PRECHECK_FINDING: DESIGN_DEFECT §2 :: The page always sends column_map and a name column is required, so a sheet with only customer_id and amount columns that imported before is now blocked, though §9.13 says rows that add a deal need no name.
+PRECHECK_FINDING: UNDECIDED §2 :: The design never defines "trim whitespace" or "characters" the same way for JS and Python (U+FEFF, surrogate pairs), nor which text form of number or date cells to use for samples, so the page and the backend can disagree on column_map keys and limits.
+session verdict: NOT_READY
+PRECHECK_RESULT: NOT_READY
+用量：Claude 会话 1 次，共 14.4 万 token（其中缓存读取 10.9 万），折合 API 价约 $0.37；周额度读数 34%。
+退出码 1
+第 5 轮 CRM-TASK-055:
+PRECHECK_FINDING: UNDECIDED 4.1 :: column_map keys that trim to the same header (e.g. "电话" and " 电话 ") or repeat as raw JSON keys can map one column to two fields; §2 forbids that, but the 422 list never says reject or which key wins.
+PRECHECK_FINDING: UNDECIDED 9 :: §9.4/9.9/9.11 say empty, non-text and formula header cells cannot be imported, but the backend criteria don't say whether keys like "", "2024" or "=A1" matching such cells must be 422 or accepted.
+PRECHECK_FINDING: UNDECIDED 4.1 :: Unstated: whether an empty column_map="" counts as not given or as invalid JSON (422), and whether column_map's 422 or the existing 400 checks (file type, size, empty file) are applied first.
+session verdict: NOT_READY
+judged from the findings, not the session's verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 11.2 万 token（其中缓存读取 8.8 万），折合 API 价约 $0.27；周额度读数 34%。
+退出码 0
+第 5 轮 CRM-TASK-058:
+PRECHECK_FINDING: DESIGN_DEFECT §9.9 :: Backend stringifies numeric/date header cells (str(cell).strip()), so a numeric header 2024 before a text header "2024" makes the backend's first-match pick the wrong column, silently importing wrong data.
+PRECHECK_FINDING: DESIGN_DEFECT §9.15 :: "trim then strip leading U+FEFF" differs between JS trim and Python strip (trailing FEFF, whitespace after leading FEFF, U+001C-001F), so column_map keys or AI headers mismatch and cause 422 or AI_ERROR.
+PRECHECK_FINDING: DESIGN_DEFECT §1 :: Frontend reads SheetNames[0] but backend reads wb.active; when another tab is active, column_map headers from sheet one are absent in the backend sheet and import returns 422.
+session verdict: NOT_READY
+PRECHECK_RESULT: NOT_READY
+用量：Claude 会话 1 次，共 20.3 万 token（其中缓存读取 15.7 万），折合 API 价约 $0.47；周额度读数 34%。
+退出码 1
+第 6 轮 CRM-TASK-055:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 10.8 万 token（其中缓存读取 8.4 万），折合 API 价约 $0.27；周额度读数 35%。
+退出码 0
+第 6 轮 CRM-TASK-056:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 40.9 万 token（其中缓存读取 36.5 万），折合 API 价约 $0.49；周额度读数 35%。
+退出码 0
+第 6 轮 CRM-TASK-058:
+PRECHECK_FINDING: UNDECIDED 9 :: "Original first row" is not pinned to sheet row 1 from column A; the backend reads row 1 via openpyxl, but SheetJS ranges may start elsewhere, which would make column_map keys miss and return 422.
+PRECHECK_FINDING: UNDECIDED 4.4 :: Preview counts don't say whether fully blank mapped rows (which the backend drops) are counted, or whether "has a value" uses the §9 item 16 trim set.
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 13.3 万 token（其中缓存读取 9.4 万），折合 API 价约 $0.43；周额度读数 35%。
 退出码 0
 ```
 
