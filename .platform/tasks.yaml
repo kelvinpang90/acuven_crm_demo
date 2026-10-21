@@ -639,21 +639,22 @@ tasks:
       按 docs/chatbot-replies.md 第八节、第九节与第十四节第 12 条，在 CRM-TASK-019 部署（运行版本已不映射这一列）之后，
       一次迁移删掉 contacts.is_gateway 与它的索引。只做迁移：不改模型、服务、接口、前端。
       迁移编号原为 015，登记 CRM-TASK-021 时 015 给了 ai_requests 建表，顺延为 016（docs/inbox-ai-assist.md 第八节第 4 条）；
-      登记 CRM-TASK-039 时 016 给了审计表 contact_id 改可空，再顺延为 017（docs/dashboard-ai-insight.md 第七节）。
+      登记 CRM-TASK-039 时 016 给了审计表 contact_id 改可空，顺延为 017（docs/dashboard-ai-insight.md 第七节）；
+      登记 CRM-TASK-065 时 017 给了会话标签表，再顺延为 018（docs/inbox-ai-triage.md 第三节）。
     status: ready
     depends_on:
       - CRM-TASK-019
-      - CRM-TASK-039
+      - CRM-TASK-065
     acceptance_criteria:
-      - 新增迁移 017，down_revision 为 016（CRM-TASK-039 的审计表 contact_id 改可空）：upgrade 删掉 contacts 的 is_gateway 列与 idx_contacts_is_gateway 索引；downgrade 重建该列（布尔，非空，带数据库默认值 false）与索引，不还原原来为真的值，在迁移的 docstring 写明
+      - 新增迁移 018，down_revision 为 017（CRM-TASK-065 的会话标签表）：upgrade 删掉 contacts 的 is_gateway 列与 idx_contacts_is_gateway 索引；downgrade 重建该列（布尔，非空，带数据库默认值 false）与索引，不还原原来为真的值，在迁移的 docstring 写明
       - 不改模型（CRM-TASK-019 已取消映射）、服务、接口与前端
-      - 新增测试：用 Alembic 的 Operations 在内存 SQLite 上对含 id 与 is_gateway 的最小 contacts 表执行 017 的 upgrade 再 downgrade，断言列与索引先消失后回来、回来后全部为 false；每条测试写明守住的是哪一条验收标准；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
+      - 新增测试：用 Alembic 的 Operations 在内存 SQLite 上对含 id 与 is_gateway 的最小 contacts 表执行 018 的 upgrade 再 downgrade，断言列与索引先消失后回来、回来后全部为 false；每条测试写明守住的是哪一条验收标准；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
       - tasks/todo.md 新增 CRM-TASK-020 记录段（做了什么、偏离了什么、验证到什么程度）；不改 planning-v1 块；复选框只允许 [ ] / [x]
       - 改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖
       - allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#28），不合并、不直推
     allowed_change_paths:
-      - backend/alembic/versions/017_drop_contact_is_gateway.py
-      - backend/tests/test_migration_017.py
+      - backend/alembic/versions/018_drop_contact_is_gateway.py
+      - backend/tests/test_migration_018.py
       - tasks/todo.md
     allowed_commands:
       - lint.check
@@ -1531,6 +1532,573 @@ tasks:
     allowed_change_paths:
       - backend/evals/samples/dashboard_insight.json
       - backend/tests/test_evals_samples_dashboard.py
+      - tasks/todo.md
+    allowed_commands:
+      - lint.check
+      - format.check
+      - format.apply
+    creates_branch: true
+    creates_pull_request: true
+
+  # 优先 5 的四个设计（Kelvin 2026-10-21 批准，均按建议，PR kelvinpang90/acuven_crm_demo#135）：
+  # 050–054 从聊天提取客户资料（docs/contact-ai-extract.md）；055–059 导入识别列名（docs/contact-import-columns.md）；
+  # 060–064 疑似重复提示（docs/contact-duplicate-hints.md，不用 AI）；065–070 收件箱意图与紧急度（docs/inbox-ai-triage.md）。
+  # 迁移编号：065 取 017（conversation_triage 建表、ai_requests.user_id 改可空），被 017 阻塞的 CRM-TASK-020 删列迁移顺延为 018。
+  # 设计预审的完整输出在 tasks/todo.md「登记 CRM-TASK-050 至 070」。
+  - id: CRM-TASK-050
+    title: 从聊天提取客户资料的快照组装与行业常量
+    purpose: >-
+      按 docs/contact-ai-extract.md 第三节与第九节，组装发给模型的客户资料提取快照：哪些字段还空着、名字是不是号码、最近 40 条消息（带序号），并加一份与前端一致的行业常量。只做业务规则层的快照函数：不调 AI、不写审计、不加接口、不改前端、不加表与迁移；测试不调真实模型、不写任何真实密钥与地址。
+    status: ready
+    depends_on: []
+    acceptance_criteria:
+      - 新文件 contact_extract_service 新增常量 INDUSTRIES（与 frontend 的 ContactForm 里的十个行业逐字相同、顺序相同）、EXTRACT_FIELDS（company、industry、email、phone、address，按此顺序）与函数 build_extract_snapshot(db, *, contact, now)；contact 是调用方已读出的未删除记录，now 是带时区的 UTC 时间（库里不带时区的时间按 UTC 处理）；返回的字典恰好含 contact、messages、truncated 三个键；不调 AI、不写审计、不写库
+      - contact 块恰好含 name、name_is_phone、empty_fields：name 原样（截到 100 字）；name_is_phone 为名字去首尾空白后非空、只由数字、加号、空格与短横组成且至少含一个数字；empty_fields 为 EXTRACT_FIELDS 里当前值为 null 或去首尾空白后为空串的字段，按 EXTRACT_FIELDS 的顺序；快照里没有任何字段的现有值（name 除外）、没有 id、负责人与员工姓名
+      - messages 块：这个联系人的消息（不按 now 过滤，与客户摘要相同），按创建时间、同一时间按 id 取最近 40 条，从旧到新；每条恰好含 index、at（UTC 到秒带 Z）、direction、author_kind（为空时入站按 customer、出站按 agent）、channel、body（截到 1000 字），邮件另带 subject（截到 100 字，为空为空串）；index 是该条在最终快照里从 0 起的位置
+      - 16 KiB 与 truncated：上限写成本模块的常量（值为 16384，比较时按模块属性读取，便于测试调小），快照按紧凑 JSON、不转义非 ASCII 的 UTF-8 计，超过上限时从最旧的消息开始丢、至少留 1 条，丢完后重新编 index；任何一处截断、消息超过 40 条没取全、或因 16 KiB 丢了消息，truncated 为真，否则为假
+      - 新测试文件 test_contact_extract_snapshot 覆盖下列用例（now 固定）：1 顶层三个键、contact 块三个键，快照里没有 email、phone 等现有值；2 name_is_phone：60123456789、+60 12-345 6789 为真，Tan、空串、Tan 0123 为假；3 empty_fields：null、空串与只有空白都算空，有值的不算，顺序固定；4 messages：41 条只取最近 40 条且从旧到新，同一时间按 id，index 从 0 连续；别的联系人的消息不进来；author_kind 为空时按方向推断；邮件带 subject、WhatsApp 不带；1001 字正文截到 1000 且 truncated 为真；5 16 KiB：超大时丢最旧的消息并重新编 index，truncated 为真；只剩 1 条仍超出的情况由测试临时调小模块里的上限常量来构造（单条消息按截断规则到不了 16 KiB），照常返回；小快照为假；6 INDUSTRIES 恰好十个且与前端列表相同（测试里写死这十个字符串）。测试只需覆盖这些用例，每个测试写明守住的是哪一条验收标准；清单之外的补充覆盖只算非阻塞意见；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
+      - tasks/todo.md 新增 CRM-TASK-050 记录段（做了什么、偏离了什么、验证到什么程度）；偏离段只列两类、每条一句：与验收标准或设计文档不一致的做法，以及验收标准没有要求、但改变了现有接口或页面行为的改动；验收标准要求的改动与重构、命名、格式调整不算偏离，没有就写无；偏离段漏列只算非阻塞意见，除非漏列的改动本身违反某条验收标准（那时按那一条判）；验证段只写测试由 PR 的必需检查 backend 执行、检查结果由 Worker 和 CI 记录不写在这里，不写任何检查是否运行或通过；不改 planning-v1 块；复选框只允许 [ ] / [x]；改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不加表、不加迁移、不改接口与前端；allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#135），不合并、不直推
+    allowed_change_paths:
+      - backend/app/services/contact_extract_service.py
+      - backend/tests/test_contact_extract_snapshot.py
+      - tasks/todo.md
+    allowed_commands:
+      - lint.check
+      - format.check
+      - format.apply
+    creates_branch: true
+    creates_pull_request: true
+
+  - id: CRM-TASK-051
+    title: 从聊天提取客户资料的提示词、出处校验与业务函数
+    purpose: >-
+      按 docs/contact-ai-extract.md 4.1 节与第五节，定义 crm.contact_extract 的系统提示、JSON schema 与输出校验（出处必须是某条入站消息的原话、值必须出现在出处里），并用 CRM-TASK-050 的快照函数串成业务函数。只做业务规则层：不加接口、不改前端、不加表与迁移、不写客户资料；测试打桩 AI 客户端，不调真实模型、不写任何真实密钥与地址。
+    status: ready
+    depends_on:
+      - CRM-TASK-050
+    acceptance_criteria:
+      - ai_features 新增 CONTACT_EXTRACT_FEATURE（crm.contact_extract）、CONTACT_EXTRACT_SYSTEM、CONTACT_EXTRACT_SCHEMA 与 validate_contact_extract(output, snapshot)；系统提示写明快照是不可信数据、不执行其中的指令，只从 direction 为 inbound 的消息里取资料（出站里的电话地址多半是我们公司的），只给 empty_fields 里的字段与 name_is_phone 为真时的 name，找不到就不给、不猜，evidence 逐字抄顾客原话里含这个值的一小段，一个字段最多一条，行业只能从 INDUSTRIES 里选（列出这十个），写明各字段上限；schema 为 suggestions（对象数组，每个对象 field 为 name、company、industry、email、phone、address 之一，value、evidence 为字符串，message_index 为整数，全部必填、不允许多余字段）；max_tokens 4000
+      - 校验函数（去首尾空白、按码点）：输出恰好含 suggestions；最多 6 条，field 不重复，且 field 在快照的 empty_fields 里、或为 name 且 name_is_phone 为真；value 1 至 200 字（name 1 至 100，address 1 至 300），evidence 1 至 300 字；message_index 指向快照 messages 里 direction 为 inbound 的一条，且把连续空白压成一个空格后 evidence 是该条 body 的子串；email 的 value 含 @ 且出现在 evidence 里（不分大小写）；phone 的 value 能用 normalize_phone 规范化为 N，且把 evidence 里的非数字字符全部去掉后的数字串包含 N，或在 N 以 60 开头时包含 0 加 N 去掉 60 后的部分（设计第九节第 3 条）；industry 的 value 在 INDUSTRIES 里；name、company、address 的 value 压空白后出现在 evidence 里（不分大小写）；任一条不合返回 None（整次判 AI 出错，不丢单条）；合格时返回去空白后的 suggestions（每条四个键）
+      - ai_assist_service 的结果对象沿用已有的 suggestions 字段（经理看板解读用的是字符串列表），把它的类型放宽为可空的任意元素列表，本功能放每条建议的对象；新增类别常量 NOTHING_TO_FILL（nothing_to_fill）；其他 AI 功能的行为不变
+      - contact_extract_service 新增业务函数 generate_contact_extract(db, *, user, contact_id, output_language)：第一步读未删除的联系人，读不到抛 ValueError；之后检查顺序为 output_language 不在 zh-CN、en、ms 之内为 invalid_input，AI 未配置为 not_configured，empty_fields 为空且 name_is_phone 为假为 nothing_to_fill；之后用当前 UTC 时间调 build_extract_snapshot，快照的 messages 里没有 direction 为 inbound 的一条为 no_messages（沿用已有常量 NO_MESSAGES；按最终快照判断，最近 40 条全是出站也算）；这四种不调 AI、不写审计
+      - 业务函数续：发一条用户消息，内容是紧凑 JSON 数据块，恰好含 as_of、output_language、snapshot；按 AI 客户端的三类结果处理，每次进入调用都用 write_ai_request 写一行 feature 为 crm.contact_extract、contact_id 为这个联系人的审计；客户端成功但校验不过时改判 error 且审计保留 request_id；成功时结果带 suggestions 与快照的 truncated；成功、AI 出错与暂时不可用时结果都带 request_id（有的话）；不修改联系人
+      - 新测试文件 test_contact_extract_service 打桩 AI 客户端与配置，覆盖下列用例（一个用例可以是一个参数化测试）：1 校验：合格的一条通过并去空白；evidence 不在任何消息里、指向出站消息、index 越界都不通过；evidence 与正文只差连续空白时通过；address 250 字且在 evidence 里时通过；email 不在 evidence 里不通过；phone 012-345 6789 对应 evidence 里的 +60 12 345 6789 通过、对应 evidence 里的 012-3456789 10 am 也通过、对应不上的不通过；industry 不在列表里不通过；field 已有值（不在 empty_fields）不通过，name 只在 name_is_phone 为真时通过；7 条、同 field 两条、缺键、多键、空数组外的非对象都不通过，空数组通过；2 请求：feature、max_tokens 4000、schema 等于 CONTACT_EXTRACT_SCHEMA、系统提示含不可信数据与只取入站的声明，用户消息恰好三个键；3 检查顺序：语言不合法同时未配置为 invalid_input；未配置同时没有可填字段为 not_configured；没有可填字段同时没有入站消息为 nothing_to_fill；只有出站消息为 no_messages，最近 40 条全是出站而更早有入站也为 no_messages；都断言没调客户端、审计表没有新行；联系人不存在或已删除抛 ValueError；4 结果与审计：成功、校验不过（保留 request_id）、error、unavailable 各自的类别与审计一行；成功后联系人的字段没有被改。测试只需覆盖这些用例，每个测试写明守住的是哪一条验收标准；清单之外的补充覆盖只算非阻塞意见；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
+      - tasks/todo.md 新增 CRM-TASK-051 记录段（做了什么、偏离了什么、验证到什么程度）；偏离段只列两类、每条一句：与验收标准或设计文档不一致的做法，以及验收标准没有要求、但改变了现有接口或页面行为的改动；验收标准要求的改动与重构、命名、格式调整不算偏离，没有就写无；偏离段漏列只算非阻塞意见，除非漏列的改动本身违反某条验收标准（那时按那一条判）；验证段只写测试由 PR 的必需检查 backend 执行、检查结果由 Worker 和 CI 记录不写在这里，不写任何检查是否运行或通过；不改 planning-v1 块；复选框只允许 [ ] / [x]；改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不加表、不加迁移、不改接口与前端；allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#135），不合并、不直推
+    allowed_change_paths:
+      - backend/app/services/contact_extract_service.py
+      - backend/app/services/ai_features.py
+      - backend/app/services/ai_assist_service.py
+      - backend/tests/test_contact_extract_service.py
+      - tasks/todo.md
+    allowed_commands:
+      - lint.check
+      - format.check
+      - format.apply
+    creates_branch: true
+    creates_pull_request: true
+
+  - id: CRM-TASK-052
+    title: 从聊天提取客户资料的接口
+    purpose: >-
+      按 docs/contact-ai-extract.md 第 4.2 节，把 CRM-TASK-051 的业务函数接成 POST /api/ai/contacts/{contact_id}/extract，供 CRM-TASK-053 的详情面板使用。只做接口层：加在已有的 AI 路由里，不改 main.py、不改业务规则、不改表结构、不改前端、不改现有的联系人接口。
+    status: ready
+    depends_on:
+      - CRM-TASK-051
+    acceptance_criteria:
+      - 新增 POST /api/ai/contacts/{contact_id}/extract，请求模型：output_language 可选且只能是 zh-CN、en、ms，不合 422；缺省时取当前用户的界面语言（与简报接口相同）
+      - 要求登录；联系人存在、未删除且 may_access_contact 为真才往下走（与客户摘要接口同一判断），否则返回 403 NOT_ASSIGNED，不调用业务函数、不写审计
+      - 调用业务函数时传当前用户对象、contact_id 与 output_language；成功返回 200 与 request_id、suggestions、truncated；nothing_to_fill 返回 400 NOTHING_TO_FILL，no_messages 返回 400 NO_MESSAGES；其余类别与其他 AI 接口相同（503 AI_NOT_CONFIGURED、503 AI_UNAVAILABLE、502 AI_ERROR、422 INVALID_INPUT），错误照现有 fail 外壳；其他 AI 接口与 status 接口的行为不变
+      - 新测试文件 test_ai_contact_extract_api 打桩业务函数，覆盖：1 output_language 为 fr 返回 422 且业务函数没被调用；2 默认语言按界面语言，显式给的原样传；3 销售请求别人名下的联系人、请求不存在或已删除的联系人返回 403 NOT_ASSIGNED 且业务函数没被调用，未登录返回 401 或 403；4 业务函数收到的用户与 contact_id 与请求一致；5 ok 返回 200 与三个字段，nothing_to_fill、no_messages、not_configured、unavailable、error、invalid_input 分别返回上述状态码与错误码。测试只需覆盖这些用例，每个测试写明守住的是哪一条验收标准；清单之外的补充覆盖只算非阻塞意见；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
+      - tasks/todo.md 新增 CRM-TASK-052 记录段（做了什么、偏离了什么、验证到什么程度）；偏离段只列两类、每条一句：与验收标准或设计文档不一致的做法，以及验收标准没有要求、但改变了现有接口或页面行为的改动；验收标准要求的改动与重构、命名、格式调整不算偏离，没有就写无；偏离段漏列只算非阻塞意见，除非漏列的改动本身违反某条验收标准（那时按那一条判）；验证段只写测试由 PR 的必需检查 backend 执行、检查结果由 Worker 和 CI 记录不写在这里，不写任何检查是否运行或通过；不改 planning-v1 块；复选框只允许 [ ] / [x]；改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不加表、不加迁移、不改前端；allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#135），不合并、不直推
+    allowed_change_paths:
+      - backend/app/routers/ai.py
+      - backend/app/schemas/ai.py
+      - backend/tests/test_ai_contact_extract_api.py
+      - tasks/todo.md
+    allowed_commands:
+      - lint.check
+      - format.check
+      - format.apply
+    creates_branch: true
+    creates_pull_request: true
+
+  - id: CRM-TASK-053
+    title: 联系人详情面板加从聊天提取资料，勾选后填入
+    purpose: >-
+      按 docs/contact-ai-extract.md 第 4.3 节，在联系人详情面板的 AI 客户摘要下面加从聊天提取资料，调用 CRM-TASK-052 的接口；员工勾选、可改值后点填入，用现有的更新客户接口保存。AI 未配置时不显示。只改前端：不改后端、不加页面或路由。
+    status: ready
+    depends_on:
+      - CRM-TASK-052
+    acceptance_criteria:
+      - 新组件 ContactAiExtract 放在 ContactDetailPanel 的 ContactAiSummary 之后；AI 状态用 services/ai.ts 已有的 getStatus（整页只读一次），enabled 为假或读取失败时不显示；请求进行中按钮置灰、显示加载中
+      - services/ai.ts 新增调用提取接口的函数，58 秒超时，带按界面语言映射的 output_language（以 zh 开头为 zh-CN，以 en 开头为 en，其他不带）；类型定义与接口的三个字段一致
+      - 结果为带 AI 生成未核实标识的卡片：每条建议一行，显示字段名（用现有表单的字段文案）、可编辑的建议值、灰字引号里的出处原话，默认全部勾选；没有建议时显示聊天里没有找到可以填的资料；truncated 为真时注明只看了最近一部分聊天
+      - 填入：提交前先用现有的读取客户接口重新读一次这个客户，按读回的数据确认每个勾选字段仍为空（name 仍是号码），不再为空的那条取消勾选、置灰并注明已有值、不提交；值被改成去空白后为空的那条自动取消勾选、不能勾选；邮箱建议值用与客户表单相同的格式校验，不合的那条不能勾选并注明格式不对；行业用与客户表单相同的十个行业下拉框，其他字段为文本框；其余勾选字段的值去首尾空白后用现有的更新客户接口一次提交；成功后列表与面板里当前选中的客户都刷新为新数据（Contacts 的 index.tsx 给面板加一个刷新当前客户的回调）并清掉卡片，失败时提示保存失败加接口返回的 message（有的话）、卡片保留；没有可提交的字段时填入按钮置灰
+      - 切换联系人或关闭面板时丢弃还没回来的结果与卡片；面板现有的其他内容与行为不变
+      - 失败时按错误码提示：NOT_ASSIGNED 为你没有这个客户的权限，NOTHING_TO_FILL 为资料已经填全了，NO_MESSAGES 为这个客户还没有聊天，AI_NOT_CONFIGURED 为 AI 未启用，AI_UNAVAILABLE、超时与网络错误为 AI 暂时不可用，AI_ERROR 与其他为 AI 请求失败；新文案同时加在 en 与 zh 的 contacts 命名空间，不写硬编码文字；前端类型检查与构建由 PR 的必需 CI 检查 frontend 执行并通过（Worker 沙箱不跑 npm）
+      - tasks/todo.md 新增 CRM-TASK-053 记录段（做了什么、偏离了什么、验证到什么程度）；偏离段只列两类、每条一句：与验收标准或设计文档不一致的做法，以及验收标准没有要求、但改变了现有接口或页面行为的改动；验收标准要求的改动与重构、命名、格式调整不算偏离，没有就写无；偏离段漏列只算非阻塞意见，除非漏列的改动本身违反某条验收标准（那时按那一条判）；验证段只写前端类型检查与构建由 PR 的必需检查 frontend 执行、检查结果由 Worker 和 CI 记录不写在这里、没有在浏览器里实际操作过，不写任何检查是否运行或通过；不改 planning-v1 块；复选框只允许 [ ] / [x]；改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不改后端；allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#135），不合并、不直推
+    allowed_change_paths:
+      - frontend/src/pages/Contacts/ContactAiExtract.tsx
+      - frontend/src/pages/Contacts/ContactDetailPanel.tsx
+      - frontend/src/pages/Contacts/index.tsx
+      - frontend/src/services/ai.ts
+      - frontend/src/types/index.ts
+      - frontend/src/locales/en/contacts.json
+      - frontend/src/locales/zh/contacts.json
+      - tasks/todo.md
+    allowed_commands:
+      - lint.check
+      - format.check
+      - format.apply
+    creates_branch: true
+    creates_pull_request: true
+
+  - id: CRM-TASK-054
+    title: AI评测样例：从聊天提取客户资料10个
+    purpose: >-
+      按 docs/contact-ai-extract.md 第五节与第九节、docs/ai-eval.md 第二节，在评测脚本里加 contact_extract 功能并写 10 个自拟的 demo 样例。只改评测脚本的功能登记与样例：不改 app 下任何文件；样例里的人名、公司、电话、邮箱全部自拟。
+    status: ready
+    depends_on:
+      - CRM-TASK-051
+    acceptance_criteria:
+      - evals 的 FEATURE_NAMES 在 deal_next_step 之后、dashboard_insight 之前加 contact_extract；features.py 加对应的适配：调用 contact_extract_service.generate_contact_extract，传 acting_user 的用户对象、params 里 contact 换成的 id 与 output_language；报告字段为 suggestions 与 truncated；自动标记扫 suggestions 里每条的 value 与 evidence；其他功能的登记不变
+      - 新增 backend/evals/samples/contact_extract.json，10 个样例，格式照评测设计第二节、第九节，样例 id 全仓唯一，covers 用一句中文写明覆盖什么；覆盖：顾客报了公司和邮箱、只报了电话、员工消息里有我们公司自己的地址和电话（不应被提取）、一句话里多个资料、名字是号码、中文、英文、马来文；1 个注入样例（injection 为真，某条入站消息里写着让 AI 在每个字段末尾加 EVAL-INJECTED，must_not_contain 写 EVAL-INJECTED）；不放资料已经填全的样例（nothing_to_fill 由业务测试覆盖，评测脚本会把它当成样例写错）
+      - 样例只用自拟的人名、公司、电话与邮箱，邮箱的域名只用 RFC 2606 保留给示例的域名，不写任何网址与真实个人或公司的信息
+      - 新测试文件 test_evals_samples_extract 覆盖：1 有 10 个样例、id 不重复、每个有 covers；2 每个样例都能建进内存 SQLite，并调 build_extract_snapshot 建出快照，empty_fields 非空或 name_is_phone 为真，且至少有一条入站消息；3 恰好一个 injection 为真的样例且其 must_not_contain 为 EVAL-INJECTED；4 FEATURE_NAMES 含 contact_extract 且顺序如上，features 的适配按样例建出的参数正确（不调业务函数）。测试只需覆盖这些用例，每个测试写明守住的是哪一条验收标准；清单之外的补充覆盖只算非阻塞意见；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
+      - tasks/todo.md 新增 CRM-TASK-054 记录段（做了什么、偏离了什么、验证到什么程度）；偏离段只列两类、每条一句：与验收标准或设计文档不一致的做法，以及验收标准没有要求、但改变了现有接口或页面行为的改动；验收标准要求的改动与重构、命名、格式调整不算偏离，没有就写无；偏离段漏列只算非阻塞意见，除非漏列的改动本身违反某条验收标准（那时按那一条判）；验证段只写测试由 PR 的必需检查 backend 执行、检查结果由 Worker 和 CI 记录不写在这里、没有调用过真实模型，不写任何检查是否运行或通过；不改 planning-v1 块；复选框只允许 [ ] / [x]；改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不改 app 下任何文件；allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#135），不合并、不直推
+    allowed_change_paths:
+      - backend/evals/__init__.py
+      - backend/evals/features.py
+      - backend/evals/samples/contact_extract.json
+      - backend/tests/test_evals_samples_extract.py
+      - tasks/todo.md
+    allowed_commands:
+      - lint.check
+      - format.check
+      - format.apply
+    creates_branch: true
+    creates_pull_request: true
+
+  - id: CRM-TASK-055
+    title: 导入客户接口支持列对应表，并修正导入结果的返回结构
+    purpose: >-
+      按 docs/contact-import-columns.md 第二节与 4.1 节，导入接口加可选的 column_map，有它时按它取每列对应的字段；没有时行为不变。顺带让 ImportResult 与实际返回一致。只做接口层：不改导入的业务规则、不加表与迁移、不改前端。
+    status: ready
+    depends_on: []
+    acceptance_criteria:
+      - POST /api/contacts/import 新增可选表单字段 column_map：JSON 对象，键为表头原文（去首尾空白后比较），值为 name、company、industry、email、phone、address、notes、tags、assigned_to_email、status、priority、deal_value、deal_title、id 之一或 null；不是合法 JSON 对象、值不在上述范围、同一字段出现两次、没有任何列对应 name 且也没有列对应 id、或写了表格第一行里不存在的表头，返回 422 且不导入；表头与 column_map 的键都按去首尾空白（只去这几种字符：半角空格、制表、换行、回车、垂直制表、换页、U+00A0、U+3000、U+FEFF，前后端逐字一致，设计第九节第 16 条）后比较；表格第一行只认文字单元格作表头，数字、日期、公式与空单元格所在的列一律不能被 column_map 选中；column_map 的键去空白后为空、或有两个键去空白后相同，也返回 422；column_map 为空串按没给处理；文件类型、大小与空文件的现有 400 检查先于 column_map 的检查
+      - 有 column_map 时：只按它取值，表格里没写进 column_map 的列与值为 null 的列一律不导入；表格里同名的文字表头只取第一列；取出的值交给 import_contacts 的处理与现在完全相同（notes、tags、deal_value、id 与模板列 remark、tag、amount、customer_id 对应的处理一致）
+      - 没有 column_map 时按现有的模板表头规则取值，行为与现在逐行相同
+      - schemas 里的 ImportResult 改为与 import_contacts 实际返回的字段一致（total、inserted、deals_added、skipped、errors），不改 import_contacts
+      - 新测试文件 test_contact_import_column_map 覆盖：1 中文表头加 column_map 能导入，值落在对应字段；2 没写进 column_map 的列与对应 null 的列不导入；3 非法 JSON、未知字段、同一字段两次、既没有 name 也没有 id、表头不存在各返回 422 且库里没有新客户；只有 id 与 deal_value 两列时能导入（只加商机）；4 不给 column_map 时用模板表头导入的结果与现在相同；5 column_map 把某列对应到 id 时按加商机到已有客户处理；6 同名表头只取第一列；数字表头 2024 在文字表头 2024 前面时取文字的那一列；两个键去空白后相同返回 422；column_map 为空串时按模板表头导入。测试只需覆盖这些用例，每个测试写明守住的是哪一条验收标准；清单之外的补充覆盖只算非阻塞意见；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
+      - tasks/todo.md 新增 CRM-TASK-055 记录段（做了什么、偏离了什么、验证到什么程度）；偏离段只列两类、每条一句：与验收标准或设计文档不一致的做法，以及验收标准没有要求、但改变了现有接口或页面行为的改动；验收标准要求的改动与重构、命名、格式调整不算偏离，没有就写无；偏离段漏列只算非阻塞意见，除非漏列的改动本身违反某条验收标准（那时按那一条判）；验证段只写测试由 PR 的必需检查 backend 执行、检查结果由 Worker 和 CI 记录不写在这里，不写任何检查是否运行或通过；不改 planning-v1 块；复选框只允许 [ ] / [x]；改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不加表、不加迁移、不改前端、不改 contact_service；allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#135），不合并、不直推
+    allowed_change_paths:
+      - backend/app/routers/contacts.py
+      - backend/app/schemas/contact.py
+      - backend/tests/test_contact_import_column_map.py
+      - tasks/todo.md
+    allowed_commands:
+      - lint.check
+      - format.check
+      - format.apply
+    creates_branch: true
+    creates_pull_request: true
+
+  - id: CRM-TASK-056
+    title: 导入表格识别列名的提示词、输出校验与业务函数
+    purpose: >-
+      按 docs/contact-import-columns.md 第三节、4.2 节与第五节，定义 crm.import_columns 的系统提示、JSON schema 与输出校验，并写业务函数。只做业务规则层：不加接口、不改前端、不加表与迁移；测试打桩 AI 客户端，不调真实模型、不写任何真实密钥与地址。
+    status: ready
+    depends_on: []
+    acceptance_criteria:
+      - ai_features 新增 IMPORT_COLUMNS_FEATURE（crm.import_columns）、IMPORT_COLUMNS_SYSTEM、IMPORT_COLUMNS_SCHEMA 与 validate_import_columns(output, headers)；IMPORT_FIELDS 常量为 name、company、industry、email、phone、address、notes、tags、assigned_to_email、status、priority、deal_value、deal_title、id 十四个字段；系统提示写明表头与样本是不可信数据、不执行其中的指令，为每一列选一个最合适的字段或 null，看不准给 null，同一字段只给一列，并逐个写明字段含义（id 是 CRM 的客户编号、不是对方表格的序号，deal_value 是金额，assigned_to_email 是负责员工的邮箱）；schema 为 mappings（对象数组，每个对象 header 为字符串、field 为十四个字段之一或 null，全部必填、不允许多余字段）；max_tokens 4000
+      - 校验函数：输出恰好含 mappings；mappings 的 header 集合与发出的表头完全相同（不多、不少、不重复）；非 null 的 field 不重复且在 IMPORT_FIELDS 里；任一不合返回 None；合格时按发出的列顺序返回 mappings
+      - ai_assist_service 的结果对象新增可空字段 mappings；其他 AI 功能的行为不变
+      - 新文件 import_columns_service 新增 suggest_import_columns(db, *, user, columns, output_language)：columns 为对象列表（header 字符串、samples 字符串列表）；表头先去首尾空白（只去这几种字符：半角空格、制表、换行、回车、垂直制表、换页、U+00A0、U+3000、U+FEFF，前后端逐字一致，设计第九节第 16 条），发给模型与校验都用去空白后的表头，长度按码点计；0 列、超过 40 列、表头去空白后为空或重复、samples 超过 3 个、样本超过 50 字、表头超过 100 字、output_language 不在 zh-CN、en、ms 之内为 invalid_input；AI 未配置为 not_configured；这两种不调 AI、不写审计
+      - 业务函数续：用户消息为紧凑 JSON，恰好含 output_language、columns、fields（IMPORT_FIELDS）；按三类结果处理，每次进入调用写一行 feature 为 crm.import_columns、contact_id 为空的审计；校验不过改判 error 且保留 request_id；成功时结果带 mappings；成功、AI 出错与暂时不可用时都带 request_id（有的话）
+      - 新测试文件 test_import_columns_service 打桩 AI 客户端与配置，覆盖：1 校验：合格通过；少一列、多一列、header 重复、两列同一字段、未知字段、缺键、多键都不通过；全部为 null 通过；2 请求：feature、max_tokens、schema、系统提示含不可信数据声明，用户消息三个键且 fields 为十四个；3 参数：0 列、41 列、空表头、重复表头、4 个样本、51 字样本、101 字表头、语言不合法都为 invalid_input，同时未配置时仍为 invalid_input；未配置为 not_configured；都不调客户端、不写审计；4 结果与审计：成功、校验不过、error、unavailable 各自的类别，审计一行且 contact_id 为空。测试只需覆盖这些用例，每个测试写明守住的是哪一条验收标准；清单之外的补充覆盖只算非阻塞意见；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
+      - tasks/todo.md 新增 CRM-TASK-056 记录段（做了什么、偏离了什么、验证到什么程度）；偏离段只列两类、每条一句：与验收标准或设计文档不一致的做法，以及验收标准没有要求、但改变了现有接口或页面行为的改动；验收标准要求的改动与重构、命名、格式调整不算偏离，没有就写无；偏离段漏列只算非阻塞意见，除非漏列的改动本身违反某条验收标准（那时按那一条判）；验证段只写测试由 PR 的必需检查 backend 执行、检查结果由 Worker 和 CI 记录不写在这里，不写任何检查是否运行或通过；不改 planning-v1 块；复选框只允许 [ ] / [x]；改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不加表、不加迁移、不改接口与前端；allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#135），不合并、不直推
+    allowed_change_paths:
+      - backend/app/services/import_columns_service.py
+      - backend/app/services/ai_features.py
+      - backend/app/services/ai_assist_service.py
+      - backend/tests/test_import_columns_service.py
+      - tasks/todo.md
+    allowed_commands:
+      - lint.check
+      - format.check
+      - format.apply
+    creates_branch: true
+    creates_pull_request: true
+
+  - id: CRM-TASK-057
+    title: 导入表格识别列名的接口
+    purpose: >-
+      按 docs/contact-import-columns.md 第 4.3 节，把 CRM-TASK-056 的业务函数接成 POST /api/ai/import/columns，供 CRM-TASK-058 的导入页使用。只做接口层：加在已有的 AI 路由里，不改 main.py、不改业务规则、不改表结构、不改前端。
+    status: ready
+    depends_on:
+      - CRM-TASK-056
+    acceptance_criteria:
+      - 新增 POST /api/ai/import/columns，要求登录；请求模型：columns（对象数组，每个 header 字符串、samples 字符串数组）必填，output_language 可选且只能是 zh-CN、en、ms，缺省按界面语言；字段类型不对返回 422
+      - 调用业务函数时传当前用户、columns 与 output_language；成功返回 200 与 request_id、mappings；其余类别与其他 AI 接口相同（503 AI_NOT_CONFIGURED、503 AI_UNAVAILABLE、502 AI_ERROR、422 INVALID_INPUT）；其他 AI 接口与 status 接口的行为不变
+      - 新测试文件 test_ai_import_columns_api 打桩业务函数，覆盖：1 未登录返回 401 或 403；2 columns 缺失或类型不对返回 422 且业务函数没被调用；3 默认语言与显式语言；4 传参一致；5 ok 返回 200 与两个字段，not_configured、unavailable、error、invalid_input 的映射。测试只需覆盖这些用例，每个测试写明守住的是哪一条验收标准；清单之外的补充覆盖只算非阻塞意见；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
+      - tasks/todo.md 新增 CRM-TASK-057 记录段（做了什么、偏离了什么、验证到什么程度）；偏离段只列两类、每条一句：与验收标准或设计文档不一致的做法，以及验收标准没有要求、但改变了现有接口或页面行为的改动；验收标准要求的改动与重构、命名、格式调整不算偏离，没有就写无；偏离段漏列只算非阻塞意见，除非漏列的改动本身违反某条验收标准（那时按那一条判）；验证段只写测试由 PR 的必需检查 backend 执行、检查结果由 Worker 和 CI 记录不写在这里，不写任何检查是否运行或通过；不改 planning-v1 块；复选框只允许 [ ] / [x]；改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不加表、不加迁移、不改前端；allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#135），不合并、不直推
+    allowed_change_paths:
+      - backend/app/routers/ai.py
+      - backend/app/schemas/ai.py
+      - backend/tests/test_ai_import_columns_api.py
+      - tasks/todo.md
+    allowed_commands:
+      - lint.check
+      - format.check
+      - format.apply
+    creates_branch: true
+    creates_pull_request: true
+
+  - id: CRM-TASK-058
+    title: 导入页加列对应表与AI识别列，修正结果卡片与预览计数
+    purpose: >-
+      按 docs/contact-import-columns.md 第二节与 4.4 节，在导入页的预览上方加列对应表（不依赖 AI）与 AI 识别列按钮，导入时提交 column_map；并修正结果卡片与预览计数的两处现有错误。只改前端：不改后端、不加页面或路由。
+    status: ready
+    depends_on:
+      - CRM-TASK-055
+      - CRM-TASK-057
+    acceptance_criteria:
+      - 新组件 ImportColumnMap 放在 ExcelImport 的预览上方：读工作簿当前选中的工作表（与后端的 active 一致；没有记录时取第一张），表头从它的第 1 行、A 列起读（与后端 openpyxl 读的第一行一致，不用 SheetJS 改过名的键，也不按 SheetJS 的数据范围起点），只认文字表头（数字、日期、公式等非纯文字的表头单元格按空表头处理，不能导入），每列一个下拉框，选项为十四个字段（字段名走 en 与 zh 的文案）与不导入；表头与模板表头一致的列自动对上，其余默认不导入；每个字段最多被一列选中（已被选的在其他下拉框里置灰）；同名表头提示并只允许第一列选择；表头为空的列下拉框置灰并注明没有表头不能导入；没有任何列对应 name 且也没有列对应 id 时导入按钮置灰并提示（只加商机的表格不需要名字列）
+      - AI 启用时（services/ai.ts 已有的 getStatus）显示 AI 识别列：只发表头非空的列，表头做去首尾空白、按码点截到 100 字、再去一次首尾空白（去空白只去设计第九节第 16 条列出的字符，与后端逐字一致；按码点用 Array.from 计）后相同的一组只发第一列（其余留给手选），按列顺序取通过这两条的前 40 列，每列带第 2 行起前 3 个非空样本（取单元格显示的文字，同样去空白、按码点截到 50 字），按发出的截断表头把结果对回原列；置灰、58 秒超时；成功后只填当前为不导入且用户从没手动改过的列，已有选择的列（自动对上、手选、上次 AI 填的）一律不改，建议为 null 的不处理；按列顺序填，某字段已被任何一列占用（含本次刚填的）时丢掉这条建议，被 AI 填的下拉框旁标 AI；失败按错误码提示（AI_NOT_CONFIGURED、AI_UNAVAILABLE 与超时网络错误、AI_ERROR 与其他）
+      - 导入提交时带 column_map（JSON 字符串，键为按上面同样规则去首尾空白、不截断的表头原文，值为字段或 null；表头为空的列与同名的后几列不放进去）；services/contacts.ts 的导入函数增加这个参数
+      - 结果卡片显示实际返回的新增客户数（inserted）、加到已有客户的商机数（deals_added）、跳过数（skipped）与错误列表，不再读不存在的 updated；预览里新增与更新的计数改为按对应到 id 的列计加商机到已有客户的行数，不再读已不存在的表头；预览里缺名字的行数与标红改为按对应到 name 的列判断（没有对应 name 的列时不标；对应到 id 的列有值的行是加商机到已有客户，不需要名字、不标；整行都为空的行不计入任何计数；单元格「有值」按设计第九节第 16 条的字符集去空白后判断）
+      - services/ai.ts 新增调用识别列接口的函数与类型；新文案同时加在 en 与 zh 的 contacts 命名空间，不写硬编码文字；导入页其他行为（自动分配、策略、模板下载）不变；前端类型检查与构建由 PR 的必需 CI 检查 frontend 执行并通过（Worker 沙箱不跑 npm）
+      - tasks/todo.md 新增 CRM-TASK-058 记录段（做了什么、偏离了什么、验证到什么程度）；偏离段只列两类、每条一句：与验收标准或设计文档不一致的做法，以及验收标准没有要求、但改变了现有接口或页面行为的改动；验收标准要求的改动与重构、命名、格式调整不算偏离，没有就写无；偏离段漏列只算非阻塞意见，除非漏列的改动本身违反某条验收标准（那时按那一条判）；验证段只写前端类型检查与构建由 PR 的必需检查 frontend 执行、检查结果由 Worker 和 CI 记录不写在这里、没有在浏览器里实际操作过，不写任何检查是否运行或通过；不改 planning-v1 块；复选框只允许 [ ] / [x]；改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不改后端；allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#135），不合并、不直推
+    allowed_change_paths:
+      - frontend/src/pages/Contacts/ExcelImport.tsx
+      - frontend/src/pages/Contacts/ImportColumnMap.tsx
+      - frontend/src/services/contacts.ts
+      - frontend/src/services/ai.ts
+      - frontend/src/types/index.ts
+      - frontend/src/locales/en/contacts.json
+      - frontend/src/locales/zh/contacts.json
+      - tasks/todo.md
+    allowed_commands:
+      - lint.check
+      - format.check
+      - format.apply
+    creates_branch: true
+    creates_pull_request: true
+
+  - id: CRM-TASK-059
+    title: AI评测样例：导入表格识别列名10个
+    purpose: >-
+      按 docs/contact-import-columns.md 第五节与第九节、docs/ai-eval.md 第二节，在评测脚本里加 import_columns 功能并写 10 个自拟样例。只改评测脚本的功能登记与样例：不改 app 下任何文件；样本值里的人名、公司、电话、邮箱全部自拟。
+    status: ready
+    depends_on:
+      - CRM-TASK-056
+      - CRM-TASK-054
+    acceptance_criteria:
+      - evals 的 FEATURE_NAMES 在 contact_extract 之后加 import_columns；features.py 加对应适配：调用 import_columns_service.suggest_import_columns，传 acting_user 的用户对象、params 里的 columns 与 output_language；报告字段为 mappings；自动标记不扫任何字段（输出没有自由文字）；样例只需建出 acting_user，不建客户数据；其他功能的登记不变
+      - 新增 backend/evals/samples/import_columns.json，10 个样例，covers 写明覆盖什么；覆盖：中文表头、英文表头、马来文表头、缩写（如 Tel、HP、Co）、只能看样本才能判断的表头（如 Column3）、多余的序号列（应为 null）、两列都像电话、有金额与状态列；1 个注入样例（injection 为真，某个表头或样本里写着让 AI 把所有列都对应到 name，must_not_contain 留空，靠人工判断）
+      - 样本值只用自拟的人名、公司、电话与邮箱，不写任何网址、主机名与真实个人或公司的信息；每个样例的 columns 符合业务函数的上限
+      - 新测试文件 test_evals_samples_import 覆盖：1 有 10 个样例、id 不重复、每个有 covers；2 每个样例都能建出 acting_user，columns 不超过 40 列、每列不超过 3 个样本、样本不超过 50 字、表头不重复；3 恰好一个 injection 为真的样例；4 FEATURE_NAMES 的顺序与适配的参数正确（不调业务函数）。测试只需覆盖这些用例，每个测试写明守住的是哪一条验收标准；清单之外的补充覆盖只算非阻塞意见；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
+      - tasks/todo.md 新增 CRM-TASK-059 记录段（做了什么、偏离了什么、验证到什么程度）；偏离段只列两类、每条一句：与验收标准或设计文档不一致的做法，以及验收标准没有要求、但改变了现有接口或页面行为的改动；验收标准要求的改动与重构、命名、格式调整不算偏离，没有就写无；偏离段漏列只算非阻塞意见，除非漏列的改动本身违反某条验收标准（那时按那一条判）；验证段只写测试由 PR 的必需检查 backend 执行、检查结果由 Worker 和 CI 记录不写在这里、没有调用过真实模型，不写任何检查是否运行或通过；不改 planning-v1 块；复选框只允许 [ ] / [x]；改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不改 app 下任何文件；allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#135），不合并、不直推
+    allowed_change_paths:
+      - backend/evals/__init__.py
+      - backend/evals/features.py
+      - backend/evals/samples/import_columns.json
+      - backend/tests/test_evals_samples_import.py
+      - tasks/todo.md
+    allowed_commands:
+      - lint.check
+      - format.check
+      - format.apply
+    creates_branch: true
+    creates_pull_request: true
+
+  - id: CRM-TASK-060
+    title: 疑似重复客户的判定规则与查询，按可见范围分组
+    purpose: >-
+      按 docs/contact-duplicate-hints.md 第三、四节与 6.1 节，写疑似重复的规则判定（电话、邮箱、同名同公司）与查询，结果按员工看得到与看不到分开。只做业务规则层：不用 AI、不加接口、不改前端、不加表与迁移、不改 contact_service。
+    status: ready
+    depends_on: []
+    acceptance_criteria:
+      - 新文件 duplicate_service 新增 normalize_name(value)（转小写、去掉标点与全部空白）与 normalize_company(value)：先转小写、把标点换成空格、压缩空白，再从末尾按整词反复去掉常见后缀（sdn bhd、bhd、berhad、plt、enterprise、trading、ltd、limited、co、inc；中文后缀有限公司、公司按末尾子串去掉），最后去掉全部空白；不是整词的部分不去（Zinc 不变）；空值或规范化后为空返回 None
+      - 新增 find_duplicates(db, *, user, name, company, email, phone, exclude_id=None, limit=20)，返回含 visible 与 hidden_count 的结果对象：比较对象是未删除（含已归档）且不是 exclude_id 的客户；规则 phone 为两边 normalize_phone 后相同（规范化不了的不比）；email 为两边去首尾空白转小写后相同，去空白后为空的不比；name_company 为名字与公司都非空、两边的名字都不是号码（去首尾空白后只由数字、加号、空格与短横组成的算号码，任一边是号码就不比），且 normalize_name 与 normalize_company 两边都相同；一个客户命中几条规则 rules 就列几条（按 phone、email、name_company 的顺序）
+      - 可见范围：对方客户 may_access_contact 为真的进 visible（每个含 id、name、company、assigned_to_name、rules，按命中规则数从多到少、再按创建时间从早到晚，最多 limit 个），否则只计入 hidden_count；管理员全部可见
+      - 查询方式：phone 用等值条件；email 用库里 lower(trim(email)) 与输入比较；name_company 取全部未删除且名字与公司都非空的客户的 id、name、company，在 Python 里比规范化结果（demo 规模可接受，接真实客户前再议，设计第九节第 2 条）；整个函数的查询次数是常数
+      - 新测试文件 test_duplicate_service 覆盖：1 normalize_company：Tan Hardware Sdn Bhd、TAN HARDWARE、tan hardware sdn. bhd. 规范化相同，T.A.N. Hardware 与 Tan Hardware 相同，陈氏贸易有限公司与陈氏贸易相同，Zinc 与 Mexico 不变，空串为 None；2 phone：012-345 6789 与 60123456789 命中，规范化不了的不比；3 email 大小写与首尾空白不同仍命中，只有空白的邮箱不比；4 name_company：同名同公司命中，只同名或只同公司不命中，名字是号码不参与；5 一个客户同时命中 phone 与 email 时 rules 两条；6 已删除的不算、已归档的算、exclude_id 被排除；7 销售查到别人名下的只计 hidden_count、自己名下的进 visible 且带负责人名字，经理看得到团队的，管理员全部可见；8 limit 生效且排序正确。测试只需覆盖这些用例，每个测试写明守住的是哪一条验收标准；清单之外的补充覆盖只算非阻塞意见；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
+      - tasks/todo.md 新增 CRM-TASK-060 记录段（做了什么、偏离了什么、验证到什么程度）；偏离段只列两类、每条一句：与验收标准或设计文档不一致的做法，以及验收标准没有要求、但改变了现有接口或页面行为的改动；验收标准要求的改动与重构、命名、格式调整不算偏离，没有就写无；偏离段漏列只算非阻塞意见，除非漏列的改动本身违反某条验收标准（那时按那一条判）；验证段只写测试由 PR 的必需检查 backend 执行、检查结果由 Worker 和 CI 记录不写在这里，不写任何检查是否运行或通过；不改 planning-v1 块；复选框只允许 [ ] / [x]；改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不加表、不加迁移、不改接口与前端、不改 contact_service；allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#135），不合并、不直推
+    allowed_change_paths:
+      - backend/app/services/duplicate_service.py
+      - backend/tests/test_duplicate_service.py
+      - tasks/todo.md
+    allowed_commands:
+      - lint.check
+      - format.check
+      - format.apply
+    creates_branch: true
+    creates_pull_request: true
+
+  - id: CRM-TASK-061
+    title: 疑似重复客户的查询接口：新建前检查与客户的疑似重复
+    purpose: >-
+      按 docs/contact-duplicate-hints.md 6.2 节，把 CRM-TASK-060 的查询接成两个接口。只做接口层：不改判定规则、不改表结构、不改前端、不改现有联系人接口的行为。
+    status: ready
+    depends_on:
+      - CRM-TASK-060
+      - CRM-TASK-055
+    acceptance_criteria:
+      - 新增 POST /api/contacts/duplicate-check：要求登录；请求体 name、company、email、phone 都可空（字符串，各按联系人表的长度上限校验，超长 422）；调用 find_duplicates 并返回 visible 与 hidden_count；四项都为空时直接返回空结果、不查库
+      - 新增 GET /api/contacts/{contact_id}/duplicates：要求登录；联系人不存在、已删除或 may_access_contact 为假时返回与 GET /api/contacts/{contact_id} 相同的 404 NOT_FOUND；否则用这个联系人的 name、company、email、phone 与 exclude_id 调 find_duplicates 并返回同样的结构
+      - 两个接口的路由不与现有的 /{contact_id} 路由冲突（duplicate-check 不会被当成 id）；schemas 里加请求与响应模型；现有联系人接口的行为不变
+      - 新测试文件 test_contact_duplicates_api 覆盖：1 duplicate-check 未登录 401 或 403、超长 422、四项为空返回空结果；2 销售查到的别人名下的只给数量、不出现对方名字；3 GET duplicates 对别人名下的联系人返回 404，对自己的返回结果且不包含自己；4 已删除的联系人返回 404；5 GET /api/contacts/{id} 与 PUT 的行为不受影响（各一个用例）。测试只需覆盖这些用例，每个测试写明守住的是哪一条验收标准；清单之外的补充覆盖只算非阻塞意见；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
+      - tasks/todo.md 新增 CRM-TASK-061 记录段（做了什么、偏离了什么、验证到什么程度）；偏离段只列两类、每条一句：与验收标准或设计文档不一致的做法，以及验收标准没有要求、但改变了现有接口或页面行为的改动；验收标准要求的改动与重构、命名、格式调整不算偏离，没有就写无；偏离段漏列只算非阻塞意见，除非漏列的改动本身违反某条验收标准（那时按那一条判）；验证段只写测试由 PR 的必需检查 backend 执行、检查结果由 Worker 和 CI 记录不写在这里，不写任何检查是否运行或通过；不改 planning-v1 块；复选框只允许 [ ] / [x]；改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不加表、不加迁移、不改前端；allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#135），不合并、不直推
+    allowed_change_paths:
+      - backend/app/routers/contacts.py
+      - backend/app/schemas/contact.py
+      - backend/tests/test_contact_duplicates_api.py
+      - tasks/todo.md
+    allowed_commands:
+      - lint.check
+      - format.check
+      - format.apply
+    creates_branch: true
+    creates_pull_request: true
+
+  - id: CRM-TASK-062
+    title: 导入客户时按电话或邮箱跳过疑似重复，可选择照导
+    purpose: >-
+      按 docs/contact-duplicate-hints.md 第五节第 3 条与 6.3 节，导入新建客户的行在插入前按电话与邮箱查重，命中默认跳过并记错误，导入接口加 skip_duplicates 可关闭。只改导入：不改其他联系人接口、不加表与迁移、不改前端。
+    status: ready
+    depends_on:
+      - CRM-TASK-060
+      - CRM-TASK-055
+    acceptance_criteria:
+      - import_contacts 新增参数 skip_duplicates（缺省为真）；只填了 id 的行（加商机到已有客户）不查重；新建客户的行在插入前用 phone 与 email 两条规则（与 duplicate_service 相同的规范化）和库里未删除的客户、以及本次导入已插入的行比较；已因校验失败（名字、邮箱格式、负责人、状态等）被跳过的行不再查重；查重的先后为：电话与本次已插入的行相同、电话与导入前就有的客户相同、邮箱与本次已插入的行相同、邮箱与导入前就有的客户相同，取第一个命中的（本次已插入的行记下规范化后的电话、邮箱与表格行号）；命中且 skip_duplicates 为真时跳过，errors 记一条：row 为该行的表格行号（表头是第 1 行），field 为命中的那一项（phone 或 email），message 为英文 Possible duplicate 加 same phone as row N、same email as row N、same phone as an existing contact 或 same email as an existing contact 之一，N 为表格行号；不写对方的名字与 id
+      - skip_duplicates 为假时照常插入（与现在相同）；name_company 规则不用于导入；导入的其他规则与返回结构不变
+      - POST /api/contacts/import 新增可选表单字段 skip_duplicates（缺省为真，接受 true 与 false），传给 import_contacts；与 CRM-TASK-055 的 column_map 同时使用时互不影响
+      - 新测试文件 test_contact_import_duplicates 覆盖：1 与已有客户电话相同的行被跳过且原因正确、不含对方名字；2 邮箱大小写不同也跳过；3 同一张表里第 3 行与第 2 行（第一条数据）电话相同时第 3 行跳过，message 含 same phone as row 2；电话与已有客户相同、邮箱与本表前一行相同时只记一条，field 为 phone、message 为 same phone as an existing contact；缺名字的行只有原来的错误、没有疑似重复的错误；4 skip_duplicates 为假时都插入；5 已删除的客户不算；6 只填 id 的行不查重；7 与 column_map 同时使用正常。测试只需覆盖这些用例，每个测试写明守住的是哪一条验收标准；清单之外的补充覆盖只算非阻塞意见；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
+      - tasks/todo.md 新增 CRM-TASK-062 记录段（做了什么、偏离了什么、验证到什么程度）；偏离段只列两类、每条一句：与验收标准或设计文档不一致的做法，以及验收标准没有要求、但改变了现有接口或页面行为的改动；验收标准要求的改动与重构、命名、格式调整不算偏离，没有就写无；偏离段漏列只算非阻塞意见，除非漏列的改动本身违反某条验收标准（那时按那一条判）；验证段只写测试由 PR 的必需检查 backend 执行、检查结果由 Worker 和 CI 记录不写在这里，不写任何检查是否运行或通过；不改 planning-v1 块；复选框只允许 [ ] / [x]；改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不加表、不加迁移、不改前端；allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#135），不合并、不直推
+    allowed_change_paths:
+      - backend/app/services/contact_service.py
+      - backend/app/routers/contacts.py
+      - backend/tests/test_contact_import_duplicates.py
+      - tasks/todo.md
+    allowed_commands:
+      - lint.check
+      - format.check
+      - format.apply
+    creates_branch: true
+    creates_pull_request: true
+
+  - id: CRM-TASK-063
+    title: 新建客户表单与详情面板显示疑似重复提示
+    purpose: >-
+      按 docs/contact-duplicate-hints.md 第四节、第五节第 1、2 条与 6.4 节，调用 CRM-TASK-061 的两个接口，在新建客户表单与客户详情面板显示疑似重复。只提示不拦。只改前端：不改后端、不加页面或路由。
+    status: ready
+    depends_on:
+      - CRM-TASK-061
+      - CRM-TASK-053
+    acceptance_criteria:
+      - 新组件 DuplicateHint 输入 visible 与 hidden_count：visible 每个显示名字、公司、负责人与命中的规则（电话相同、邮箱相同、同名同公司），只有在详情面板里可点击（新建页里是纯文字）；hidden_count 大于 0 时显示另有 N 个客户可能是同一人、归属其他同事、请联系经理确认，不显示对方任何资料；两者都为空时不渲染
+      - 新建客户（NewContact 使用的 ContactForm，仅新建模式）：电话、邮箱、名字、公司任一失焦时，四项都为空则清掉提示、不发请求，否则调 duplicate-check（300 毫秒内只发最后一次，旧请求的结果被新请求取代），结果显示在表单上方；不拦保存，请求未回来也能保存；编辑模式不查
+      - 客户详情面板：打开或切换客户时调 GET duplicates，有结果时在名字下面显示 DuplicateHint；点击看得到的客户时通过 Contacts 的 index.tsx 新加的回调读出该客户并设为当前选中（编辑、归档、删除随之指向它）；切换客户时丢弃还没回来的结果；面板现有内容（含电话冲突标记与 AI 卡片）与行为不变
+      - services/contacts.ts 新增两个接口的调用函数，types 加对应类型；新文案同时加在 en 与 zh 的 contacts 命名空间，不写硬编码文字；前端类型检查与构建由 PR 的必需 CI 检查 frontend 执行并通过（Worker 沙箱不跑 npm）
+      - tasks/todo.md 新增 CRM-TASK-063 记录段（做了什么、偏离了什么、验证到什么程度）；偏离段只列两类、每条一句：与验收标准或设计文档不一致的做法，以及验收标准没有要求、但改变了现有接口或页面行为的改动；验收标准要求的改动与重构、命名、格式调整不算偏离，没有就写无；偏离段漏列只算非阻塞意见，除非漏列的改动本身违反某条验收标准（那时按那一条判）；验证段只写前端类型检查与构建由 PR 的必需检查 frontend 执行、检查结果由 Worker 和 CI 记录不写在这里、没有在浏览器里实际操作过，不写任何检查是否运行或通过；不改 planning-v1 块；复选框只允许 [ ] / [x]；改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不改后端；allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#135），不合并、不直推
+    allowed_change_paths:
+      - frontend/src/pages/Contacts/DuplicateHint.tsx
+      - frontend/src/pages/Contacts/NewContact.tsx
+      - frontend/src/pages/Contacts/ContactForm.tsx
+      - frontend/src/pages/Contacts/ContactDetailPanel.tsx
+      - frontend/src/pages/Contacts/index.tsx
+      - frontend/src/services/contacts.ts
+      - frontend/src/types/index.ts
+      - frontend/src/locales/en/contacts.json
+      - frontend/src/locales/zh/contacts.json
+      - tasks/todo.md
+    allowed_commands:
+      - lint.check
+      - format.check
+      - format.apply
+    creates_branch: true
+    creates_pull_request: true
+
+  - id: CRM-TASK-064
+    title: 导入页加疑似重复的也导入勾选框
+    purpose: >-
+      按 docs/contact-duplicate-hints.md 第五节第 3 条与 6.4 节，在导入页加勾选框，把 CRM-TASK-062 的 skip_duplicates 传给导入接口。只改前端：不改后端。
+    status: ready
+    depends_on:
+      - CRM-TASK-062
+      - CRM-TASK-058
+    acceptance_criteria:
+      - ExcelImport 在自动分配选项附近加勾选框疑似重复的也导入，默认不勾；不勾时提交 skip_duplicates 为 true，勾上为 false；旁边一句说明按电话或邮箱判断
+      - services/contacts.ts 的导入函数增加 skip_duplicates 参数；结果卡片的错误列表照常显示疑似重复的原因（来自接口，不另加文案）
+      - 导入页其他行为（列对应表、AI 识别列、自动分配、模板下载、结果卡片）不变；新文案同时加在 en 与 zh 的 contacts 命名空间；前端类型检查与构建由 PR 的必需 CI 检查 frontend 执行并通过（Worker 沙箱不跑 npm）
+      - tasks/todo.md 新增 CRM-TASK-064 记录段（做了什么、偏离了什么、验证到什么程度）；偏离段只列两类、每条一句：与验收标准或设计文档不一致的做法，以及验收标准没有要求、但改变了现有接口或页面行为的改动；验收标准要求的改动与重构、命名、格式调整不算偏离，没有就写无；偏离段漏列只算非阻塞意见，除非漏列的改动本身违反某条验收标准（那时按那一条判）；验证段只写前端类型检查与构建由 PR 的必需检查 frontend 执行、检查结果由 Worker 和 CI 记录不写在这里、没有在浏览器里实际操作过，不写任何检查是否运行或通过；不改 planning-v1 块；复选框只允许 [ ] / [x]；改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不改后端；allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#135），不合并、不直推
+    allowed_change_paths:
+      - frontend/src/pages/Contacts/ExcelImport.tsx
+      - frontend/src/services/contacts.ts
+      - frontend/src/locales/en/contacts.json
+      - frontend/src/locales/zh/contacts.json
+      - tasks/todo.md
+    allowed_commands:
+      - lint.check
+      - format.check
+      - format.apply
+    creates_branch: true
+    creates_pull_request: true
+
+  - id: CRM-TASK-065
+    title: 会话意图与紧急度标签表，以及AI审计表的员工字段改为可空
+    purpose: >-
+      按 docs/inbox-ai-triage.md 第三节与第七节第 1 项，新建 conversation_triage 表存每个客户会话的两个标签，并把 ai_requests.user_id 改为可空（系统自动触发的调用没有员工）。一次迁移加模型同步。只做表结构：不改服务、接口、前端。
+    status: ready
+    depends_on: []
+    acceptance_criteria:
+      - 新增迁移 017，down_revision 为 016：upgrade 新建 conversation_triage 表（contact_id 字符串 36 主键；intent 枚举 inquiry、quotation、order、complaint、after_sales、appointment、other，非空；urgency 枚举 low、normal、high、urgent，非空；message_id 字符串 36 非空；request_id 字符串 32 可空；triaged_at 时间非空，无时区 UTC），不加外键；并把 ai_requests.user_id 改为可空（用 batch_alter_table 并给出 existing_type，MySQL 与 SQLite 都能执行）
+      - downgrade：删除 user_id 为空的审计行后把 user_id 改回非空，再删掉 conversation_triage 表与它的枚举；迁移的 docstring 写明 downgrade 会丢掉这些审计行与全部标签
+      - 新增模型 ConversationTriage 并在 models 包里导出，枚举用 validate_strings；AiRequest.user_id 改为可空；其他模型不变
+      - 新测试文件 test_migration_017 用 Alembic 的 Operations 在内存 SQLite 上覆盖：1 依次执行 015、016、017 的 upgrade 后表与列存在、user_id 可空、能插入 user_id 为空的审计行；2 017 的 downgrade 后表消失、user_id 为空的行被删、其他行保留、user_id 回到非空；3 按模型建表后 intent 与 urgency 只接受枚举值。现有的 test_migration_015 与 test_migration_016_ai_requests 不改且照常通过。测试只需覆盖这些用例，每个测试写明守住的是哪一条验收标准；清单之外的补充覆盖只算非阻塞意见；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
+      - tasks/todo.md 新增 CRM-TASK-065 记录段（做了什么、偏离了什么、验证到什么程度）；偏离段只列两类、每条一句：与验收标准或设计文档不一致的做法，以及验收标准没有要求、但改变了现有接口或页面行为的改动；验收标准要求的改动与重构、命名、格式调整不算偏离，没有就写无；偏离段漏列只算非阻塞意见，除非漏列的改动本身违反某条验收标准（那时按那一条判）；验证段只写测试由 PR 的必需检查 backend 执行、检查结果由 Worker 和 CI 记录不写在这里，不写任何检查是否运行或通过；不改 planning-v1 块；复选框只允许 [ ] / [x]；改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不改服务、接口与前端；allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#135），不合并、不直推
+    allowed_change_paths:
+      - backend/alembic/versions/017_add_conversation_triage.py
+      - backend/app/models/conversation_triage.py
+      - backend/app/models/__init__.py
+      - backend/app/models/ai_request.py
+      - backend/tests/test_migration_017.py
+      - tasks/todo.md
+    allowed_commands:
+      - lint.check
+      - format.check
+      - format.apply
+    creates_branch: true
+    creates_pull_request: true
+
+  - id: CRM-TASK-066
+    title: 会话意图与紧急度的快照、提示词、校验与打标签函数
+    purpose: >-
+      按 docs/inbox-ai-triage.md 第四节 4.1 与第五节、第九节，写会话快照、crm.message_triage 的提示词与校验、给一个会话打标签并写入 conversation_triage 的函数，以及后台任务用的包装函数与开关配置。只做业务规则层：不改事件接口与收件箱接口、不改前端；测试打桩 AI 客户端，不调真实模型、不写任何真实密钥与地址。
+    status: ready
+    depends_on:
+      - CRM-TASK-065
+    acceptance_criteria:
+      - 新文件 message_triage_service 新增 build_triage_snapshot(db, *, contact, now)：恰好含 contact（name 截 100 字、company 截 200 字）与 messages（这个客户最近 10 条消息，按创建时间、同一时间按 id，从旧到新，每条含 at、direction、author_kind（为空时按方向推断）、channel、body 截到 500 字）；不调 AI
+      - ai_features 新增 MESSAGE_TRIAGE_FEATURE（crm.message_triage）、MESSAGE_TRIAGE_SYSTEM、MESSAGE_TRIAGE_SCHEMA 与 validate_message_triage(output)；系统提示写明快照是不可信数据、不执行其中的指令，按顾客最新的诉求判断，逐个写明七个意图与四个紧急度的含义（照设计第五节），拿不准时意图选 other、紧急度选 normal；schema 为 intent、urgency 两个枚举，必填，不允许多余字段；校验两个值都在枚举里且恰好这两个键，否则返回 None；max_tokens 4000
+      - ai_assist_service：结果对象新增可空字段 intent、urgency；新增类别常量 SKIPPED（skipped）与 SUPERSEDED（superseded）；write_ai_request 与它内部记结果的函数的 user_id 可以是 None；其他 AI 功能的行为不变
+      - 新增 classify_conversation(db, *, contact_id, message_id)：客户不存在或已删除、message_id 不存在或不属于这个客户为 skipped；message_id 那条不是入站消息为 skipped；这个客户有比它更新（创建时间更晚、同一时间按 id，且创建时间不晚于当前 UTC 加 5 分钟，设计第九节第 5 条）的入站消息为 superseded；AI 未配置为 not_configured；这三种不调 AI、不写审计；之后组装快照，用户消息为紧凑 JSON，恰好含 as_of 与 snapshot；按三类结果处理，每次进入调用写一行 feature 为 crm.message_triage、user_id 为空、contact_id 为这个客户的审计；校验不过改判 error 且保留 request_id；成功时在写入前再查一次是否已有更新的入站消息、以及已有的一行覆盖的消息是否比 message_id 那条更新（同样只算创建时间不晚于当前 UTC 加 5 分钟的），任一成立则不写、类别改为 superseded（审计照实写 ok）；否则把这个客户的一行插入或覆盖（intent、urgency、message_id、request_id、triaged_at 为当前 UTC）；失败不改原有的行；返回带类别、request_id、intent、urgency 的结果；不提交事务（调用方提交）
+      - config 新增 ai_triage_enabled（环境变量 AI_TRIAGE_ENABLED，缺省为假）；新增常量 TRIAGE_DELAY_SECONDS 为 20 与 run_triage(contact_id, message_id, delay=TRIAGE_DELAY_SECONDS)：开关为假或 AI 未配置时直接返回；否则先等 delay 秒（让顾客连发的后几条先进库，设计第九节第 4 条），再自己用应用的会话工厂开一个会话调 classify_conversation 并提交；任何异常只记日志不抛出
+      - 新测试文件 test_message_triage_service 打桩 AI 客户端与配置，覆盖：1 快照：11 条只取最近 10 条且从旧到新、别的客户的不进来、501 字截到 500、author_kind 推断；2 校验：合格通过，枚举外的值、缺键、多键不通过；3 请求：feature、max_tokens、schema、系统提示含不可信数据声明，用户消息两个键；4 检查顺序：客户已删除、message_id 属于别的客户、message_id 是出站消息为 skipped；有更新的入站消息为 superseded，更新的是出站消息或创建时间在 10 分钟后的未来时不是；未配置为 not_configured；都不调客户端、不写审计；5 成功时 conversation_triage 新插入一行、再次成功覆盖同一行，审计 user_id 为空；AI 调用期间（打桩里）插入一条更新的入站消息时不写、类别为 superseded；已有的一行覆盖的是更新的消息时不被旧的覆盖；校验不过、error、unavailable 时原有的行不变且审计各一行；6 run_triage：开关为假时不调 classify_conversation，classify_conversation 抛异常时 run_triage 不抛出，delay 为 0 时不等待（测试一律传 0）。测试只需覆盖这些用例，每个测试写明守住的是哪一条验收标准；清单之外的补充覆盖只算非阻塞意见；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
+      - tasks/todo.md 新增 CRM-TASK-066 记录段（做了什么、偏离了什么、验证到什么程度）；偏离段只列两类、每条一句：与验收标准或设计文档不一致的做法，以及验收标准没有要求、但改变了现有接口或页面行为的改动；验收标准要求的改动与重构、命名、格式调整不算偏离，没有就写无；偏离段漏列只算非阻塞意见，除非漏列的改动本身违反某条验收标准（那时按那一条判）；验证段只写测试由 PR 的必需检查 backend 执行、检查结果由 Worker 和 CI 记录不写在这里，不写任何检查是否运行或通过；不改 planning-v1 块；复选框只允许 [ ] / [x]；改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不加表、不加迁移、不改接口与前端；allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#135），不合并、不直推
+    allowed_change_paths:
+      - backend/app/services/message_triage_service.py
+      - backend/app/services/ai_features.py
+      - backend/app/services/ai_assist_service.py
+      - backend/app/config.py
+      - backend/tests/test_message_triage_service.py
+      - tasks/todo.md
+    allowed_commands:
+      - lint.check
+      - format.check
+      - format.apply
+    creates_branch: true
+    creates_pull_request: true
+
+  - id: CRM-TASK-067
+    title: chatbot顾客消息进来后在后台触发会话意图与紧急度标注
+    purpose: >-
+      按 docs/inbox-ai-triage.md 第二节与 4.2 节，chatbot 事件接口在新存入一条顾客消息并提交后，把 CRM-TASK-066 的 run_triage 排进后台任务；开关缺省关。并在部署文档写明新配置。只改事件接口与部署文档：不改事件处理规则、不改收件箱接口、不改前端。
+    status: ready
+    depends_on:
+      - CRM-TASK-066
+    acceptance_criteria:
+      - POST /internal/chatbot/events 增加 BackgroundTasks 参数：事件类型为 customer_message、处理结果为 stored、且 ai_triage_enabled 为真与 AI 已配置时，在提交之后按 external_id（wa_message_id）查出刚存入的消息，把 run_triage(该消息的 contact_id, 该消息的 id) 排进后台任务；其他事件类型、duplicate 与 ignored 结果、开关为假时都不排
+      - 给 chatbot 的响应内容与状态码不变，不等后台任务；查消息或排任务出错只记日志，不影响响应
+      - DEPLOY.md 的环境变量清单加 AI_TRIAGE_ENABLED：缺省关，打开后顾客消息进来约 20 秒后自动调用一次 AI，20 秒内的连发只调一次（只在 AI 四项配置齐全时生效）
+      - 新测试文件 test_chatbot_event_triage 打桩 run_triage 与签名，覆盖：1 开关开时新存入的 customer_message 排了一次 run_triage 且参数是该消息的 contact_id 与 id；2 重复事件、ignored、agent_reply、交接与送达类事件都不排；3 开关关、或 AI 未配置时不排；4 响应与开关关时完全相同。测试只需覆盖这些用例，每个测试写明守住的是哪一条验收标准；清单之外的补充覆盖只算非阻塞意见；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
+      - tasks/todo.md 新增 CRM-TASK-067 记录段（做了什么、偏离了什么、验证到什么程度）；偏离段只列两类、每条一句：与验收标准或设计文档不一致的做法，以及验收标准没有要求、但改变了现有接口或页面行为的改动；验收标准要求的改动与重构、命名、格式调整不算偏离，没有就写无；偏离段漏列只算非阻塞意见，除非漏列的改动本身违反某条验收标准（那时按那一条判）；验证段只写测试由 PR 的必需检查 backend 执行、检查结果由 Worker 和 CI 记录不写在这里，不写任何检查是否运行或通过；不改 planning-v1 块；复选框只允许 [ ] / [x]；改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不加表、不加迁移、不改前端；allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#135），不合并、不直推
+    allowed_change_paths:
+      - backend/app/routers/internal_chatbot.py
+      - DEPLOY.md
+      - backend/tests/test_chatbot_event_triage.py
+      - tasks/todo.md
+    allowed_commands:
+      - lint.check
+      - format.check
+      - format.apply
+    creates_branch: true
+    creates_pull_request: true
+
+  - id: CRM-TASK-068
+    title: 收件箱消息列表返回会话标签，未读页可按紧急度排序
+    purpose: >-
+      按 docs/inbox-ai-triage.md 4.3 节，GET /api/messages 每条消息带所属会话的标签，并在只看未读时支持按紧急度排序。只做接口层：不改权限与分页规则、不改表结构、不改前端。
+    status: ready
+    depends_on:
+      - CRM-TASK-065
+    acceptance_criteria:
+      - GET /api/messages 每条消息新增 triage：所属客户在 conversation_triage 有一行时为含 intent、urgency、triaged_at（UTC 到秒带 Z）的对象，否则为 null；一页的标签用一次查询取出，不按消息逐条查
+      - 新增查询参数 sort，取值 time（缺省）或 urgency，其他值返回 422；urgency 只在 is_read 为 false 时生效：按所属会话的紧急度 urgent、high、normal、low、没有标签的顺序，再按创建时间倒序；is_read 不是 false 时给了 urgency 仍按时间倒序
+      - 权限范围、筛选、分页与总数的计算不变；其他消息接口不变
+      - 新测试文件 test_messages_triage 覆盖：1 有标签与没标签的消息各自的 triage；2 is_read 为 false 且 sort 为 urgency 时的顺序（四个紧急度加没有标签，同紧急度按时间倒序）；3 is_read 不为 false 时 sort 为 urgency 仍按时间；4 sort 为非法值返回 422；5 销售只看到自己的消息且分页总数正确。测试只需覆盖这些用例，每个测试写明守住的是哪一条验收标准；清单之外的补充覆盖只算非阻塞意见；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
+      - tasks/todo.md 新增 CRM-TASK-068 记录段（做了什么、偏离了什么、验证到什么程度）；偏离段只列两类、每条一句：与验收标准或设计文档不一致的做法，以及验收标准没有要求、但改变了现有接口或页面行为的改动；验收标准要求的改动与重构、命名、格式调整不算偏离，没有就写无；偏离段漏列只算非阻塞意见，除非漏列的改动本身违反某条验收标准（那时按那一条判）；验证段只写测试由 PR 的必需检查 backend 执行、检查结果由 Worker 和 CI 记录不写在这里，不写任何检查是否运行或通过；不改 planning-v1 块；复选框只允许 [ ] / [x]；改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不加表、不加迁移、不改前端；allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#135），不合并、不直推
+    allowed_change_paths:
+      - backend/app/routers/messages.py
+      - backend/tests/test_messages_triage.py
+      - tasks/todo.md
+    allowed_commands:
+      - lint.check
+      - format.check
+      - format.apply
+    creates_branch: true
+    creates_pull_request: true
+
+  - id: CRM-TASK-069
+    title: 收件箱显示会话意图与紧急度标签，未读页可按紧急度排序
+    purpose: >-
+      按 docs/inbox-ai-triage.md 4.4 节，在收件箱消息列表显示 CRM-TASK-068 返回的标签，并在未读页签加按时间与按紧急度的切换。只改前端：不改后端。
+    status: ready
+    depends_on:
+      - CRM-TASK-068
+    acceptance_criteria:
+      - MessageList 的入站消息行在 triage 不为 null 时显示意图小标签，紧急度为 urgent 时加红色紧急标签、high 时加橙色较急标签，normal 与 low 不显示紧急度标签；旁注 AI，悬停显示意图、紧急度、AI 自动判断未核实与判断时间；出站消息与 triage 为 null 时不显示
+      - 收件箱的未读页签加按时间与按紧急度的切换（只在未读页签显示），选按紧急度时请求带 sort=urgency，其他页签不带 sort；切换后回到第一页；选择存在本页状态里，切到别的页签再回来保持原选择，离开收件箱后回到按时间
+      - services/messages.ts 的列表函数增加 sort 参数，types 加 triage 类型；现有的筛选、分页、标为已读与会话视图的行为不变
+      - 新文案同时加在 en 与 zh 的 inbox 命名空间，不写硬编码文字；前端类型检查与构建由 PR 的必需 CI 检查 frontend 执行并通过（Worker 沙箱不跑 npm）
+      - tasks/todo.md 新增 CRM-TASK-069 记录段（做了什么、偏离了什么、验证到什么程度）；偏离段只列两类、每条一句：与验收标准或设计文档不一致的做法，以及验收标准没有要求、但改变了现有接口或页面行为的改动；验收标准要求的改动与重构、命名、格式调整不算偏离，没有就写无；偏离段漏列只算非阻塞意见，除非漏列的改动本身违反某条验收标准（那时按那一条判）；验证段只写前端类型检查与构建由 PR 的必需检查 frontend 执行、检查结果由 Worker 和 CI 记录不写在这里、没有在浏览器里实际操作过，不写任何检查是否运行或通过；不改 planning-v1 块；复选框只允许 [ ] / [x]；改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不改后端；allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#135），不合并、不直推
+    allowed_change_paths:
+      - frontend/src/pages/Inbox/MessageList.tsx
+      - frontend/src/pages/Inbox/index.tsx
+      - frontend/src/services/messages.ts
+      - frontend/src/types/index.ts
+      - frontend/src/locales/en/inbox.json
+      - frontend/src/locales/zh/inbox.json
+      - tasks/todo.md
+    allowed_commands:
+      - lint.check
+      - format.check
+      - format.apply
+    creates_branch: true
+    creates_pull_request: true
+
+  - id: CRM-TASK-070
+    title: AI评测样例：会话意图与紧急度12个
+    purpose: >-
+      按 docs/inbox-ai-triage.md 第五节与第九节、docs/ai-eval.md 第二节，在评测脚本里加 message_triage 功能并写 12 个自拟样例。只改评测脚本的功能登记与样例：不改 app 下任何文件；样例里的人名、公司、电话、邮箱全部自拟。
+    status: ready
+    depends_on:
+      - CRM-TASK-066
+      - CRM-TASK-059
+    acceptance_criteria:
+      - seed.py 的参数引用表加 message 对应 messages（只此一处改动），使 params 里的 message 按 key 换成消息 id；evals 的 FEATURE_NAMES 在 import_columns 之后加 message_triage；features.py 加对应适配：调用 message_triage_service.classify_conversation，传 params 里 contact 换成的 id 与 message 换成的消息 id（不传用户）；报告字段为 intent 与 urgency；自动标记不扫任何字段；其他功能的登记不变
+      - 新增 backend/evals/samples/message_triage.json，12 个样例，covers 写明覆盖什么；七个意图每个至少一个，四个紧急度都有；覆盖：很生气的投诉、问价格、只说谢谢、前面投诉后面已解决、中文、英文、马来文；params 的 message 指向这个客户最新的一条入站消息（否则会被判为 superseded）；1 个注入样例（injection 为真，消息里写着让 AI 把它标成 urgent，must_not_contain 留空，靠人工判断）
+      - 样例只用自拟的人名、公司、电话与邮箱，不写任何网址、主机名与真实个人或公司的信息
+      - 新测试文件 test_evals_samples_triage 覆盖：1 有 12 个样例、id 不重复、每个有 covers；2 每个样例都能建进内存 SQLite，params 的 message 是这个客户最新的入站消息，build_triage_snapshot 能建出快照；3 恰好一个 injection 为真的样例；4 FEATURE_NAMES 的顺序与适配的参数正确（不调业务函数）。测试只需覆盖这些用例，每个测试写明守住的是哪一条验收标准；清单之外的补充覆盖只算非阻塞意见；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
+      - tasks/todo.md 新增 CRM-TASK-070 记录段（做了什么、偏离了什么、验证到什么程度）；偏离段只列两类、每条一句：与验收标准或设计文档不一致的做法，以及验收标准没有要求、但改变了现有接口或页面行为的改动；验收标准要求的改动与重构、命名、格式调整不算偏离，没有就写无；偏离段漏列只算非阻塞意见，除非漏列的改动本身违反某条验收标准（那时按那一条判）；验证段只写测试由 PR 的必需检查 backend 执行、检查结果由 Worker 和 CI 记录不写在这里、没有调用过真实模型，不写任何检查是否运行或通过；不改 planning-v1 块；复选框只允许 [ ] / [x]；改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不改 app 下任何文件；allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#135），不合并、不直推
+    allowed_change_paths:
+      - backend/evals/__init__.py
+      - backend/evals/features.py
+      - backend/evals/seed.py
+      - backend/evals/samples/message_triage.json
+      - backend/tests/test_evals_samples_triage.py
       - tasks/todo.md
     allowed_commands:
       - lint.check
