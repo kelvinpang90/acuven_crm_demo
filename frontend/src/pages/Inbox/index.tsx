@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { messagesApi, type MessageListParams } from '@/services/messages';
 import type { Message, PaginatedResponse } from '@/types';
@@ -6,6 +6,7 @@ import MessageList from './MessageList';
 import ConversationView from './ConversationView';
 import Pagination from '@/components/common/Pagination';
 import { useIsMobile } from '@/hooks/useBreakpoint';
+import { useInboxChanges } from '@/hooks/useInboxChanges';
 
 type ChannelFilter = 'all' | 'whatsapp' | 'email' | 'unread';
 
@@ -20,6 +21,7 @@ export default function InboxPage() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Message | null>(null);
+  const requestSeq = useRef(0);
 
   const filters: { key: ChannelFilter; label: string }[] = [
     { key: 'all', label: t('allMessages') },
@@ -28,8 +30,10 @@ export default function InboxPage() {
     { key: 'unread', label: t('unread') },
   ];
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  // silent: a pushed refresh, which keeps the current list on screen meanwhile.
+  const load = useCallback(async (silent = false) => {
+    const seq = ++requestSeq.current;
+    if (!silent) setLoading(true);
     try {
       const params: MessageListParams = { page, page_size: PAGE_SIZE };
       if (filter === 'whatsapp' || filter === 'email') {
@@ -39,13 +43,17 @@ export default function InboxPage() {
       }
       const res = await messagesApi.getMessages(params);
       const paged: PaginatedResponse<Message> = res.data.data;
-      setMessages(paged.data);
-      setTotal(paged.total);
+      // Only the latest request may land; an older one would show stale rows.
+      if (seq === requestSeq.current) {
+        setMessages(paged.data);
+        setTotal(paged.total);
+      }
     } catch { /* ignore */ }
-    setLoading(false);
+    if (seq === requestSeq.current) setLoading(false);
   }, [filter, page]);
 
   useEffect(() => { load(); }, [load]);
+  useInboxChanges(() => { void load(true); });
 
   const handleFilterChange = (f: ChannelFilter) => {
     setFilter(f);

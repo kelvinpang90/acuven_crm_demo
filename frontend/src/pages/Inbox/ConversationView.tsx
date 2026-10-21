@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import axios from 'axios';
@@ -8,6 +8,7 @@ import { contactsApi, type WhatsAppHandover } from '@/services/contacts';
 import { aiApi } from '@/services/ai';
 import type { AiConversationBrief, AiLanguage, ApiError, Contact, Message } from '@/types';
 import dayjs from 'dayjs';
+import { useInboxChanges } from '@/hooks/useInboxChanges';
 import ReplyBox from './ReplyBox';
 
 interface Props {
@@ -93,20 +94,31 @@ export default function ConversationView({ contactId, contactName, channel }: Pr
   const previousContactId = useRef(contactId);
   const messageTranslationRequestVersion = useRef(0);
   const handbackRefreshTimer = useRef<number | null>(null);
+  const loadSeq = useRef(0);
+  const listRef = useRef<HTMLDivElement>(null);
+  const stickToBottom = useRef(false);
   if (previousContactId.current !== contactId) {
     previousContactId.current = contactId;
     messageTranslationRequestVersion.current += 1;
   }
   activeContactId.current = contactId;
 
-  const load = useCallback(async () => {
+  // silent: a pushed refresh, which keeps the conversation on screen meanwhile.
+  const load = useCallback(async (silent = false) => {
     if (activeContactId.current !== contactId) return;
-    setLoading(true);
+    const seq = ++loadSeq.current;
+    if (!silent) setLoading(true);
     try {
       const res = await messagesApi.getContactMessages(contactId);
-      if (activeContactId.current === contactId) setMessages(res.data.data);
+      if (activeContactId.current === contactId && seq === loadSeq.current) {
+        // Follow new messages only when the reader is already at the bottom.
+        const list = listRef.current;
+        stickToBottom.current = silent && !!list
+          && list.scrollHeight - list.scrollTop - list.clientHeight < 80;
+        setMessages(res.data.data);
+      }
     } catch { /* ignore */ }
-    if (activeContactId.current === contactId) setLoading(false);
+    if (activeContactId.current === contactId && seq === loadSeq.current) setLoading(false);
   }, [contactId]);
 
   const loadContact = useCallback(async () => {
@@ -117,6 +129,16 @@ export default function ConversationView({ contactId, contactName, channel }: Pr
   }, [contactId]);
 
   useEffect(() => { load(); }, [load]);
+  useLayoutEffect(() => {
+    if (!stickToBottom.current) return;
+    stickToBottom.current = false;
+    if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
+  }, [messages]);
+  // An inbound message also moves the WhatsApp reply window on the contact.
+  useInboxChanges(() => {
+    void load(true);
+    void loadContact();
+  });
   useEffect(() => {
     let active = true;
     void aiApi.getStatus().then(
@@ -309,7 +331,7 @@ export default function ConversationView({ contactId, contactName, channel }: Pr
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto p-3 space-y-3">
+      <div ref={listRef} className="flex-1 overflow-y-auto p-3 space-y-3">
         {loading ? <p className="text-text-muted text-sm text-center py-4">...</p> : messages.length === 0 ? <p className="text-text-muted text-sm text-center py-4">{t('noMessages')}</p> : messages.map((msg) => (
           <div key={msg.id} className={`flex ${msg.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}>
             <div className={`max-w-[75%] rounded-xl px-3 py-2 ${msg.direction === 'outbound' ? 'bg-primary/20 text-text-primary' : 'bg-dark-hover text-text-primary'}`}>
