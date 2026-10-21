@@ -1,6 +1,7 @@
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends
+from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,7 +11,7 @@ from app.models.contact import Contact
 from app.models.message import Message
 from app.models.user import User
 from app.schemas.message import EmailSendRequest, WhatsAppSendRequest
-from app.services import access_service, chatbot_send_service, email_service
+from app.services import access_service, chatbot_send_service, email_service, inbox_events
 from app.services.email_service import EmailSendError
 from app.utils.response import fail, ok
 
@@ -87,6 +88,24 @@ async def contact_messages(
     )
     messages = await _message_dicts(db, result.scalars().all())
     return ok(data=messages)
+
+
+@router.get("/stream")
+async def message_stream(
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Server-sent events: `messages_changed` whenever a message write commits."""
+    # The stream outlives this handler. FastAPI 0.111 closes get_db's session before
+    # streaming, but newer releases keep it until the response ends, which would pin
+    # a pooled connection per open stream; release it here either way.
+    await db.close()
+    return StreamingResponse(
+        inbox_events.stream(),
+        media_type="text/event-stream",
+        # X-Accel-Buffering: nginx must pass each event through, not buffer it.
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.patch("/{message_id}/read")
