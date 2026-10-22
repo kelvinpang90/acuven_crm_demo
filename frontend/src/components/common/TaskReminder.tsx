@@ -28,7 +28,7 @@ export default function TaskReminder() {
   if (!visible || tasks.length === 0) return null;
 
   return (
-    <div className="fixed top-4 right-4 z-50 w-80 bg-dark-card border border-primary/30 rounded-xl shadow-lg shadow-primary/10 p-4 animate-in fade-in slide-in-from-top-2">
+    <div className="bg-dark-card border border-primary/30 rounded-xl shadow-lg shadow-primary/10 p-4 animate-in fade-in slide-in-from-top-2">
       <div className="flex items-center justify-between mb-3">
         <h4 className="text-sm font-semibold text-text-primary">
           📋 {t('todayTasks')} ({tasks.length})

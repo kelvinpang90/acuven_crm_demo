@@ -86,5 +86,8 @@
   "aiOverwriteConfirm": "要覆盖已有的回复内容吗？",
   "aiLanguageZhCn": "中文",
   "aiLanguageEn": "英文",
-  "aiLanguageMs": "马来语"
+  "aiLanguageMs": "马来语",
+  "newMessages": "新消息",
+  "moreNewMessages": "还有 {{count}} 条",
+  "unknownContact": "未知联系人"
 }

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { messagesApi, type MessageListParams } from '@/services/messages';
 import type { Message, PaginatedResponse } from '@/types';
 import MessageList from './MessageList';
@@ -15,6 +16,8 @@ const PAGE_SIZE = 20;
 export default function InboxPage() {
   const { t } = useTranslation('inbox');
   const isMobile = useIsMobile();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [filter, setFilter] = useState<ChannelFilter>('all');
   const [messages, setMessages] = useState<Message[]>([]);
   const [total, setTotal] = useState(0);
@@ -72,6 +75,15 @@ export default function InboxPage() {
       } catch { /* ignore */ }
     }
   };
+
+  // Opened from the new-message alert: show that conversation straight away.
+  const openMessage = (location.state as { openMessage?: Message } | null)?.openMessage;
+  useEffect(() => {
+    if (!openMessage) return;
+    void handleSelect(openMessage);
+    // Drop the state so a reload or going back does not reopen it.
+    navigate(location.pathname, { replace: true, state: null });
+  }, [openMessage]);
 
   return (
     <div className="h-full flex flex-col">
