@@ -105,7 +105,7 @@ export default function InboxPage() {
   }, [openMessage]);
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-[calc(100dvh-6rem)] md:h-[calc(100dvh-2rem)] lg:h-[calc(100dvh-3rem)] flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-bold text-text-primary">{t('title')}</h1>
