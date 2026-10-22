@@ -290,7 +290,7 @@ export default function ConversationView({ contactId, contactName, channel }: Pr
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col flex-1 min-h-0">
       <div className="p-3 border-b border-dark-border">
         <div className="flex items-start justify-between gap-3">
           <div>
