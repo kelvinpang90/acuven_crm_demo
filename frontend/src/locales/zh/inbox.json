@@ -88,6 +88,6 @@
   "aiLanguageEn": "英文",
   "aiLanguageMs": "马来语",
   "newMessages": "新消息",
-  "moreNewMessages": "还有 {{count}} 条",
-  "unknownContact": "未知联系人"
+  "moreNewMessages": "还有 {{count}} 个会话",
+  "newMessagesCount": "{{count}} 条新消息"
 }

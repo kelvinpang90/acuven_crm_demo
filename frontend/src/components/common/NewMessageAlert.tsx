@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { messagesApi } from '@/services/messages';
 import { useInboxChanges } from '@/hooks/useInboxChanges';
 import type { Message } from '@/types';
+import { customerOf, farEndOf, openConversation } from '@/utils/conversation';
 
 const LATEST_COUNT = 20;
 const MAX_LISTED = 3;
@@ -20,15 +21,19 @@ function preview(body: string) {
   return chars.length > PREVIEW_CHARS ? `${chars.slice(0, PREVIEW_CHARS).join('')}…` : chars.join('');
 }
 
-// Top-right card for customer messages that arrive while the user is outside the
-// inbox. Reads the latest messages through the normal, permission-scoped list.
+// One row per customer: their newest unseen message and how many arrived.
+interface Alert {
+  latest: Message;
+  count: number;
+}
+
+// Top-right card for new customer messages, on every page except for the
+// conversation already open in the inbox. Reads the latest messages through the
+// normal, permission-scoped list.
 export default function NewMessageAlert() {
   const { t } = useTranslation('inbox');
   const navigate = useNavigate();
-  const onInbox = useLocation().pathname.startsWith('/inbox');
-  const onInboxRef = useRef(onInbox);
-  onInboxRef.current = onInbox;
-  const [alerts, setAlerts] = useState<Message[]>([]);
+  const [alerts, setAlerts] = useState<Alert[]>([]);
   // Ids already accounted for; null until the first look, which only records them.
   const seen = useRef<Set<string> | null>(null);
 
@@ -41,17 +46,30 @@ export default function NewMessageAlert() {
         seen.current = new Set(latest.map((m) => m.id));
         return;
       }
-      const fresh = latest.filter((m) => m.direction === 'inbound' && !known.has(m.id));
+      const open = openConversation.get();
+      const fresh = latest.filter(
+        (m) => m.direction === 'inbound' && !known.has(m.id) && customerOf(m) !== open
+      );
       latest.forEach((m) => known.add(m.id));
-      // The inbox list updates live; no card there, and nothing saved for later.
-      if (fresh.length === 0 || onInboxRef.current) return;
-      setAlerts((prev) => [...fresh, ...prev.filter((m) => !fresh.some((f) => f.id === m.id))]);
+      if (fresh.length === 0) return;
+      setAlerts((prev) => {
+        // Newest first: the list arrives newest first, so the first hit is the latest.
+        const merged = new Map<string, Alert>();
+        for (const m of fresh) {
+          const key = customerOf(m);
+          const hit = merged.get(key);
+          if (hit) hit.count += 1;
+          else merged.set(key, { latest: m, count: 1 });
+        }
+        for (const alert of prev) {
+          const hit = merged.get(customerOf(alert.latest));
+          if (hit) hit.count += alert.count;
+          else merged.set(customerOf(alert.latest), alert);
+        }
+        return [...merged.values()];
+      });
     } catch { /* ignore */ }
   });
-
-  useEffect(() => {
-    if (onInbox) setAlerts([]);
-  }, [onInbox]);
 
   // Restarts whenever more messages arrive.
   useEffect(() => {
@@ -71,7 +89,7 @@ export default function NewMessageAlert() {
     <div className="bg-dark-card border border-primary/30 rounded-xl shadow-lg shadow-primary/10 p-4 animate-in fade-in slide-in-from-top-2">
       <div className="flex items-center justify-between mb-3">
         <h4 className="text-sm font-semibold text-text-primary">
-          🔔 {t('newMessages')} ({alerts.length})
+          🔔 {t('newMessages')} ({alerts.reduce((sum, alert) => sum + alert.count, 0)})
         </h4>
         <button
           onClick={() => setAlerts([])}
@@ -82,20 +100,23 @@ export default function NewMessageAlert() {
         </button>
       </div>
       <div className="space-y-2">
-        {alerts.slice(0, MAX_LISTED).map((message) => (
+        {alerts.slice(0, MAX_LISTED).map(({ latest, count }) => (
           <button
-            key={message.id}
+            key={customerOf(latest)}
             type="button"
-            onClick={() => open(message)}
+            onClick={() => open(latest)}
             className="w-full text-left p-2 rounded-lg bg-dark-hover hover:bg-primary/10 text-sm"
           >
             <span className="flex items-center gap-2">
-              <span>{CHANNEL_ICONS[message.channel] || '📨'}</span>
+              <span>{CHANNEL_ICONS[latest.channel] || '📨'}</span>
               <span className="font-medium text-text-primary truncate">
-                {message.contact_name || t('unknownContact')}
+                {latest.contact_name || farEndOf(latest)}
               </span>
+              {count > 1 && (
+                <span className="ml-auto shrink-0 text-xs text-primary">{t('newMessagesCount', { count })}</span>
+              )}
             </span>
-            <span className="block text-text-secondary text-xs truncate mt-1">{preview(message.body)}</span>
+            <span className="block text-text-secondary text-xs truncate mt-1">{preview(latest.body)}</span>
           </button>
         ))}
         {alerts.length > MAX_LISTED && (
