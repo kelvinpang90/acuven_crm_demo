@@ -88,6 +88,6 @@
   "aiLanguageEn": "English",
   "aiLanguageMs": "Malay",
   "newMessages": "New messages",
-  "moreNewMessages": "+{{count}} more",
-  "unknownContact": "Unknown contact"
+  "moreNewMessages": "+{{count}} more conversations",
+  "newMessagesCount": "{{count}} new"
 }

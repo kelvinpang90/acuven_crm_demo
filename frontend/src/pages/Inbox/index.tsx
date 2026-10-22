@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { messagesApi, type MessageListParams } from '@/services/messages';
-import type { Message, PaginatedResponse } from '@/types';
+import { messagesApi, type ConversationListParams } from '@/services/messages';
+import type { Conversation, Message, PaginatedResponse } from '@/types';
 import MessageList from './MessageList';
 import ConversationView from './ConversationView';
 import Pagination from '@/components/common/Pagination';
 import { useIsMobile } from '@/hooks/useBreakpoint';
 import { useInboxChanges } from '@/hooks/useInboxChanges';
+import { customerOf, farEndOf, openConversation } from '@/utils/conversation';
 
 type ChannelFilter = 'all' | 'whatsapp' | 'email' | 'unread';
 
@@ -19,12 +20,13 @@ export default function InboxPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const [filter, setFilter] = useState<ChannelFilter>('all');
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Message | null>(null);
   const requestSeq = useRef(0);
+  const selectedCustomer = selected ? customerOf(selected) : undefined;
 
   const filters: { key: ChannelFilter; label: string }[] = [
     { key: 'all', label: t('allMessages') },
@@ -38,17 +40,17 @@ export default function InboxPage() {
     const seq = ++requestSeq.current;
     if (!silent) setLoading(true);
     try {
-      const params: MessageListParams = { page, page_size: PAGE_SIZE };
+      const params: ConversationListParams = { page, page_size: PAGE_SIZE };
       if (filter === 'whatsapp' || filter === 'email') {
         params.channel = filter;
       } else if (filter === 'unread') {
-        params.is_read = false;
+        params.unread = true;
       }
-      const res = await messagesApi.getMessages(params);
-      const paged: PaginatedResponse<Message> = res.data.data;
+      const res = await messagesApi.getConversations(params);
+      const paged: PaginatedResponse<Conversation> = res.data.data;
       // Only the latest request may land; an older one would show stale rows.
       if (seq === requestSeq.current) {
-        setMessages(paged.data);
+        setConversations(paged.data);
         setTotal(paged.total);
       }
     } catch { /* ignore */ }
@@ -64,23 +66,40 @@ export default function InboxPage() {
     setSelected(null);
   };
 
-  const handleSelect = async (msg: Message) => {
-    setSelected(msg);
-    if (!msg.is_read) {
-      try {
-        await messagesApi.markRead(msg.id);
-        setMessages((prev) =>
-          prev.map((m) => (m.id === msg.id ? { ...m, is_read: true } : m))
-        );
-      } catch { /* ignore */ }
-    }
+  // Reads the whole conversation; one without a contact can only read this row.
+  const markRead = async (message: Message) => {
+    try {
+      if (message.contact_id) await messagesApi.markContactRead(message.contact_id);
+      else await messagesApi.markRead(message.id);
+      const customer = customerOf(message);
+      setConversations((prev) =>
+        prev.map((c) => (customerOf(c) === customer ? { ...c, unread_count: 0 } : c))
+      );
+    } catch { /* ignore */ }
   };
 
+  // The open conversation stays read: on opening, and when a pushed refresh
+  // brings it new messages.
+  useEffect(() => {
+    const row = conversations.find((c) => customerOf(c) === selectedCustomer);
+    if (row && row.unread_count > 0) void markRead(row);
+  }, [conversations, selectedCustomer]);
+
+  // Lets the new-message alert skip the conversation already on screen.
+  useEffect(() => {
+    openConversation.set(selectedCustomer ?? null);
+    return () => openConversation.set(null);
+  }, [selectedCustomer]);
+
+  const handleSelect = (conversation: Conversation) => setSelected(conversation);
+
   // Opened from the new-message alert: show that conversation straight away.
+  // It may not be on this page of the list, so read it here as well.
   const openMessage = (location.state as { openMessage?: Message } | null)?.openMessage;
   useEffect(() => {
     if (!openMessage) return;
-    void handleSelect(openMessage);
+    setSelected(openMessage);
+    void markRead(openMessage);
     // Drop the state so a reload or going back does not reopen it.
     navigate(location.pathname, { replace: true, state: null });
   }, [openMessage]);
@@ -120,12 +139,12 @@ export default function InboxPage() {
           <div className="flex-1 overflow-y-auto p-2">
             {loading ? (
               <p className="text-text-muted text-sm text-center py-8">...</p>
-            ) : messages.length === 0 ? (
+            ) : conversations.length === 0 ? (
               <p className="text-text-muted text-sm text-center py-8">{t('noMessages')}</p>
             ) : (
               <MessageList
-                messages={messages}
-                selectedId={selected?.id}
+                conversations={conversations}
+                selectedCustomer={selectedCustomer}
                 onSelect={handleSelect}
               />
             )}
@@ -158,8 +177,8 @@ export default function InboxPage() {
                 </button>
               )}
               <ConversationView
-                contactId={selected.contact_id || selected.sender_id}
-                contactName={selected.contact_name || selected.sender_id}
+                contactId={customerOf(selected)}
+                contactName={selected.contact_name || farEndOf(selected)}
                 channel={selected.channel}
               />
             </>

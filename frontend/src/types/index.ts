@@ -158,6 +158,11 @@ export interface Message {
   sent_by_name: string | null;
 }
 
+// A customer's latest message, as one row of the grouped inbox.
+export interface Conversation extends Message {
+  unread_count: number;
+}
+
 // === Routing Rule ===
 export type RoutingStrategy = 'workload' | 'region' | 'win_rate';
 
