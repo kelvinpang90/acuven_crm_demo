@@ -86,5 +86,8 @@
   "aiOverwriteConfirm": "Replace the existing reply content?",
   "aiLanguageZhCn": "Chinese",
   "aiLanguageEn": "English",
-  "aiLanguageMs": "Malay"
+  "aiLanguageMs": "Malay",
+  "newMessages": "New messages",
+  "moreNewMessages": "+{{count}} more",
+  "unknownContact": "Unknown contact"
 }

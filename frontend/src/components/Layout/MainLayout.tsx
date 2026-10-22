@@ -4,6 +4,7 @@ import { useBreakpoint } from '@/hooks/useBreakpoint';
 import Sidebar from './Sidebar';
 import BottomTabBar from './BottomTabBar';
 import TaskReminder from '@/components/common/TaskReminder';
+import NewMessageAlert from '@/components/common/NewMessageAlert';
 import clsx from 'clsx';
 
 export default function MainLayout() {
@@ -30,7 +31,11 @@ export default function MainLayout() {
       </main>
 
       {isMobile && <BottomTabBar />}
-      <TaskReminder />
+      {/* Top-right cards stack here instead of overlapping. */}
+      <div className="fixed top-4 right-4 z-50 w-80 max-w-[calc(100vw-2rem)] flex flex-col gap-3">
+        <NewMessageAlert />
+        <TaskReminder />
+      </div>
     </div>
   );
 }
