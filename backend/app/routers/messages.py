@@ -2,7 +2,7 @@ from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -74,6 +74,63 @@ async def list_messages(
     )
 
 
+@router.get("/conversations")
+async def list_conversations(
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    channel: Optional[str] = None,
+    unread: Optional[bool] = None,
+    page: int = 1,
+    page_size: int = 20,
+):
+    """One row per customer: their latest message plus the unread inbound count."""
+    # The customer: the linked contact, else the far end of the message.
+    customer = func.coalesce(
+        Message.contact_id,
+        case((Message.direction == "inbound", Message.sender_id), else_=Message.recipient_id),
+    )
+    filters = await access_service.owner_scope(db, current_user, Message.assigned_to)
+    if channel:
+        filters.append(Message.channel == channel)
+
+    unread_inbound = case(
+        ((Message.direction == "inbound") & Message.is_read.is_(False), 1), else_=0
+    )
+    ranked = (
+        select(
+            Message.id.label("id"),
+            func.row_number()
+            .over(partition_by=customer, order_by=(Message.created_at.desc(), Message.id.desc()))
+            .label("rank"),
+            func.sum(unread_inbound).over(partition_by=customer).label("unread_count"),
+        )
+        .where(*filters)
+        .subquery()
+    )
+    latest = select(ranked.c.id, ranked.c.unread_count).where(ranked.c.rank == 1)
+    if unread is True:
+        latest = latest.where(ranked.c.unread_count > 0)
+    elif unread is False:
+        latest = latest.where(ranked.c.unread_count == 0)
+    latest = latest.subquery()
+
+    total = (await db.execute(select(func.count()).select_from(latest))).scalar() or 0
+    rows = (
+        await db.execute(
+            select(Message, latest.c.unread_count)
+            .join(latest, Message.id == latest.c.id)
+            .order_by(Message.created_at.desc(), Message.id.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+    ).all()
+
+    items = await _message_dicts(db, [row[0] for row in rows], include_contact_name=True)
+    for item, row in zip(items, rows):
+        item["unread_count"] = int(row[1] or 0)
+    return ok(data={"data": items, "total": total, "page": page, "page_size": page_size})
+
+
 @router.get("/contact/{contact_id}")
 async def contact_messages(
     contact_id: str,
@@ -88,6 +145,28 @@ async def contact_messages(
     )
     messages = await _message_dicts(db, result.scalars().all())
     return ok(data=messages)
+
+
+@router.patch("/contact/{contact_id}/read")
+async def mark_contact_read(
+    contact_id: str,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Opening a conversation reads all of it, not just the row that was clicked."""
+    if not await access_service.may_access_contact(db, current_user, contact_id):
+        return fail(message=NOT_YOURS_TO_READ, code="NOT_ASSIGNED", status_code=403)
+    result = await db.execute(
+        update(Message)
+        .where(
+            Message.contact_id == contact_id,
+            Message.direction == "inbound",
+            Message.is_read.is_(False),
+        )
+        .values(is_read=True)
+    )
+    await db.commit()
+    return ok(data={"updated": result.rowcount})
 
 
 @router.get("/stream")
