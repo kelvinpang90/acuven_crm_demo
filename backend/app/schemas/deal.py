@@ -1,8 +1,11 @@
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, field_validator
+
+# ai_chatbot_demo industry bots, by their bot id.
+DealSource = Literal["banking", "food", "hotel", "realestate", "retail", "saas"]
 
 
 class DealCreate(BaseModel):
@@ -12,6 +15,7 @@ class DealCreate(BaseModel):
     priority: str = "mid"
     amount: Decimal = Decimal("0.00")
     assigned_to: Optional[str] = None
+    source: Optional[DealSource] = None
 
     @field_validator("amount")
     @classmethod
@@ -45,6 +49,7 @@ class DealResponse(BaseModel):
     status: str
     priority: str
     amount: Decimal
+    source: Optional[str] = None
     assigned_to: Optional[str] = None
     assigned_to_name: Optional[str] = None
     won_at: Optional[datetime] = None

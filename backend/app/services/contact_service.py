@@ -108,6 +108,7 @@ async def list_contacts(
             d["assigned_to_name"] = user_cache[c.assigned_to]
         d["total_deal_amount"] = deal_summary.get(c.id, {}).get("total", 0.0)
         d["deal_count"] = deal_summary.get(c.id, {}).get("count", 0)
+        d["sources"] = deal_summary.get(c.id, {}).get("sources", [])
         data.append(d)
 
     return {"data": data, "total": total, "page": page, "page_size": page_size}
@@ -132,6 +133,7 @@ async def get_contact(
     summary = await _bulk_deal_summary(db, [contact_id])
     d["total_deal_amount"] = summary.get(contact_id, {}).get("total", 0.0)
     d["deal_count"] = summary.get(contact_id, {}).get("count", 0)
+    d["sources"] = summary.get(contact_id, {}).get("sources", [])
     d["wa_reply_window_until"] = (await _reply_windows_for(db, [contact_id])).get(contact_id)
     return d
 
@@ -175,6 +177,7 @@ async def create_contact(db: AsyncSession, data: dict, current_user: User) -> di
         status=data.get("initial_status", "lead"),
         priority=data.get("initial_priority", "mid"),
         amount=data.get("initial_amount", 0.0),
+        source=data.get("initial_source"),
         assigned_to=contact.assigned_to,
         won_at=datetime.utcnow() if data.get("initial_status") == "won" else None,
     )
@@ -504,7 +507,23 @@ async def _bulk_deal_summary(db: AsyncSession, contact_ids: list[str]) -> dict:
         .where(Deal.contact_id.in_(contact_ids), Deal.deleted_at.is_(None))
         .group_by(Deal.contact_id)
     )
-    return {row.contact_id: {"count": row.cnt, "total": float(row.total)} for row in r.all()}
+    summary = {
+        row.contact_id: {"count": row.cnt, "total": float(row.total), "sources": []}
+        for row in r.all()
+    }
+    r = await db.execute(
+        select(Deal.contact_id, Deal.source)
+        .where(
+            Deal.contact_id.in_(contact_ids),
+            Deal.deleted_at.is_(None),
+            Deal.source.is_not(None),
+        )
+        .distinct()
+        .order_by(Deal.contact_id, Deal.source)
+    )
+    for row in r.all():
+        summary[row.contact_id]["sources"].append(row.source)
+    return summary
 
 
 def _handover_in_effect(contact: Contact) -> bool:
@@ -538,6 +557,7 @@ def _contact_to_dict(contact: Contact) -> dict:
         "autocount_customer_code": contact.autocount_customer_code,
         "total_deal_amount": 0.0,
         "deal_count": 0,
+        "sources": [],
         "wa_handover_active": _handover_in_effect(contact),
         # Naive UTC like created_at; ok() marks them with Z on the way out.
         "wa_handover_expires_at": _isoformat(contact.wa_handover_expires_at),

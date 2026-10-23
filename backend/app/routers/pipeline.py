@@ -73,6 +73,7 @@ async def get_pipeline(
                 "contact_company": row.company,
                 "title": row.Deal.title,
                 "amount": float(row.Deal.amount),
+                "source": row.Deal.source,
                 "priority": row.Deal.priority,
                 "status": row.Deal.status,
                 "assigned_to": row.Deal.assigned_to,

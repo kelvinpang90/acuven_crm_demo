@@ -3302,3 +3302,26 @@ PRECHECK_RESULT: NOT_READY
 - 偏离了什么：无。
 - 验证到什么程度：`npm run build`（含 tsc）通过；本机 SQLite 后端 + Vite + 浏览器：两客户各一行、角标 1 与 3；打开会话角标清零，期间到的消息直接进对话不弹不加角标；
   收件箱页另一客户连来两条合并为一行「2 new」；在收件箱与仪表盘点弹窗都切到该客户会话并清角标。
+
+## Pipeline 与联系人列表标出客户来源行业 + 重新播种（人工会话，2026-10-23，无编号）
+
+### 计划（Kelvin 2026-10-23 批准）
+
+- 需求：Pipeline 卡片与联系人列表标出客户来源（realestate / retail / saas 等，即客户从 ai_chatbot_demo 哪个行业机器人进来）。
+  现有 `contacts.industry` 记的是客户自己的行业（AutoCount `NatureOfBusiness`、表单下拉），语义不同，不复用。
+- 可选项：来源记在联系人上（只记首次进来的行业，同一人试多个行业时商机全显示同一个，否决）；记在商机上，联系人列表汇总（选定）。
+- PR 1 后端：`deals.source`（可空，迁移 017），取值 banking / food / hotel / realestate / retail / saas；`POST /api/deals` 收 `source`，
+  `POST /api/contacts` 收 `initial_source` 写到自动建的商机；Pipeline 卡片返回 `source`，联系人列表与详情返回 `sources`（名下在用商机的来源去重排序）；
+  `seed.py` 每个商机按公司行业配一个来源。
+- PR 2 前端：Pipeline 卡片与联系人列表显示来源标签，中英文案。
+- ai_chatbot_demo 另开会话：新建联系人 / 商机时带上本行业的来源（在线工具与 seed_crm）。
+- 两边都部署后：删掉生产库里没有来源的老数据，再重新导入带来源的种子数据（CRM `seed.py` + ai_chatbot_demo `seed_crm`）；删除范围先列清单给 Kelvin 确认。
+- 设计闸门：不适用——不碰钱，也不新增个人数据的收集、存储或导出；只加一个可空列，降级即删列。
+
+### 评审：PR 1 后端（2026-10-23）
+
+- 做了什么：`models/deal.py` 加 `source`；`alembic/versions/017_add_deal_source.py`；`schemas/deal.py`（`DealSource` 取值约束）与 `schemas/contact.py`；
+  `deal_service` / `contact_service` / `routers/pipeline.py` 读写与返回；`seed.py` 20 个商机配来源（Central Perk 有 12 家酒店餐饮场所，配 hotel；banking 2、hotel 1、food 1、realestate 2、retail 3、其余 11 个 saas）；
+  `tests/test_deal_source.py` 6 条（含迁移升降级、非法取值 422）。
+- 偏离了什么：无。
+- 验证到什么程度：SQLite 全量后端测试 1026 条通过，ruff check / format 通过。
