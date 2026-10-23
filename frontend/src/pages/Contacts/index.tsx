@@ -11,6 +11,7 @@ import SearchInput from '@/components/common/SearchInput';
 import EmptyState from '@/components/common/EmptyState';
 import Skeleton from '@/components/common/Skeleton';
 import Modal from '@/components/common/Modal';
+import SourceBadge from '@/components/common/SourceBadge';
 import ContactDetailPanel from './ContactDetailPanel';
 import ContactForm from './ContactForm';
 import type { Contact } from '@/types';
@@ -225,6 +226,7 @@ export default function ContactsPage() {
                       </span>
                     )}
                     <span className="text-xs text-text-muted">{c.deal_count} {t('deals')}</span>
+                    {c.sources.map((s) => <SourceBadge key={s} value={s} />)}
                   </div>
                   <p className="text-xs text-text-muted truncate">{c.company || '-'} · {formatMYR(c.total_deal_amount)}</p>
                 </div>
@@ -240,6 +242,7 @@ export default function ContactsPage() {
               <tr className="border-b border-dark-border text-text-muted text-left">
                 <th className="pb-2 font-medium">{t('common:name')}</th>
                 <th className="pb-2 font-medium">{t('common:company')}</th>
+                <th className="pb-2 font-medium">{t('common:source')}</th>
                 <th className="pb-2 font-medium">{t('assignedTo')}</th>
                 <th
                   className="pb-2 font-medium text-right cursor-pointer select-none hover:text-text-primary"
@@ -277,6 +280,15 @@ export default function ContactsPage() {
                     </div>
                   </td>
                   <td className="py-3 text-text-secondary">{c.company || '-'}</td>
+                  <td className="py-3">
+                    {c.sources.length ? (
+                      <div className="flex flex-wrap gap-1">
+                        {c.sources.map((s) => <SourceBadge key={s} value={s} />)}
+                      </div>
+                    ) : (
+                      <span className="text-text-muted">-</span>
+                    )}
+                  </td>
                   <td className="py-3 text-text-secondary">{c.assigned_to_name || '-'}</td>
                   <td className="py-3 text-right text-text-primary">{formatMYR(c.total_deal_amount)}</td>
                   <td className="py-3 text-right text-text-muted">{c.deal_count}</td>

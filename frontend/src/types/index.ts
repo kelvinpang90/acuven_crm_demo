@@ -33,6 +33,7 @@ export interface Contact {
   autocount_customer_code: string | null;
   total_deal_amount: number;
   deal_count: number;
+  sources: string[];
   wa_handover_active: boolean;
   wa_handover_expires_at: string | null;
   wa_handover_updated_at: string | null;
@@ -92,6 +93,7 @@ export interface Deal {
   status: DealStatus;
   priority: Priority;
   amount: number;
+  source: string | null;
   assigned_to: string | null;
   assigned_to_name?: string | null;
   won_at: string | null;
