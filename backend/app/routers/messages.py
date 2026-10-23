@@ -1,8 +1,8 @@
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
-from sqlalchemy import case, func, select, update
+from sqlalchemy import case, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -136,14 +136,36 @@ async def contact_messages(
     contact_id: str,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    before: Optional[str] = None,
+    limit: int = Query(default=50, ge=1, le=200),
 ):
+    """The latest `limit` messages, or the `limit` older than message `before`; oldest first."""
     if not await access_service.may_access_contact(db, current_user, contact_id):
         return fail(message=NOT_YOURS_TO_READ, code="NOT_ASSIGNED", status_code=403)
 
+    query = select(Message).where(Message.contact_id == contact_id)
+    if before:
+        cursor = (
+            await db.execute(
+                select(Message.created_at, Message.id).where(
+                    Message.id == before, Message.contact_id == contact_id
+                )
+            )
+        ).one_or_none()
+        if cursor is None:
+            return fail(message="Unknown message cursor.", code="INVALID_CURSOR")
+        # Ties on created_at are split by id, so a page boundary never repeats or skips one.
+        query = query.where(
+            or_(
+                Message.created_at < cursor.created_at,
+                (Message.created_at == cursor.created_at) & (Message.id < cursor.id),
+            )
+        )
+
     result = await db.execute(
-        select(Message).where(Message.contact_id == contact_id).order_by(Message.created_at.asc())
+        query.order_by(Message.created_at.desc(), Message.id.desc()).limit(limit)
     )
-    messages = await _message_dicts(db, result.scalars().all())
+    messages = await _message_dicts(db, list(reversed(result.scalars().all())))
     return ok(data=messages)
 
 
