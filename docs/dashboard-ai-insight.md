@@ -2,6 +2,7 @@
 
 > 状态：**已批准**（Kelvin 2026-10-18，原话「Q4放每人停滞的商机数，其他按照建议」：Q4 改为 B，Q1 至 Q3、Q5 按建议，PR kelvinpang90/acuven_crm_demo#108）。登记的任务，设计闸门引用 kelvinpang90/acuven_crm_demo#108。
 > 第一至八节如上已批准；**第九节**是登记 CRM-TASK-039 至 044 时按设计预审补的，Kelvin 2026-10-19 在登记 PR kelvinpang90/acuven_crm_demo#109 上批准（原话「绿了」，回复的是请他批准第九节、CI 全绿后合并的那条消息）；与正文冲突处以第九节为准（正文相应处已同步改）。
+> **第十节**是 2026-10-24 第一轮质量评测后的修订（快照加 `days_remaining`、输出不写字段名），待 Kelvin 批准；与正文冲突处以第十节为准（正文相应处已同步改）。
 > 设计闸门的理由：要把团队成员的姓名与业绩数字发给模型（员工的个人数据），并改审计表结构、加一个迁移。不发任何客户资料。
 > 上位决定：`acuven_hub` 的 `DECISIONS.md` E-12（发给模型的字段不设限制）、E-14、E-16、E-17、A-18（CRM 定为 demo）。
 > 来由：任务八（`tasks/todo.md`「CRM 里可以加 AI 辅助的地方」）优先 4 的「仪表盘：经理看板的数据解读：数字由 CRM 算好，AI 只写解读」。
@@ -76,7 +77,7 @@ AI 拿到这组数字很可能写出「已联系到需求确认转化率 60%」�
 
 ```json
 {
-  "period": {"month": "2026-10", "as_of": "2026-10-18", "day_of_month": 18, "days_in_month": 31},
+  "period": {"month": "2026-10", "as_of": "2026-10-18", "day_of_month": 18, "days_in_month": 31, "days_remaining": 13},
   "team": {
     "this_month": {"won_amount": "38000.00", "won_count": 3, "target_amount": "100000.00", "target_rate": 38.0,
                    "created_count": 12, "created_won_count": 2, "win_rate": 16.7},
@@ -116,6 +117,7 @@ AI 拿到这组数字很可能写出「已联系到需求确认转化率 60%」�
 | `avg_sales_cycle_days` | 最近 90 天赢单的（`won_at` − `created_at`）天数平均，一位小数；没有为 `null`。在 Python 里算，不用 MySQL 的 `datediff` | 「平均销售周期」 |
 | `remaining_to_target` | `target_amount − won_amount`，小于 0 按 `"0.00"`；没设目标为 `null` | 新算的 |
 | `day_of_month`、`days_in_month` | 由 `now` 算 | 新给的：让 AI 判断「月过几成」，不用自己算 |
+| `days_remaining` | `days_in_month − day_of_month`（今天之后本月还剩几天，月底最后一天为 0） | 新给的（第十节）：AI 要说「还剩几天」时直接引用，不自己减 |
 
 #### 4.2.1 停滞（批量）
 
@@ -177,6 +179,7 @@ AI 拿到这组数字很可能写出「已联系到需求确认转化率 60%」�
   写明每个数字的口径（第 4.2 节的表），特别是：`win_rate` 是按创建月的批次、月初偏低不代表变差；`target_rate` 为 `null` 是没设目标、不是完成 0%；
   `open_deals` 是现在的在途、不分月；
   对比上月时要考虑 `day_of_month`：本月还没过完，不能直接说「比上月少」，只并列两个数并说明本月过了几天；
+  说本月还剩几天时引用 `days_remaining`；输出里用平常的话说，不写快照的字段名（如 `remaining_to_target`）（第十节）；
   建议要具体到人或阶段，不点名任何商机或客户（快照里也没有），不建议改系统设置、不声称已修改任何记录；不评价员工的能力与态度，只说数字；写明各字段上限；用 `output_language` 写。
 - schema：`headline`（字符串）、`observations`（字符串数组）、`suggestions`（字符串数组），全部必填，不允许多余字段。
 - 校验（去首尾空白、按码点）：`headline` 1–120；`observations` 2–4 条，每条 1–200；`suggestions` 1–3 条，每条 1–150。不合即「AI 出错」，不截断、不补齐、不丢掉不合格的那一条。
@@ -241,3 +244,14 @@ AI 拿到这组数字很可能写出「已联系到需求确认转化率 60%」�
 1. **快照的键分两个任务加**：040 规定成员与 `team` 的键集合，041 再加 `stalled_deals`。041 允许改 040 的测试文件，只改这两处键集合的断言。
 2. **未登录的状态码**：本项目的 FastAPI 版本对不带 token 的请求返回 403 而不是 401，现有 AI 接口测试写的是「401 或 403」。043 照此写。
 3. **排行榜换月份**：经理看板换月份时会整页重新加载（显示骨架屏），卡片组件被卸载。不为保留卡片改看板现有的加载方式，换月份后卡片清掉、要再点一次。原 4.5「排行榜换月份不影响卡片」改为此。
+
+## 十、第一轮质量评测后的修订（2026-10-24，待 Kelvin 批准）
+
+第一轮评测（`tasks/todo.md`「AI 质量评测第一轮」）里，dash-05 判为编造：模型写了「可在剩余 9 天内优先推进」，9 是它用 `days_in_month` 31 减 `day_of_month` 22 自己算的。数是对的，但越过了「CRM 算、AI 解读」的分工，系统提示也明令不做新的运算。另有两个样例（dash-03、dash-07）在输出里直接写了字段名 `remaining_to_target`。
+
+1. **快照 `period` 加 `days_remaining`**：`days_in_month − day_of_month`，整数，月底最后一天为 0。与 `day_of_month` 一样按 UTC 的 `now` 算。
+   - 理由：「本月还剩几天」是经理最常想说的派生数，与第六节「自己算数」的风险同一类；照第六节的思路由 CRM 给出，比在提示词里再加一条禁令可靠。
+2. **系统提示两处补充**：字段说明里加 `days_remaining` 的含义，并写明说本月还剩几天时引用它；输出用平常的话说，不写快照的字段名。
+3. **不改**：输出结构、各字段上限、校验、接口、前端、评测样例。`days_remaining` 只进快照，不进接口响应。
+4. **改完只重评这个功能**：`python -m evals run --features dashboard_insight`，按 `docs/ai-eval.md` 第六节判，打分方式见该文件第十节。
+5. **登记**：一个任务，改 `backend/app/services/dashboard_insight_service.py`（快照）、`backend/app/services/ai_features.py`（系统提示）、`backend/tests/test_dashboard_insight_snapshot.py`（`period` 的键集合加 `days_remaining`；月中、月底最后一天为 0 两个用例）、`tasks/todo.md`。
