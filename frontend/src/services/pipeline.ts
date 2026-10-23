@@ -8,6 +8,7 @@ export interface PipelineStageDeal {
   contact_company: string | null;
   title: string | null;
   amount: number;
+  source: string | null;
   priority: string;
   status: string;
   assigned_to: string | null;

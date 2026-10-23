@@ -2,6 +2,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { formatMYR } from '@/utils/currency';
 import Badge from '@/components/common/Badge';
+import SourceBadge from '@/components/common/SourceBadge';
 import type { PipelineStageDeal } from '@/services/pipeline';
 
 interface Props {
@@ -50,7 +51,10 @@ export default function PipelineCard({ deal, onEdit }: Props) {
           <p className="text-xs text-text-muted truncate mb-1">{deal.contact_company}</p>
         )}
         <div className="flex items-center justify-between mt-2">
-          <Badge value={deal.priority} type="priority" size="sm" />
+          <div className="flex items-center gap-1.5 min-w-0">
+            <Badge value={deal.priority} type="priority" size="sm" />
+            {deal.source && <SourceBadge value={deal.source} />}
+          </div>
           <span className="text-xs font-medium text-text-secondary">
             {formatMYR(deal.amount)}
           </span>

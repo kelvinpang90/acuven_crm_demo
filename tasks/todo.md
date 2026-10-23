@@ -3325,3 +3325,12 @@ PRECHECK_RESULT: NOT_READY
   `tests/test_deal_source.py` 6 条（含迁移升降级、非法取值 422）。
 - 偏离了什么：无。
 - 验证到什么程度：SQLite 全量后端测试 1026 条通过，ruff check / format 通过。
+
+### 评审：PR 2 前端（2026-10-23）
+
+- 做了什么：新增 `frontend/src/components/common/SourceBadge.tsx`（六个行业各一种颜色）；`PipelineCard.tsx` 在优先级旁显示来源；
+  联系人列表桌面表格加「来源」列（多个来源并排、没有显示「-」），手机卡片在名字行显示；`types/index.ts` 与 `services/pipeline.ts` 加字段；
+  `locales/{en,zh}/common.json` 加 `source` 与 `sourceLabels`。
+- 偏离了什么：无。
+- 验证到什么程度：`npm run build`（含 tsc）通过；本机 SQLite 后端（后端 PR 分支）+ Vite + 浏览器：Pipeline 卡片显示 Real Estate / Retail / SaaS / Hotel；
+  联系人列表单来源、三个来源（Banking / F&B / Retail）、无来源「-」都正确。

@@ -56,6 +56,15 @@
     "won": "Won",
     "lost": "Lost"
   },
+  "source": "Source",
+  "sourceLabels": {
+    "banking": "Banking",
+    "food": "F&B",
+    "hotel": "Hotel",
+    "realestate": "Real Estate",
+    "retail": "Retail",
+    "saas": "SaaS"
+  },
   "priorityLabels": {
     "high": "High",
     "mid": "Medium",

@@ -56,6 +56,15 @@
     "won": "已成交",
     "lost": "已流失"
   },
+  "source": "来源",
+  "sourceLabels": {
+    "banking": "银行",
+    "food": "餐饮",
+    "hotel": "酒店",
+    "realestate": "房地产",
+    "retail": "零售",
+    "saas": "软件服务"
+  },
   "priorityLabels": {
     "high": "高",
     "mid": "中",
