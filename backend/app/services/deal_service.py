@@ -31,6 +31,7 @@ async def create_deal(
         status=status,
         priority=data.get("priority", "mid"),
         amount=Decimal(str(data.get("amount", "0.00"))),
+        source=data.get("source"),
         assigned_to=data.get("assigned_to") or (contact.assigned_to if contact else None),
         won_at=datetime.utcnow() if status == "won" else None,
     )
@@ -171,6 +172,7 @@ async def _deal_to_dict(db: AsyncSession, deal: Deal) -> dict:
         "status": deal.status,
         "priority": deal.priority,
         "amount": float(deal.amount),
+        "source": deal.source,
         "assigned_to": deal.assigned_to,
         "assigned_to_name": assigned_to_name,
         "won_at": deal.won_at.isoformat() if deal.won_at else None,

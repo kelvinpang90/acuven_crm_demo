@@ -25,6 +25,9 @@ class Deal(Base):
         default="mid",
     )
     amount: Mapped[Decimal] = mapped_column(DECIMAL(15, 2), nullable=False, default=Decimal("0.00"))
+    # The ai_chatbot_demo industry bot the enquiry came in through (DEAL_SOURCES);
+    # NULL for deals created any other way.
+    source: Mapped[str | None] = mapped_column(String(20), nullable=True)
     assigned_to: Mapped[str | None] = mapped_column(String(36), nullable=True)
     won_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

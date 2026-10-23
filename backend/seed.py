@@ -547,6 +547,31 @@ async def seed():
             ),
         ]
 
+        # contact_key -> the ai_chatbot_demo industry bot the deal came in through,
+        # picked from the company's line of business.
+        deal_sources = {
+            0: "saas",  # Apex Cloud Solutions
+            1: "banking",  # Meridian Finance Group
+            2: "saas",  # BioCore Diagnostics
+            3: "saas",  # GreenLeaf Energy
+            4: "retail",  # NexGen Retail
+            5: "saas",  # Vertex Manufacturing
+            6: "realestate",  # Summit Real Estate
+            7: "saas",  # Clarity Consulting
+            8: "food",  # FreshBite Foods
+            9: "saas",  # SwiftLog Logistics
+            10: "saas",  # EduPath Online
+            11: "saas",  # CoreLogic Analytics
+            12: "retail",  # Dunder Paper Co.
+            13: "hotel",  # Central Perk Ventures
+            14: "saas",  # MedTech Innovations
+            15: "realestate",  # Pacific Realty Group
+            16: "banking",  # Atlas Insurance
+            17: "saas",  # TechForward Staffing
+            18: "saas",  # CleanTech Systems
+            19: "retail",  # Bloom E-commerce
+        }
+
         contacts = []
         seed_deals = []
         d: dict[int, str] = {}  # contact_key → deal_id
@@ -591,6 +616,7 @@ async def seed():
                     status=status,
                     priority=priority,
                     amount=deal_value,
+                    source=deal_sources[key],
                     assigned_to=assigned_to,
                     won_at=created_ts if status == "won" else None,
                     created_at=created_ts,

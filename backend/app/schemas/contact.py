@@ -3,6 +3,8 @@ from typing import List, Optional
 
 from pydantic import BaseModel, EmailStr, field_validator
 
+from app.schemas.deal import DealSource
+
 
 class ContactCreate(BaseModel):
     name: str
@@ -20,6 +22,7 @@ class ContactCreate(BaseModel):
     initial_priority: str = "mid"
     initial_amount: float = 0.0
     initial_title: Optional[str] = None
+    initial_source: Optional[DealSource] = None
 
     @field_validator("name")
     @classmethod
@@ -67,6 +70,8 @@ class ContactResponse(BaseModel):
     autocount_customer_code: Optional[str] = None
     total_deal_amount: float = 0.0
     deal_count: int = 0
+    # Distinct sources of the contact's live deals, sorted.
+    sources: List[str] = []
     # False once expires_at has passed, whatever is stored (docs/chatbot-events.md section 5).
     wa_handover_active: bool = False
     wa_handover_expires_at: Optional[datetime] = None
