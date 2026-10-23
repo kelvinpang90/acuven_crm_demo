@@ -77,11 +77,28 @@ function bubbleLanguage(language: string): AiLanguage {
   return language.startsWith('en') ? 'en' : 'zh-CN';
 }
 
+const PAGE_SIZE = 50;
+
+// open: the latest page replaces what is shown, read from the bottom.
+// refresh: the latest page joins the older pages already shown; follows new
+//   messages only when the reader is already at the bottom.
+// sent: as refresh, then to the bottom to show what was just sent.
+type LoadMode = 'open' | 'refresh' | 'sent';
+
+// The latest page under the older pages already shown. When they do not meet
+// (more new messages than a page), the page stands alone.
+function joinLatest(shown: Message[], page: Message[]) {
+  const joint = page.length ? shown.findIndex((message) => message.id === page[0].id) : -1;
+  return joint >= 0 ? [...shown.slice(0, joint), ...page] : null;
+}
+
 export default function ConversationView({ contactId, contactName, channel }: Props) {
   const { t, i18n } = useTranslation('inbox');
   const [messages, setMessages] = useState<Message[]>([]);
   const [contact, setContact] = useState<Contact | null>(null);
   const [loading, setLoading] = useState(true);
+  const [hasOlder, setHasOlder] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
   const [retryingId, setRetryingId] = useState<string | null>(null);
   const [handingBack, setHandingBack] = useState(false);
   const [aiEnabled, setAiEnabled] = useState(false);
@@ -97,29 +114,56 @@ export default function ConversationView({ contactId, contactName, channel }: Pr
   const loadSeq = useRef(0);
   const listRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(false);
+  // Distance from the bottom to restore after older messages land on top.
+  const keepFromBottom = useRef<number | null>(null);
+  const shown = useRef(messages);
   if (previousContactId.current !== contactId) {
     previousContactId.current = contactId;
     messageTranslationRequestVersion.current += 1;
   }
   activeContactId.current = contactId;
+  shown.current = messages;
 
-  // silent: a pushed refresh, which keeps the conversation on screen meanwhile.
-  const load = useCallback(async (silent = false) => {
+  const load = useCallback(async (mode: LoadMode = 'open') => {
     if (activeContactId.current !== contactId) return;
     const seq = ++loadSeq.current;
-    if (!silent) setLoading(true);
+    if (mode === 'open') setLoading(true);
     try {
-      const res = await messagesApi.getContactMessages(contactId);
+      const res = await messagesApi.getContactMessages(contactId, { limit: PAGE_SIZE });
       if (activeContactId.current === contactId && seq === loadSeq.current) {
-        // Follow new messages only when the reader is already at the bottom.
+        const page = res.data.data;
         const list = listRef.current;
-        stickToBottom.current = silent && !!list
-          && list.scrollHeight - list.scrollTop - list.clientHeight < 80;
-        setMessages(res.data.data);
+        stickToBottom.current = mode !== 'refresh'
+          || (!!list && list.scrollHeight - list.scrollTop - list.clientHeight < 80);
+        keepFromBottom.current = null;
+        if (mode === 'open' || !joinLatest(shown.current, page)) setHasOlder(page.length === PAGE_SIZE);
+        setMessages((current) => (mode === 'open' ? page : joinLatest(current, page) ?? page));
       }
     } catch { /* ignore */ }
     if (activeContactId.current === contactId && seq === loadSeq.current) setLoading(false);
   }, [contactId]);
+
+  const loadOlder = async () => {
+    const oldest = shown.current[0];
+    if (!oldest || loadingOlder) return;
+    const requestedContactId = contactId;
+    setLoadingOlder(true);
+    try {
+      const res = await messagesApi.getContactMessages(requestedContactId, { before: oldest.id, limit: PAGE_SIZE });
+      if (activeContactId.current !== requestedContactId) return;
+      const older = res.data.data;
+      const list = listRef.current;
+      if (list) keepFromBottom.current = list.scrollHeight - list.scrollTop;
+      setHasOlder(older.length === PAGE_SIZE);
+      setMessages((current) => (current[0]?.id === oldest.id ? [...older, ...current] : current));
+    } catch { /* ignore */ } finally {
+      if (activeContactId.current === requestedContactId) setLoadingOlder(false);
+    }
+  };
+
+  const handleScroll = () => {
+    if (hasOlder && !loadingOlder && (listRef.current?.scrollTop ?? 0) < 80) void loadOlder();
+  };
 
   const loadContact = useCallback(async () => {
     try {
@@ -130,13 +174,18 @@ export default function ConversationView({ contactId, contactName, channel }: Pr
 
   useEffect(() => { load(); }, [load]);
   useLayoutEffect(() => {
-    if (!stickToBottom.current) return;
-    stickToBottom.current = false;
-    if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
+    const list = listRef.current;
+    if (stickToBottom.current) {
+      stickToBottom.current = false;
+      if (list) list.scrollTop = list.scrollHeight;
+    } else if (keepFromBottom.current !== null) {
+      if (list) list.scrollTop = list.scrollHeight - keepFromBottom.current;
+      keepFromBottom.current = null;
+    }
   }, [messages]);
   // An inbound message also moves the WhatsApp reply window on the contact.
   useInboxChanges(() => {
-    void load(true);
+    void load('refresh');
     void loadContact();
   });
   useEffect(() => {
@@ -149,6 +198,8 @@ export default function ConversationView({ contactId, contactName, channel }: Pr
   }, []);
   useEffect(() => {
     setContact(null);
+    setHasOlder(false);
+    setLoadingOlder(false);
     setHandingBack(false);
     setBrief(null);
     setBriefing(false);
@@ -180,7 +231,7 @@ export default function ConversationView({ contactId, contactName, channel }: Pr
   }, [channel, clock, messages]);
 
   const handleSent = () => {
-    load();
+    load('sent');
     loadContact();
   };
 
@@ -221,7 +272,7 @@ export default function ConversationView({ contactId, contactName, channel }: Pr
       toast.error(retryErrorMessage(error, t));
     } finally {
       setRetryingId(null);
-      load();
+      load('refresh');
     }
   };
 
@@ -331,7 +382,16 @@ export default function ConversationView({ contactId, contactName, channel }: Pr
         )}
       </div>
 
-      <div ref={listRef} className="flex-1 overflow-y-auto p-3 space-y-3">
+      <div ref={listRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-3 space-y-3">
+        {!loading && messages.length > 0 && (
+          <div className="text-center text-xs text-text-muted">
+            {hasOlder ? (
+              <button type="button" className="text-primary" disabled={loadingOlder} onClick={() => void loadOlder()}>
+                {loadingOlder ? t('loadingOlder') : t('loadOlder')}
+              </button>
+            ) : t('noOlder')}
+          </div>
+        )}
         {loading ? <p className="text-text-muted text-sm text-center py-4">...</p> : messages.length === 0 ? <p className="text-text-muted text-sm text-center py-4">{t('noMessages')}</p> : messages.map((msg) => (
           <div key={msg.id} className={`flex ${msg.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}>
             <div className={`max-w-[75%] rounded-xl px-3 py-2 ${msg.direction === 'outbound' ? 'bg-primary/20 text-text-primary' : 'bg-dark-hover text-text-primary'}`}>

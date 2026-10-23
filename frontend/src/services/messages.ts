@@ -26,8 +26,9 @@ export const messagesApi = {
   markContactRead: (contactId: string) =>
     api.patch<ApiResponse<{ updated: number }>>(`/messages/contact/${contactId}/read`),
 
-  getContactMessages: (contactId: string) =>
-    api.get<ApiResponse<Message[]>>(`/messages/contact/${contactId}`),
+  // The latest `limit` messages, or the `limit` older than message `before`; oldest first.
+  getContactMessages: (contactId: string, params?: { before?: string; limit?: number }) =>
+    api.get<ApiResponse<Message[]>>(`/messages/contact/${contactId}`, { params }),
 
   markRead: (id: string) =>
     api.patch<ApiResponse<Message>>(`/messages/${id}/read`),
