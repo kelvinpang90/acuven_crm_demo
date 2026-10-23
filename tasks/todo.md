@@ -3334,3 +3334,12 @@ PRECHECK_RESULT: NOT_READY
 - 偏离了什么：无。
 - 验证到什么程度：`npm run build`（含 tsc）通过；本机 SQLite 后端（后端 PR 分支）+ Vite + 浏览器：Pipeline 卡片显示 Real Estate / Retail / SaaS / Hotel；
   联系人列表单来源、三个来源（Banking / F&B / Retail）、无来源「-」都正确。
+
+### 修 `seed.py --reset` 的清空（2026-10-23，重新播种前）
+
+- 起因：生产库只读核实发现 `users.manager_id` 自引用外键（NO ACTION）；MySQL 在一条 `DELETE FROM users` 里逐行检查外键，先删到经理就报 1451，
+  整个清空回滚。另外 `autocount_documents`（8 行）与 `ai_requests`（19 行）不在清空列表里，清空后会指向已删的联系人和账号。
+- 改动（Kelvin 2026-10-23 批准）：`wipe` 删账号前先把 `manager_id` 置空，并一起清空 `autocount_documents` 与 `ai_requests`；`projects` 不关联联系人，保留。
+  `backend/tests/test_seed_wipe.py` 1 条。
+- 验证到什么程度：本机 MySQL 8.0（开着外键检查）上，新测试在修复前报 1451、修复后通过；同一库 `alembic upgrade head` → `seed.py` → `seed.py --reset` 跑通，
+  结果 6 个账号（3 个有经理）、20 个联系人、来源 saas 11 / retail 3 / banking 2 / realestate 2 / food 1 / hotel 1。SQLite 全量 1027 条通过，ruff 通过。

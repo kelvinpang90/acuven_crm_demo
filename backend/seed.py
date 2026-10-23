@@ -47,17 +47,23 @@ PREV_YEAR = YEAR if MONTH > 1 else YEAR - 1
 
 
 async def wipe(session):
+    # Projects are not tied to contacts or users and stay.
     for table in [
         "messages",
         "activities",
         "tasks",
         "sales_targets",
         "routing_rules",
+        "autocount_documents",
+        "ai_requests",
         "deals",
         "contacts",
-        "users",
     ]:
         await session.execute(text(f"DELETE FROM {table}"))
+    # MySQL checks users.manager_id row by row inside one DELETE, so a manager
+    # deleted before their reports fails the wipe; unlink them first.
+    await session.execute(text("UPDATE users SET manager_id = NULL"))
+    await session.execute(text("DELETE FROM users"))
     await session.commit()
     print("Database wiped.")
 
