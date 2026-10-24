@@ -111,5 +111,20 @@
   "aiFollowUpTaskAdding": "添加中...",
   "aiFollowUpTaskAdded": "已加",
   "aiFollowUpTaskFailed": "添加任务失败",
-  "aiFollowUpSubmitConfirm": "还有 {{count}} 条任务草稿没加，确定提交？"
+  "aiFollowUpSubmitConfirm": "还有 {{count}} 条任务草稿没加，确定提交？",
+  "aiExtractTitle": "从聊天提取资料",
+  "aiExtractGenerate": "提取",
+  "aiExtractRegenerate": "重新提取",
+  "aiExtractLoading": "提取中...",
+  "aiExtractTruncated": "只看了最近一部分聊天。",
+  "aiExtractEmpty": "聊天里没有找到可以填的资料",
+  "aiExtractEvidence": "“{{evidence}}”",
+  "aiExtractHasValue": "已有值",
+  "aiExtractFill": "填入",
+  "aiExtractFilling": "保存中...",
+  "aiExtractSaveFailed": "保存失败",
+  "aiExtractSaveFailedWithMessage": "保存失败：{{message}}",
+  "aiExtractNotAssigned": "你没有这个客户的权限",
+  "aiExtractNothingToFill": "资料已经填全了",
+  "aiExtractNoMessages": "这个客户还没有聊天"
 }

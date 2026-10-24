@@ -102,6 +102,14 @@ export default function ContactsPage() {
     } catch { /* ignore */ }
   };
 
+  const refreshSelected = async (contactId: string) => {
+    load();
+    try {
+      const res = await contactsApi.getContact(contactId);
+      setSelected((current) => (current?.id === contactId ? res.data.data : current));
+    } catch { /* ignore */ }
+  };
+
   const handleSort = (field: SortField) => {
     const nextOrder = sortField === field && sortOrder === 'desc' ? 'asc' : 'desc';
     setSortField(field);
@@ -316,6 +324,7 @@ export default function ContactsPage() {
           onDelete={() => { setDeleting(selected); setSelected(null); }}
           onArchive={handleArchive}
           onRefresh={load}
+          onContactUpdated={() => refreshSelected(selected.id)}
         />
       )}
 

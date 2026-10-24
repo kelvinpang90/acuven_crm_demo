@@ -280,6 +280,21 @@ export interface AiContactSummary {
   truncated: boolean;
 }
 
+export type AiContactExtractField = 'name' | 'company' | 'industry' | 'email' | 'phone' | 'address';
+
+export interface AiContactExtractSuggestion {
+  field: AiContactExtractField;
+  value: string;
+  evidence: string;
+  message_index: number;
+}
+
+export interface AiContactExtract {
+  request_id: string | null;
+  suggestions: AiContactExtractSuggestion[];
+  truncated: boolean;
+}
+
 export interface AiDealNextStep {
   request_id: string | null;
   assessment: string;
