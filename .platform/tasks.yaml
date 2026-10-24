@@ -1657,7 +1657,7 @@ tasks:
     title: AI评测样例：从聊天提取客户资料10个
     purpose: >-
       按 docs/contact-ai-extract.md 第五节与第九节、docs/ai-eval.md 第二节，在评测脚本里加 contact_extract 功能并写 10 个自拟的 demo 样例。只改评测脚本的功能登记与样例：不改 app 下任何文件；样例里的人名、公司、电话、邮箱全部自拟。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-051
     acceptance_criteria:
