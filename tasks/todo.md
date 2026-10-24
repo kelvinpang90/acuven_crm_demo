@@ -78,7 +78,7 @@
 
 ### 下一步
 
-- 商机下一步建议：`docs/deal-next-step.md` 第九节（每条上限改 200）；经理看板解读：`docs/dashboard-ai-insight.md` 第十节（快照加 `days_remaining`、输出不写字段名）。批准后各登记一个任务，改完只重评这两个功能。
+- 商机下一步建议：`docs/deal-next-step.md` 第九节（每条上限改 200）；经理看板解读：`docs/dashboard-ai-insight.md` 第十节（快照加 `days_remaining`、输出不写字段名）；两节与 `docs/ai-eval.md` 第十节 Kelvin 2026-10-24 在 PR kelvinpang90/acuven_crm_demo#149 上批准（原话「绿了」）。另开登记 PR 各登记一个任务，改完只重评这两个功能。
 - 不影响通过、改提示词时可以一起看的共性问题（评审 agent 的意见）：起草回复的占位符补完后前后句常矛盾（如「单价是[待确认]……确认后会回复您」）；中文输出常用半角标点；看板解读常漏掉「在途补不上差额」这类关键判断。
 
 ## CRM-TASK-049 AI评测样例：经理看板解读8个（2026-10-19）

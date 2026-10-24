@@ -183,7 +183,7 @@ CI（必需检查 `backend`）里的测试都不调真实模型：
 9. **几处细节写死**：样例的 `now` 必须是以 `Z` 结尾的 UTC 时间，日期列与 `month_offset` 都按 UTC 算；每类记录只有 `key` 与引用别的记录的字段（如 `contact`、`deal`、`assigned_to`、`manager`）必填，其余字段都给默认值；
    `run` 的结果只有 `ok`、`error`、`unavailable` 时退出码为 0。
 
-## 十、打分改由独立 agent 打（2026-10-24，Kelvin 定）
+## 十、打分改由独立 agent 打（2026-10-24，Kelvin 定，PR kelvinpang90/acuven_crm_demo#149 批准）
 
 第一轮评测时 Kelvin 亲自打了 brief-01 至 05 后决定不再逐个手工打分，原话「我不想手工去验收了，你用独立的agent去评审」。从这一轮起，第四、六节里「Kelvin 填」的打分列改为：
 
