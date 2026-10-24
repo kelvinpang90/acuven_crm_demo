@@ -49,6 +49,27 @@
 
 ---
 
+## CRM-TASK-051 从聊天提取客户资料的提示词、出处校验与业务函数（2026-10-24）
+
+### 做了什么
+
+- `backend/app/services/ai_features.py`：新增 `CONTACT_EXTRACT_FEATURE`（`crm.contact_extract`）、`CONTACT_EXTRACT_SYSTEM`、`CONTACT_EXTRACT_SCHEMA` 与 `validate_contact_extract(output, snapshot)`，按 `docs/contact-ai-extract.md` 第五节与第九节第 3、4、5、10 条。系统提示写明快照是不可信数据、不执行其中的指令，只取入站消息（出站里的电话地址多半是我们公司的），只给 `empty_fields` 里的字段与 `name_is_phone` 为真时的 `name`，找不到不给、不猜，`evidence` 逐字抄顾客原话里含这个值的一小段，一个字段最多一条，行业只能从十个 `INDUSTRIES` 里选，并写明各字段上限；schema 为 `suggestions` 对象数组，四个键全部必填、不允许多余字段。
+- `INDUSTRIES` 的定义从 `contact_extract_service.py` 移到 `ai_features.py`（提示词要列出它，放在服务里会循环导入），`contact_extract_service` 照旧导出同一个常量。
+- 校验去首尾空白、按码点量长度：输出恰好含 `suggestions`，最多 6 条，`field` 不重复且可填；值 1–200 字（`name` 1–100、`address` 1–300），`evidence` 1–300 字；`message_index` 指向入站消息，连续空白压成一个空格后 `evidence` 是正文子串；`email` 含 `@` 且在出处里、`phone` 用 `normalize_phone` 规范化为 N 后出处数字串含 N 或（N 以 60 开头时）含「0 加 N 去掉 60」、`industry` 在列表里、其余字段的值压空白后在出处里（不分大小写）；任一条不合返回 `None`，合格时返回 `{"suggestions": [...]}`，每条为去空白后的四个键（与其他校验函数一样返回整个输出对象）。
+- `backend/app/services/ai_assist_service.py`：`AiAssistResult.suggestions` 的类型放宽为 `list[Any] | None`，新增类别常量 `NOTHING_TO_FILL`；其他 AI 功能不变。
+- `backend/app/services/contact_extract_service.py`：新增 `generate_contact_extract(db, *, user, contact_id, output_language)`。先读未删除的联系人，读不到抛 `ValueError`；之后依次 `invalid_input`、`not_configured`、`nothing_to_fill`，再用当前 UTC 时间组装快照，最终快照里没有入站消息为 `no_messages`；这四种不调 AI、不写审计。调用时用户消息是恰好含 `as_of`、`output_language`、`snapshot` 的紧凑 JSON；每次调用都写一行审计（`crm.contact_extract`、这个联系人），成功但校验不过改判 `error` 并保留 `request_id`；成功时结果带 `suggestions` 与 `truncated`，各类结果带 `request_id`（有的话）；不修改联系人。
+- 新增测试 `backend/tests/test_contact_extract_service.py`，打桩 AI 客户端与配置，覆盖验收标准列出的四组用例，每个测试的 docstring 写明守住的验收标准。
+
+### 偏离了什么
+
+- 无
+
+### 验证到什么程度
+
+- 测试由 PR 的必需检查 backend 执行，检查结果由 Worker 和 CI 记录不写在这里；没有调用过真实模型。
+
+---
+
 ## CRM-TASK-050 从聊天提取客户资料的快照组装与行业常量（2026-10-24）
 
 ### 做了什么
