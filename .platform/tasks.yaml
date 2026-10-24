@@ -1573,7 +1573,7 @@ tasks:
     title: 从聊天提取客户资料的提示词、出处校验与业务函数
     purpose: >-
       按 docs/contact-ai-extract.md 4.1 节与第五节，定义 crm.contact_extract 的系统提示、JSON schema 与输出校验（出处必须是某条入站消息的原话、值必须出现在出处里），并用 CRM-TASK-050 的快照函数串成业务函数。只做业务规则层：不加接口、不改前端、不加表与迁移、不写客户资料；测试打桩 AI 客户端，不调真实模型、不写任何真实密钥与地址。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-050
     acceptance_criteria:
