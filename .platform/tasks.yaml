@@ -1549,7 +1549,7 @@ tasks:
     title: 从聊天提取客户资料的快照组装与行业常量
     purpose: >-
       按 docs/contact-ai-extract.md 第三节与第九节，组装发给模型的客户资料提取快照：哪些字段还空着、名字是不是号码、最近 40 条消息（带序号），并加一份与前端一致的行业常量。只做业务规则层的快照函数：不调 AI、不写审计、不加接口、不改前端、不加表与迁移；测试不调真实模型、不写任何真实密钥与地址。
-    status: ready
+    status: done
     depends_on: []
     acceptance_criteria:
       - 新文件 contact_extract_service 新增常量 INDUSTRIES（与 frontend 的 ContactForm 里的十个行业逐字相同、顺序相同）、EXTRACT_FIELDS（company、industry、email、phone、address，按此顺序）与函数 build_extract_snapshot(db, *, contact, now)；contact 是调用方已读出的未删除记录，now 是带时区的 UTC 时间（库里不带时区的时间按 UTC 处理）；返回的字典恰好含 contact、messages、truncated 三个键；不调 AI、不写审计、不写库
