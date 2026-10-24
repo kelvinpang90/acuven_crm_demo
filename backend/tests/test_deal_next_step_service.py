@@ -88,8 +88,8 @@ def _client(monkeypatch, result, calls):
         ({"assessment": "a", "stall_reason": "", "next_steps": ["n", "n", "n"]}, False, True),
         ({"assessment": "a", "stall_reason": "", "next_steps": []}, False, False),
         ({"assessment": "a", "stall_reason": "", "next_steps": ["n"] * 4}, False, False),
-        ({"assessment": "a", "stall_reason": "", "next_steps": ["n" * 120]}, False, True),
-        ({"assessment": "a", "stall_reason": "", "next_steps": ["n" * 121]}, False, False),
+        ({"assessment": "a", "stall_reason": "", "next_steps": ["n" * 200]}, False, True),
+        ({"assessment": "a", "stall_reason": "", "next_steps": ["n" * 201]}, False, False),
         ({"assessment": "a", "stall_reason": "", "next_steps": [" "]}, False, False),
         ({"assessment": "a", "stall_reason": "", "next_steps": [1]}, False, False),
         ({"assessment": "a", "stall_reason": ""}, False, False),
@@ -100,6 +100,12 @@ def _client(monkeypatch, result, calls):
 def test_validate_deal_next_step_boundaries_and_shape(output, stalled, expected):
     """Guards criterion 1: exact shape, code-point bounds, and stalled-dependent output."""
     assert (validate_deal_next_step(output, stalled) is not None) is expected
+
+
+def test_next_step_system_states_200_character_limit():
+    """Guards CRM-TASK-071 criterion 2: system prompt states the 200-character next-step limit."""
+    assert "each 1-200 characters" in DEAL_NEXT_STEP_SYSTEM
+    assert "1-120" not in DEAL_NEXT_STEP_SYSTEM
 
 
 def test_validate_deal_next_step_strips_text_before_returning():

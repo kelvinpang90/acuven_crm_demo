@@ -52,6 +52,24 @@
 
 ---
 
+## CRM-TASK-071 商机AI下一步建议每条下一步的字数上限由120放宽到200（2026-10-24）
+
+### 做了什么
+
+- `backend/app/services/ai_features.py`：`validate_deal_next_step` 里 `next_steps` 每条的上限由 120 改为 200（仍是去首尾空白后按码点算，超出返回 None，不截断）；`assessment`、`stall_reason` 的上限、条数 1 至 3 与 `DEAL_NEXT_STEP_SCHEMA` 不变。
+- `DEAL_NEXT_STEP_SYSTEM` 末尾改为 `each 1-200 characters`；换行位置前移到 `stall_reason: 0-300 characters;` 之后，让 `each 1-200 characters` 落在同一行，文字不变。
+- `backend/tests/test_deal_next_step_service.py`：边界参数化用例的单条 120 字通过、121 字不通过改为 200 字通过、201 字不通过；新增断言系统提示含 `each 1-200 characters`、不含 `1-120`。
+
+### 偏离了什么
+
+- 无
+
+### 验证到什么程度
+
+- 测试由 PR 的必需检查 backend 执行，检查结果由 Worker 和 CI 记录不写在这里；没有调用过真实模型。
+
+---
+
 ## 登记 CRM-TASK-071、072（2026-10-24）
 
 Kelvin 2026-10-24 在 kelvinpang90/acuven_crm_demo#149 上批准 `docs/deal-next-step.md` 第九节与 `docs/dashboard-ai-insight.md` 第十节（原话「绿了」）。本段是登记 PR 的记录。
