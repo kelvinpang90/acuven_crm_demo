@@ -1,4 +1,4 @@
-"""Bounded chat snapshots for extracting contact details (docs/contact-ai-extract.md)."""
+"""Extracting contact details from chat messages (docs/contact-ai-extract.md)."""
 
 import re
 from datetime import datetime, timezone
@@ -9,21 +9,29 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.contact import Contact
 from app.models.message import Message
+from app.models.user import User
+from app.services import ai_api_client
 from app.services.ai_api_client import compact_json
-
-# Same ten values, in the same order, as INDUSTRIES in frontend ContactForm.tsx.
-INDUSTRIES = (
-    "科技/IT",
-    "金融/保险",
-    "医疗/健康",
-    "教育/培训",
-    "零售/电商",
-    "制造/工业",
-    "房地产",
-    "咨询/服务",
-    "餐饮/酒店",
-    "物流/供应链",
+from app.services.ai_assist_service import (
+    ERROR,
+    INVALID_INPUT,
+    LANGUAGES,
+    NO_MESSAGES,
+    NOT_CONFIGURED,
+    NOTHING_TO_FILL,
+    OK,
+    AiAssistResult,
+    write_ai_request,
 )
+from app.services.ai_features import (
+    CONTACT_EXTRACT_FEATURE,
+    CONTACT_EXTRACT_SCHEMA,
+    CONTACT_EXTRACT_SYSTEM,
+    INDUSTRIES,  # noqa: F401  re-exported; defined next to the prompt that lists it
+    MAX_TOKENS,
+    validate_contact_extract,
+)
+
 EXTRACT_FIELDS = ("company", "industry", "email", "phone", "address")
 
 SNAPSHOT_LIMIT_BYTES = 16 * 1024
@@ -129,3 +137,66 @@ async def build_extract_snapshot(
         _reindex(snapshot["messages"])
         snapshot["truncated"] = True
     return snapshot
+
+
+async def generate_contact_extract(
+    db: AsyncSession, *, user: User, contact_id: str, output_language: str
+) -> AiAssistResult:
+    """Generate validated contact-detail suggestions; never modifies the contact."""
+    contact = (
+        await db.execute(
+            select(Contact).where(Contact.id == contact_id, Contact.deleted_at.is_(None))
+        )
+    ).scalar_one_or_none()
+    if contact is None:
+        raise ValueError("contact not found")
+    if not isinstance(output_language, str) or output_language not in LANGUAGES:
+        return AiAssistResult(INVALID_INPUT)
+    if not ai_api_client.is_ai_configured():
+        return AiAssistResult(NOT_CONFIGURED)
+    if not _empty_fields(contact) and not _name_is_phone(contact.name):
+        return AiAssistResult(NOTHING_TO_FILL)
+    now = datetime.now(timezone.utc)
+    snapshot = await build_extract_snapshot(db, contact=contact, now=now)
+    if not any(message["direction"] == "inbound" for message in snapshot["messages"]):
+        return AiAssistResult(NO_MESSAGES)
+    result = await ai_api_client.send_message(
+        feature=CONTACT_EXTRACT_FEATURE,
+        system=CONTACT_EXTRACT_SYSTEM,
+        messages=[
+            {
+                "role": "user",
+                "content": compact_json(
+                    {"as_of": _utc(now), "output_language": output_language, "snapshot": snapshot}
+                ),
+            }
+        ],
+        max_tokens=MAX_TOKENS,
+        schema=CONTACT_EXTRACT_SCHEMA,
+    )
+    if result.outcome == ai_api_client.OK:
+        output = validate_contact_extract(result.output, snapshot)
+        if output is not None:
+            await write_ai_request(
+                db,
+                user_id=user.id,
+                contact_id=contact_id,
+                feature=CONTACT_EXTRACT_FEATURE,
+                request_id=result.request_id,
+                outcome=OK,
+            )
+            return AiAssistResult(
+                OK, request_id=result.request_id, truncated=snapshot["truncated"], **output
+            )
+        outcome = ERROR
+    else:
+        outcome = result.outcome
+    await write_ai_request(
+        db,
+        user_id=user.id,
+        contact_id=contact_id,
+        feature=CONTACT_EXTRACT_FEATURE,
+        request_id=result.request_id,
+        outcome=outcome,
+    )
+    return AiAssistResult(outcome, request_id=result.request_id, truncated=snapshot["truncated"])

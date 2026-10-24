@@ -44,6 +44,7 @@ NO_HISTORY = "no_history"
 INVALID_INPUT = "invalid_input"
 DEAL_CLOSED = "deal_closed"
 NO_DATA = "no_data"
+NOTHING_TO_FILL = "nothing_to_fill"
 
 
 @dataclass(frozen=True)
@@ -72,7 +73,7 @@ class AiAssistResult:
     stalled: bool | None = None
     headline: str | None = None
     observations: list[str] | None = None
-    suggestions: list[str] | None = None
+    suggestions: list[Any] | None = None
     truncated: bool | None = None
 
 
