@@ -5,6 +5,7 @@ import Badge from '@/components/common/Badge';
 import Modal from '@/components/common/Modal';
 import ActivityTimeline from './ActivityTimeline';
 import ContactAiSummary from './ContactAiSummary';
+import ContactAiExtract from './ContactAiExtract';
 import { useAuthStore } from '@/store/authStore';
 import { dealsApi } from '@/services/deals';
 import { autocountApi } from '@/services/autocount';
@@ -22,9 +23,10 @@ interface Props {
   onDelete: () => void;
   onArchive: (is_archived: boolean) => void;
   onRefresh?: () => void;
+  onContactUpdated?: () => void;
 }
 
-export default function ContactDetailPanel({ contact, onClose, onEdit, onDelete, onArchive, onRefresh }: Props) {
+export default function ContactDetailPanel({ contact, onClose, onEdit, onDelete, onArchive, onRefresh, onContactUpdated }: Props) {
   const { t } = useTranslation('contacts');
   const isMobile = useIsMobile();
   const user = useAuthStore((s) => s.user);
@@ -155,6 +157,7 @@ export default function ContactDetailPanel({ contact, onClose, onEdit, onDelete,
           )}
 
           <ContactAiSummary contactId={contact.id} />
+          <ContactAiExtract contactId={contact.id} onUpdated={onContactUpdated} />
 
           {/* Actions */}
           <div className="flex gap-2 flex-wrap">

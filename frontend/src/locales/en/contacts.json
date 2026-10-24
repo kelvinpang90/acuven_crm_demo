@@ -111,5 +111,20 @@
   "aiFollowUpTaskAdding": "Adding...",
   "aiFollowUpTaskAdded": "Added",
   "aiFollowUpTaskFailed": "Failed to add task",
-  "aiFollowUpSubmitConfirm": "There are still {{count}} task drafts not added. Submit anyway?"
+  "aiFollowUpSubmitConfirm": "There are still {{count}} task drafts not added. Submit anyway?",
+  "aiExtractTitle": "Extract details from chat",
+  "aiExtractGenerate": "Extract",
+  "aiExtractRegenerate": "Extract again",
+  "aiExtractLoading": "Extracting...",
+  "aiExtractTruncated": "Only the most recent part of the chat was reviewed.",
+  "aiExtractEmpty": "No details to fill were found in the chat",
+  "aiExtractEvidence": "“{{evidence}}”",
+  "aiExtractHasValue": "Already has a value",
+  "aiExtractFill": "Fill in",
+  "aiExtractFilling": "Saving...",
+  "aiExtractSaveFailed": "Save failed",
+  "aiExtractSaveFailedWithMessage": "Save failed: {{message}}",
+  "aiExtractNotAssigned": "You do not have access to this customer",
+  "aiExtractNothingToFill": "The details are already complete",
+  "aiExtractNoMessages": "This customer has no chat yet"
 }

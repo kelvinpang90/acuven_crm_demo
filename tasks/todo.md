@@ -47,6 +47,28 @@
 
 ---
 
+## CRM-TASK-053 联系人详情面板加从聊天提取资料，勾选后填入（2026-10-24）
+
+### 做了什么
+
+- `frontend/src/types/index.ts`：新增 `AiContactExtractField`、`AiContactExtractSuggestion`（`field`、`value`、`evidence`、`message_index`）与 `AiContactExtract`（`request_id`、`suggestions`、`truncated`，与接口的三个字段一致）。
+- `frontend/src/services/ai.ts`：新增 `createContactExtract`，调用 `POST /ai/contacts/{id}/extract`，58 秒超时，`output_language` 按界面语言映射（`zh` 开头为 `zh-CN`、`en` 开头为 `en`，其他不带）。
+- 新组件 `frontend/src/pages/Contacts/ContactAiExtract.tsx`，按 `docs/contact-ai-extract.md` 第 4.3 节与第九节第 8、11、13 条：AI 状态用 `aiApi.getStatus`（整页只读一次），未启用或读取失败时不显示；请求中按钮置灰并显示提取中；结果卡片标「AI 生成，未核实」，每条建议一行（字段名用客户表单的 `common:` 文案、可编辑的建议值、灰字引号里的出处），默认全部勾选；没有建议时显示「聊天里没有找到可以填的资料」，`truncated` 为真时注明只看了最近一部分聊天；行业用与客户表单相同的十个行业下拉框，其他字段为文本框；值去空白后为空的自动取消勾选、不能勾选，邮箱用与客户表单相同的正则校验，不合的不能勾选并注明格式不正确。
+- 填入：先用 `contactsApi.getContact` 重新读这个客户，按读回数据确认勾选字段仍为空（`name` 按与后端相同的规则判断仍是号码），不再为空的取消勾选、置灰并注明「已有值」、不提交；其余勾选字段去首尾空白后用 `contactsApi.updateContact` 一次提交；成功后调用面板传入的回调并清掉卡片，失败时提示「保存失败」加接口返回的 `message`（有的话）、卡片保留；没有可提交的字段时填入按钮置灰。错误码按验收标准映射为各自的提示，超时与网络错误为 AI 暂时不可用。切换联系人或关闭面板时丢弃还没回来的结果与卡片。
+- `frontend/src/pages/Contacts/ContactDetailPanel.tsx`：在 `ContactAiSummary` 之后放 `ContactAiExtract`，新增可选的 `onContactUpdated` 属性传给它；面板其他内容不变。
+- `frontend/src/pages/Contacts/index.tsx`：新增 `refreshSelected`，刷新列表并重新读取当前选中的客户替换面板数据，作为 `onContactUpdated` 传给面板。
+- 新文案同时加在 `locales/en/contacts.json` 与 `locales/zh/contacts.json`。
+
+### 偏离了什么
+
+- 无
+
+### 验证到什么程度
+
+- 前端类型检查与构建由 PR 的必需检查 frontend 执行，检查结果由 Worker 和 CI 记录不写在这里；没有在浏览器里实际操作过。
+
+---
+
 ## CRM-TASK-052 从聊天提取客户资料的接口（2026-10-24）
 
 ### 做了什么
