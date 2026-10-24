@@ -48,6 +48,24 @@
 
 ---
 
+## CRM-TASK-052 从聊天提取客户资料的接口（2026-10-24）
+
+### 做了什么
+
+- `backend/app/schemas/ai.py`：新增 `ContactExtractRequest`，`output_language` 可选，只能是 `zh-CN`、`en`、`ms`，不合 422。
+- `backend/app/routers/ai.py`：按 `docs/contact-ai-extract.md` 第 4.2 节新增 `POST /api/ai/contacts/{contact_id}/extract`。要求登录，先用与客户摘要接口相同的 `_may_use_ai_for_contact` 判断（联系人存在、未删除且 `may_access_contact` 为真），不通过返回 403 `NOT_ASSIGNED`，不调用业务函数；通过后把当前用户对象、`contact_id` 与 `output_language`（缺省时按界面语言，与简报接口相同）传给 `contact_extract_service.generate_contact_extract`。`nothing_to_fill` 返回 400 `NOTHING_TO_FILL`，其余类别走已有的 `_result_response`（`no_messages` 400 `NO_MESSAGES`、503 `AI_NOT_CONFIGURED`、503 `AI_UNAVAILABLE`、502 `AI_ERROR`、422 `INVALID_INPUT`），成功返回 `request_id`、`suggestions`、`truncated`。其他 AI 接口与 status 接口未改。
+- 新增测试 `backend/tests/test_ai_contact_extract_api.py`，打桩业务函数，覆盖验收标准列出的五组用例，每个测试的 docstring 写明守住的验收标准。
+
+### 偏离了什么
+
+- 无
+
+### 验证到什么程度
+
+- 测试由 PR 的必需检查 backend 执行，检查结果由 Worker 和 CI 记录不写在这里。
+
+---
+
 ## CRM-TASK-051 从聊天提取客户资料的提示词、出处校验与业务函数（2026-10-24）
 
 ### 做了什么
