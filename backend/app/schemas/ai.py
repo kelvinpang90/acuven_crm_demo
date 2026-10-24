@@ -14,6 +14,10 @@ class ContactSummaryRequest(BaseModel):
     output_language: Language | None = None
 
 
+class ContactExtractRequest(BaseModel):
+    output_language: Language | None = None
+
+
 class DealNextStepRequest(BaseModel):
     output_language: Language | None = None
 
