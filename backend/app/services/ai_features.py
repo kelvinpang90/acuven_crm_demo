@@ -82,9 +82,12 @@ progress for 7 days or more, also right now and not per month; stalls are judged
 records in the CRM, so a stall may only mean the records are incomplete. avg_sales_cycle_days is
 the average days from creation to win for deals won in the last 90 days. remaining_to_target is
 target_amount minus won_amount floored at 0, null when no target is set. day_of_month and
-days_in_month show how far this month has progressed. This month is not over: do not say this
+days_in_month show how far this month has progressed. days_remaining is the number of days left
+in this month after today, already computed by the CRM; when you say how many days are left this
+month, quote days_remaining and do not compute it yourself. This month is not over: do not say this
 month is lower than last month; place the two numbers side by side and state how many days of
-this month have passed. Make each suggestion specific to a person or a status stage. Do not name
+this month have passed. Write the output in plain language and do not write the snapshot's field
+names. Make each suggestion specific to a person or a status stage. Do not name
 any deal or customer. Do not evaluate any employee's ability or attitude; describe only the
 numbers. Do not recommend changing system settings and do not claim any record was modified.
 Write in output_language. Return JSON only. headline: 1-120 characters; observations: 2-4 items,
