@@ -2106,3 +2106,52 @@ tasks:
       - format.apply
     creates_branch: true
     creates_pull_request: true
+
+  # 第一轮 AI 质量评测后的两处修订（docs/deal-next-step.md 第九节、docs/dashboard-ai-insight.md 第十节，PR #149 批准）。
+  # 改完只重评这两个功能（管理员在本机跑，不是 Worker 任务）。
+  - id: CRM-TASK-071
+    title: 商机AI下一步建议每条下一步的字数上限由120放宽到200
+    purpose: >-
+      按 docs/deal-next-step.md 第九节：第一轮评测里两个样例的下一步内容都对，但各有一条超过 120 字符被判 AI 出错。把 next_steps 每条的上限放宽到 200，系统提示里写的上限同步改。
+      只改这一个上限：不改其他字段与条数、不截断、不改 schema、接口、前端与评测样例；测试打桩 AI 客户端，不调真实模型。
+    status: ready
+    depends_on: []
+    acceptance_criteria:
+      - ai_features 的 validate_deal_next_step 把 next_steps 每条的上限由 120 改为 200（去首尾空白后按码点算），超出仍返回 None（判 AI 出错），不截断；assessment、stall_reason 的上限与 next_steps 的条数 1 至 3 不变；DEAL_NEXT_STEP_SCHEMA 不变
+      - DEAL_NEXT_STEP_SYSTEM 末尾写的上限改为 next_steps 每条 1 至 200 字符（英文写法与现有的一致，即 each 1-200 characters），其余文字不变
+      - test_deal_next_step_service 的校验边界参数化用例里，单条 120 字通过改为单条 200 字通过、单条 121 字不通过改为单条 201 字不通过，其余用例不变；新增一条断言 DEAL_NEXT_STEP_SYSTEM 含 each 1-200 characters、不含 1-120。测试只需覆盖这些用例，每个测试写明守住的是哪一条验收标准；清单之外的补充覆盖只算非阻塞意见；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
+      - tasks/todo.md 新增 CRM-TASK-071 记录段（做了什么、偏离了什么、验证到什么程度）；偏离段只列两类、每条一句：与验收标准或设计文档不一致的做法，以及验收标准没有要求、但改变了现有接口或页面行为的改动；验收标准要求的改动与重构、命名、格式调整不算偏离，没有就写无；偏离段漏列只算非阻塞意见，除非漏列的改动本身违反某条验收标准（那时按那一条判）；验证段只写测试由 PR 的必需检查 backend 执行、检查结果由 Worker 和 CI 记录不写在这里、没有调用过真实模型，不写任何检查是否运行或通过；不改 planning-v1 块；复选框只允许 [ ] / [x]；改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不加表、不加迁移、不改接口与前端；allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#149），不合并、不直推
+    allowed_change_paths:
+      - backend/app/services/ai_features.py
+      - backend/tests/test_deal_next_step_service.py
+      - tasks/todo.md
+    allowed_commands:
+      - lint.check
+      - format.check
+      - format.apply
+    creates_branch: true
+    creates_pull_request: true
+
+  - id: CRM-TASK-072
+    title: 经理看板AI解读快照加本月剩余天数，提示词要求引用它且不写字段名
+    purpose: >-
+      按 docs/dashboard-ai-insight.md 第十节：第一轮评测里模型自己用当月天数减当天算了剩余天数，越过了 CRM 算、AI 解读的分工，另有输出直接写了快照字段名。
+      由 CRM 在快照的 period 里给出 days_remaining，系统提示写明它的含义、要说剩几天时引用它、输出不写字段名。只改快照与系统提示：不改输出结构、上限与校验、接口、前端与评测样例；days_remaining 只进快照、不进接口响应；测试不调真实模型。
+    status: ready
+    depends_on: []
+    acceptance_criteria:
+      - dashboard_insight_service 的 build_team_snapshot 在 period 里 days_in_month 之后加 days_remaining，值为 days_in_month 减 day_of_month 的整数（今天之后本月还剩几天，月底最后一天为 0），与 day_of_month 一样按传入的 UTC now 算；period 其他键与快照其他部分不变
+      - DASHBOARD_INSIGHT_SYSTEM 的字段说明里加 days_remaining 的含义（本月今天之后还剩的天数，由 CRM 算好），并写明说本月还剩几天时引用 days_remaining、不自己算；另加一句输出用平常的话写、不写快照的字段名；其余文字、DASHBOARD_INSIGHT_SCHEMA 与 validate_dashboard_insight 不变
+      - test_dashboard_insight_snapshot 里现有断言 period 整块相等的两处（10 月 18 日与 1 月 3 日）各加上 days_remaining（13 与 28）；新增用例：月底最后一天（如 10 月 31 日）days_remaining 为 0、2 月非闰年的 28 日为 0。测试只需覆盖这些用例，每个测试写明守住的是哪一条验收标准；清单之外的补充覆盖只算非阻塞意见；现有看板解读业务函数的测试不改且照常通过；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
+      - tasks/todo.md 新增 CRM-TASK-072 记录段（做了什么、偏离了什么、验证到什么程度）；偏离段只列两类、每条一句：与验收标准或设计文档不一致的做法，以及验收标准没有要求、但改变了现有接口或页面行为的改动；验收标准要求的改动与重构、命名、格式调整不算偏离，没有就写无；偏离段漏列只算非阻塞意见，除非漏列的改动本身违反某条验收标准（那时按那一条判）；验证段只写测试由 PR 的必需检查 backend 执行、检查结果由 Worker 和 CI 记录不写在这里、没有调用过真实模型，不写任何检查是否运行或通过；不改 planning-v1 块；复选框只允许 [ ] / [x]；改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不加表、不加迁移、不改接口与前端；allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#149），不合并、不直推
+    allowed_change_paths:
+      - backend/app/services/dashboard_insight_service.py
+      - backend/app/services/ai_features.py
+      - backend/tests/test_dashboard_insight_snapshot.py
+      - tasks/todo.md
+    allowed_commands:
+      - lint.check
+      - format.check
+      - format.apply
+    creates_branch: true
+    creates_pull_request: true
