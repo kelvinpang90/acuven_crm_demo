@@ -52,6 +52,37 @@
 
 ---
 
+## 登记 CRM-TASK-071、072（2026-10-24）
+
+Kelvin 2026-10-24 在 kelvinpang90/acuven_crm_demo#149 上批准 `docs/deal-next-step.md` 第九节与 `docs/dashboard-ai-insight.md` 第十节（原话「绿了」）。本段是登记 PR 的记录。
+
+### 做了什么
+
+- `.platform/tasks.yaml`：登记 071（商机下一步建议每条上限 120 改 200）与 072（看板快照加 `days_remaining`、提示词引用它且不写字段名），都 `ready`、没有依赖。
+- planning-v1：071、072 排在「当前计划」最前面（改动小，挡着 AI 功能上线）；为守住 20 项上限，068、069 移到「后续计划」最前面，其余顺序不变。「已阻塞」里「AI 功能上线」一行改为等 071、072 合并部署后重评。
+
+### 设计闸门与预审
+
+- 设计闸门：都引用 #149。改动本身不新增发给模型的个人数据、不碰钱、状态机与表结构，按惯例对所改设计的批准 PR 跑了预审。
+- `contract_check`：ready to register，两个任务都没有拆分 WARN；planning-v1 `ok, next: CRM-TASK-071`。WARN 只有原有的四条，与本次无关。
+- 预审（设计文件分别为 `docs/deal-next-step.md`、`docs/dashboard-ai-insight.md`，对登记分支的干净检出）：第 1 轮都 READY，无发现。它调模型、不是确定性的，READY 不保证没有缺陷。
+
+```text
+第 1 轮 CRM-TASK-071:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 6.6 万 token（其中缓存读取 4.2 万），折合 API 价约 $0.23；周额度读数 68%。
+退出码 0
+
+第 1 轮 CRM-TASK-072:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 13.5 万 token（其中缓存读取 11 万），折合 API 价约 $0.25；周额度读数 68%。
+退出码 0
+```
+
 ## AI 质量评测第一轮（2026-10-24）
 
 ### 做了什么
