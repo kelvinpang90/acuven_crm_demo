@@ -93,6 +93,14 @@ def _deal_next_step(user: User, params: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _contact_extract(user: User, params: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "user": user,
+        "contact_id": _param(params, "contact"),
+        "output_language": _param(params, "output_language"),
+    }
+
+
 def _dashboard_insight(user: User, params: dict[str, Any]) -> dict[str, Any]:
     return {"user": user, "output_language": _param(params, "output_language")}
 
@@ -106,7 +114,8 @@ class Feature:
     # Shown in the report, in this order.
     output_fields: tuple[str, ...]
     # Free text written by the model; the only fields the automatic flags scan
-    # (section 9 item 7). "tasks.title" is the title of every task draft.
+    # (section 9 item 7). "tasks.title" is the title of every task draft;
+    # "suggestions.value" and "suggestions.evidence" read every extract suggestion.
     text_fields: tuple[str, ...]
 
     def load(self) -> tuple[ModuleType, Callable[..., Any]]:
@@ -187,6 +196,14 @@ FEATURES: dict[str, Feature] = {
                 "truncated",
             ),
             ("assessment", "stall_reason", "next_steps"),
+        ),
+        Feature(
+            "contact_extract",
+            "app.services.contact_extract_service",
+            "generate_contact_extract",
+            _contact_extract,
+            ("suggestions", "truncated"),
+            ("suggestions.value", "suggestions.evidence"),
         ),
         Feature(
             "dashboard_insight",
