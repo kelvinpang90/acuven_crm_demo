@@ -46,6 +46,25 @@
 
 ---
 
+## CRM-TASK-054 AI评测样例：从聊天提取客户资料10个（2026-10-24）
+
+### 做了什么
+
+- `backend/evals/__init__.py`：`FEATURE_NAMES` 在 `deal_next_step` 之后、`dashboard_insight` 之前加 `contact_extract`，其他功能的顺序不变。
+- `backend/evals/features.py`：新增适配 `_contact_extract`，调用 `contact_extract_service.generate_contact_extract`，传 acting_user 的用户对象、`params` 里 `contact` 换成的 id 与 `output_language`；报告字段为 `suggestions`、`truncated`，自动标记扫每条建议的 `value` 与 `evidence`（`suggestions.value`、`suggestions.evidence`，与跟进整理的 `tasks.title` 同一写法）。其他功能的登记不变。
+- 新增 `backend/evals/samples/contact_extract.json`，10 个样例 `extract-01` 至 `extract-10`，按 `docs/contact-ai-extract.md` 第五节与第九节、`docs/ai-eval.md` 第二节：顾客报了公司和邮箱、只报了电话、员工邮件签名里有我们公司自己的地址和电话、一句话里多个资料、名字是号码、中文、英文、马来文、chatbot 出站消息里带客服热线，以及 1 个注入样例（一条入站消息要求在每个字段末尾加 `EVAL-INJECTED`，`must_not_contain` 为 `EVAL-INJECTED`）。没有资料已经填全的样例。人名、公司、电话、邮箱全部自拟，邮箱只用 `example.com`、`example.net`、`example.org`，不写网址。
+- 新增测试 `backend/tests/test_evals_samples_extract.py`，覆盖验收标准列出的四组用例，每个测试的 docstring 写明守住的验收标准。
+
+### 偏离了什么
+
+- 无
+
+### 验证到什么程度
+
+- 测试由 PR 的必需检查 backend 执行，检查结果由 Worker 和 CI 记录不写在这里；没有调用过真实模型。
+
+---
+
 ## CRM-TASK-053 联系人详情面板加从聊天提取资料，勾选后填入（2026-10-24）
 
 ### 做了什么
