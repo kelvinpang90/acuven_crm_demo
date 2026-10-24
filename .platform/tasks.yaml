@@ -2137,7 +2137,7 @@ tasks:
     purpose: >-
       按 docs/dashboard-ai-insight.md 第十节：第一轮评测里模型自己用当月天数减当天算了剩余天数，越过了 CRM 算、AI 解读的分工，另有输出直接写了快照字段名。
       由 CRM 在快照的 period 里给出 days_remaining，系统提示写明它的含义、要说剩几天时引用它、输出不写字段名。只改快照与系统提示：不改输出结构、上限与校验、接口、前端与评测样例；days_remaining 只进快照、不进接口响应；测试不调真实模型。
-    status: ready
+    status: done
     depends_on: []
     acceptance_criteria:
       - dashboard_insight_service 的 build_team_snapshot 在 period 里 days_in_month 之后加 days_remaining，值为 days_in_month 减 day_of_month 的整数（今天之后本月还剩几天，月底最后一天为 0），与 day_of_month 一样按传入的 UTC now 算；period 其他键与快照其他部分不变
