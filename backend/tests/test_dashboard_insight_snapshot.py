@@ -69,7 +69,10 @@ def _member(snapshot, name):
 
 @pytest.mark.asyncio
 async def test_top_level_keys_period_and_january_previous_month(async_session_maker):
-    """Guards criteria 1 and 2: four top-level keys, the period block, and Jan -> previous Dec."""
+    """Guards criteria 1 and 2: four top-level keys, the period block, and Jan -> previous Dec.
+
+    Also guards CRM-TASK-072 criterion 1: days_remaining follows days_in_month in period.
+    """
     await _seed(
         async_session_maker,
         _manager(),
@@ -83,6 +86,7 @@ async def test_top_level_keys_period_and_january_previous_month(async_session_ma
         "as_of": "2026-10-18",
         "day_of_month": 18,
         "days_in_month": 31,
+        "days_remaining": 13,
     }
 
     january = await _snapshot(async_session_maker, now=datetime(2027, 1, 3, 8, tzinfo=timezone.utc))
@@ -91,11 +95,30 @@ async def test_top_level_keys_period_and_january_previous_month(async_session_ma
         "as_of": "2027-01-03",
         "day_of_month": 3,
         "days_in_month": 31,
+        "days_remaining": 28,
     }
     assert january["team"]["last_month"]["won_amount"] == "100.00"
     assert january["team"]["last_month"]["target_amount"] == "400.00"
     assert january["team"]["last_month"]["target_rate"] == 25.0
     assert january["team"]["this_month"]["won_amount"] == "0.00"
+
+
+@pytest.mark.asyncio
+async def test_days_remaining_is_zero_on_last_day_of_month(async_session_maker):
+    """Guards CRM-TASK-072 criterion 1: the last day of the month (Oct 31, Feb 28 in a non-leap
+    year) has days_remaining 0, computed from the UTC now."""
+    await _seed(async_session_maker, _manager())
+    october = await _snapshot(
+        async_session_maker, now=datetime(2026, 10, 31, 23, 59, 59, tzinfo=timezone.utc)
+    )
+    assert october["period"]["days_in_month"] == 31
+    assert october["period"]["days_remaining"] == 0
+
+    february = await _snapshot(
+        async_session_maker, now=datetime(2027, 2, 28, 12, tzinfo=timezone.utc)
+    )
+    assert february["period"]["days_in_month"] == 28
+    assert february["period"]["days_remaining"] == 0
 
 
 @pytest.mark.asyncio

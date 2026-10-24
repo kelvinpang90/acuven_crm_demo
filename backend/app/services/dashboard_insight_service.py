@@ -284,12 +284,14 @@ async def build_team_snapshot(db: AsyncSession, *, manager: User, now: datetime)
         _one_decimal(Decimal(sum(cycle_days)) / Decimal(len(cycle_days))) if cycle_days else None
     )
 
+    days_in_month = calendar.monthrange(now.year, now.month)[1]
     return {
         "period": {
             "month": f"{now.year:04d}-{now.month:02d}",
             "as_of": now.date().isoformat(),
             "day_of_month": now.day,
-            "days_in_month": calendar.monthrange(now.year, now.month)[1],
+            "days_in_month": days_in_month,
+            "days_remaining": days_in_month - now.day,
         },
         "team": {
             "this_month": _team_month(this_month),

@@ -51,6 +51,24 @@
 
 ---
 
+## CRM-TASK-072 经理看板AI解读快照加本月剩余天数，提示词要求引用它且不写字段名（2026-10-24）
+
+### 做了什么
+
+- `backend/app/services/dashboard_insight_service.py`：`build_team_snapshot` 的 `period` 在 `days_in_month` 之后加 `days_remaining`，为 `days_in_month − day_of_month` 的整数（月底最后一天为 0），与 `day_of_month` 一样按传入的 UTC `now` 算；`period` 其他键与快照其他部分不变，`days_remaining` 只进快照、不进接口响应。
+- `backend/app/services/ai_features.py`：`DASHBOARD_INSIGHT_SYSTEM` 的字段说明里在 `day_of_month`、`days_in_month` 之后加 `days_remaining` 的含义（本月今天之后还剩的天数，由 CRM 算好），写明说本月还剩几天时引用它、不自己算；在建议要求之前加一句输出用平常的话写、不写快照的字段名。其余文字、`DASHBOARD_INSIGHT_SCHEMA` 与 `validate_dashboard_insight` 不变。
+- `backend/tests/test_dashboard_insight_snapshot.py`：10 月 18 日与 1 月 3 日两处 `period` 整块相等的断言分别加 `days_remaining` 13 与 28；新增用例：10 月 31 日与 2027 年 2 月 28 日（非闰年）`days_remaining` 为 0。
+
+### 偏离了什么
+
+- 无
+
+### 验证到什么程度
+
+- 测试由 PR 的必需检查 backend 执行，检查结果由 Worker 和 CI 记录不写在这里；没有调用过真实模型。
+
+---
+
 ## CRM-TASK-071 商机AI下一步建议每条下一步的字数上限由120放宽到200（2026-10-24）
 
 ### 做了什么
