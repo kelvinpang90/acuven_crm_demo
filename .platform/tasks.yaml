@@ -2114,7 +2114,7 @@ tasks:
     purpose: >-
       按 docs/deal-next-step.md 第九节：第一轮评测里两个样例的下一步内容都对，但各有一条超过 120 字符被判 AI 出错。把 next_steps 每条的上限放宽到 200，系统提示里写的上限同步改。
       只改这一个上限：不改其他字段与条数、不截断、不改 schema、接口、前端与评测样例；测试打桩 AI 客户端，不调真实模型。
-    status: ready
+    status: done
     depends_on: []
     acceptance_criteria:
       - ai_features 的 validate_deal_next_step 把 next_steps 每条的上限由 120 改为 200（去首尾空白后按码点算），超出仍返回 None（判 AI 出错），不截断；assessment、stall_reason 的上限与 next_steps 的条数 1 至 3 不变；DEAL_NEXT_STEP_SCHEMA 不变
