@@ -1626,7 +1626,7 @@ tasks:
     title: 联系人详情面板加从聊天提取资料，勾选后填入
     purpose: >-
       按 docs/contact-ai-extract.md 第 4.3 节，在联系人详情面板的 AI 客户摘要下面加从聊天提取资料，调用 CRM-TASK-052 的接口；员工勾选、可改值后点填入，用现有的更新客户接口保存。AI 未配置时不显示。只改前端：不改后端、不加页面或路由。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-052
     acceptance_criteria:
