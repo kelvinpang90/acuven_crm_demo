@@ -50,6 +50,26 @@
 
 ---
 
+## CRM-TASK-050 从聊天提取客户资料的快照组装与行业常量（2026-10-24）
+
+### 做了什么
+
+- 新增 `backend/app/services/contact_extract_service.py`：常量 `INDUSTRIES`（与 `frontend/src/pages/Contacts/ContactForm.tsx` 的十个行业逐字、同序）、`EXTRACT_FIELDS`（`company`、`industry`、`email`、`phone`、`address`）、`SNAPSHOT_LIMIT_BYTES`（16384，循环里按模块属性读取）与 `build_extract_snapshot(db, *, contact, now)`，按 `docs/contact-ai-extract.md` 第三节与第九节第 2、7、12 条组装快照。
+- `contact` 块只有 `name`（截到 100 字）、`name_is_phone`（去首尾空白后非空、只由 0-9、加号、空格与短横组成且至少一个数字）、`empty_fields`（null 或去空白后为空串，按 `EXTRACT_FIELDS` 顺序）；不放任何字段的现有值、id 与负责人。
+- `messages`：这个联系人的消息按 `created_at`、`id` 倒序取 41 条判断是否超过 40，保留最近 40 条从旧到新；每条 `index`、`at`（UTC 到秒带 `Z`）、`direction`、`author_kind`（为空时入站 `customer`、出站 `agent`）、`channel`、`body`（1000 字），邮件另带 `subject`（100 字，为空为空串）；不按 `now` 过滤。
+- 快照按 `compact_json` 的 UTF-8 字节数超过上限时从最旧的消息开始丢、至少留 1 条，每丢一条重新编 `index`；名字、正文、主题截断、超过 40 条或因上限丢了消息时 `truncated` 为真。不调 AI、不写审计、不写库。
+- 新增测试 `backend/tests/test_contact_extract_snapshot.py`，覆盖验收标准列出的六组用例，每个测试的 docstring 写明守住的验收标准。
+
+### 偏离了什么
+
+- 无
+
+### 验证到什么程度
+
+- 测试由 PR 的必需检查 backend 执行，检查结果由 Worker 和 CI 记录不写在这里；没有调用过真实模型。
+
+---
+
 ## CRM-TASK-072 经理看板AI解读快照加本月剩余天数，提示词要求引用它且不写字段名（2026-10-24）
 
 ### 做了什么
