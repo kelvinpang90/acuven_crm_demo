@@ -53,6 +53,16 @@ class ReplyDraftRequest(BaseModel):
         return value
 
 
+class ImportColumn(BaseModel):
+    header: str
+    samples: list[str]
+
+
+class ImportColumnsRequest(BaseModel):
+    columns: list[ImportColumn]
+    output_language: Language | None = None
+
+
 class TranslateRequest(BaseModel):
     contact_id: str
     text: str

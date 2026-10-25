@@ -43,6 +43,24 @@
 
 ---
 
+## CRM-TASK-057 导入表格识别列名的接口（2026-10-25）
+
+### 做了什么
+
+- `backend/app/schemas/ai.py`：新增 `ImportColumn`（`header` 字符串、`samples` 字符串数组，均必填）与 `ImportColumnsRequest`（`columns` 必填，`output_language` 可选，只能是 `zh-CN`、`en`、`ms`）。只校验类型；列数、长度、去空白与重复等上限由 CRM-TASK-056 的业务函数判 `invalid_input`。
+- `backend/app/routers/ai.py`：按 `docs/contact-import-columns.md` 4.3 节新增 `POST /api/ai/import/columns`，只要求登录；调用 `import_columns_service.suggest_import_columns`，传当前用户、`columns`（按请求原样转成对象数组）与 `output_language`（缺省按界面语言，`zh` 为 `zh-CN`，其余为 `en`）；结果走共用的 `_result_response`，成功 200 返回 `request_id`、`mappings`，其余类别与其他 AI 接口相同。其他 AI 接口与 status 接口未动。
+- 新增测试 `backend/tests/test_ai_import_columns_api.py`，打桩业务函数，覆盖验收标准列出的五组用例，每个测试的 docstring 写明守住的验收标准。
+
+### 偏离了什么
+
+- 无
+
+### 验证到什么程度
+
+- 测试由 PR 的必需检查 backend 执行，检查结果由 Worker 和 CI 记录不写在这里。
+
+---
+
 ## CRM-TASK-056 导入表格识别列名的提示词、输出校验与业务函数（2026-10-25）
 
 ### 做了什么
