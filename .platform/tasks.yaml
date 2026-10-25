@@ -1842,7 +1842,7 @@ tasks:
     title: 疑似重复客户的查询接口：新建前检查与客户的疑似重复
     purpose: >-
       按 docs/contact-duplicate-hints.md 6.2 节，把 CRM-TASK-060 的查询接成两个接口。只做接口层：不改判定规则、不改表结构、不改前端、不改现有联系人接口的行为。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-060
       - CRM-TASK-055
