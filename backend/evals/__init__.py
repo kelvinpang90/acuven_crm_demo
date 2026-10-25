@@ -17,5 +17,6 @@ FEATURE_NAMES = (
     "followup_draft",
     "deal_next_step",
     "contact_extract",
+    "import_columns",
     DASHBOARD_FEATURE,
 )
