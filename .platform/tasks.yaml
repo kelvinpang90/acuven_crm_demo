@@ -1759,7 +1759,7 @@ tasks:
     title: 导入页加列对应表与AI识别列，修正结果卡片与预览计数
     purpose: >-
       按 docs/contact-import-columns.md 第二节与 4.4 节，在导入页的预览上方加列对应表（不依赖 AI）与 AI 识别列按钮，导入时提交 column_map；并修正结果卡片与预览计数的两处现有错误。只改前端：不改后端、不加页面或路由。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-055
       - CRM-TASK-057
