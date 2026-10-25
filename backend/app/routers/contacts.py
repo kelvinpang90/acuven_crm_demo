@@ -10,16 +10,24 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies import get_current_user, require_role
+from app.models.contact import Contact
 from app.models.deal import Deal
 from app.models.user import User
 from app.schemas.activity import ActivityCreate
-from app.schemas.contact import ArchiveRequest, ContactCreate, ContactUpdate
+from app.schemas.contact import (
+    ArchiveRequest,
+    ContactCreate,
+    ContactUpdate,
+    DuplicateCheckRequest,
+    DuplicateResultResponse,
+)
 from app.services import (
     access_service,
     activity_service,
     autocount_service,
     chatbot_send_service,
     contact_service,
+    duplicate_service,
     routing_service,
 )
 from app.utils.response import fail, ok
@@ -293,6 +301,62 @@ async def import_contacts(
         assign_strategy=assign_strategy,
     )
     return ok(data=result)
+
+
+# --- Duplicate routes (docs/contact-duplicate-hints.md 6.2 and 9.1) ---
+# Declared before the /{contact_id} routes so "duplicate-check" is never read as an id.
+
+
+def _duplicates_payload(result: duplicate_service.DuplicateResult) -> dict:
+    return DuplicateResultResponse.model_validate(result).model_dump()
+
+
+@router.post("/duplicate-check")
+async def check_duplicates(
+    body: DuplicateCheckRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    if not any((value or "").strip() for value in body.model_dump().values()):
+        return ok(data=DuplicateResultResponse().model_dump())
+    result = await duplicate_service.find_duplicates(
+        db,
+        user=current_user,
+        name=body.name,
+        company=body.company,
+        email=body.email,
+        phone=body.phone,
+    )
+    return ok(data=_duplicates_payload(result))
+
+
+@router.get("/{contact_id}/duplicates")
+async def list_duplicates(
+    contact_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    if not await access_service.may_access_contact(db, current_user, contact_id):
+        return _not_found()
+    # may_access_contact lets an admin through for any id, so missing and
+    # deleted customers are refused here.
+    contact = (
+        await db.execute(
+            select(Contact).where(Contact.id == contact_id, Contact.deleted_at.is_(None))
+        )
+    ).scalar_one_or_none()
+    if contact is None:
+        return _not_found()
+    result = await duplicate_service.find_duplicates(
+        db,
+        user=current_user,
+        name=contact.name,
+        company=contact.company,
+        email=contact.email,
+        phone=contact.phone,
+        exclude_id=contact.id,
+    )
+    return ok(data=_duplicates_payload(result))
 
 
 @router.get("/{contact_id}")
