@@ -40,6 +40,26 @@
 
 ---
 
+## CRM-TASK-060 疑似重复客户的判定规则与查询，按可见范围分组（2026-10-26）
+
+### 做了什么
+
+- 新增 `backend/app/services/duplicate_service.py`，按 `docs/contact-duplicate-hints.md` 第三、四节、6.1 节与第九节：
+  - `normalize_name`：转小写，去掉标点（Unicode 类别 P）与全部空白。`normalize_company`：转小写、标点换空格、压缩空白，再从末尾按整词反复去掉 `sdn bhd`、`bhd`、`berhad`、`plt`、`enterprise`、`trading`、`ltd`、`limited`、`co`、`inc`，中文后缀 `有限公司`、`公司` 按末尾子串去掉，最后去掉全部空白。两个函数遇到空值或规范化后为空都返回 `None`。
+  - `find_duplicates(db, *, user, name, company, email, phone, exclude_id=None, limit=20)` 返回 `DuplicateResult`（`visible`、`hidden_count`）。`visible` 里每个是 `DuplicateContact`，带 `id`、`name`、`company`、`assigned_to_name`、`rules`。比较对象是未删除（含已归档）且不是 `exclude_id` 的客户。`phone` 用规范化后的号码做等值查询；`email` 用 `lower(trim(email))` 比较；`name_company` 取全部未删除、名字与公司都非空的客户的 id、名字、公司，在 Python 里比，任一边名字是号码就不比。`rules` 按 `phone`、`email`、`name_company` 的顺序列出。
+  - 可见范围用 `access_service.owner_scope` 一次查出命中客户里看得到的那些（并带出负责人名字），判定结果和逐个调用 `may_access_contact` 相同；其余只计入 `hidden_count`。`visible` 按命中规则数从多到少、再按创建时间从早到晚排，最多 `limit` 个。查询次数是常数：每条适用的规则一次、经理的团队一次、可见客户一次。
+- 新增测试 `backend/tests/test_duplicate_service.py`，覆盖验收标准列出的八组用例，每个测试的 docstring 写明守住的是哪条验收标准。
+
+### 偏离了什么
+
+- 无
+
+### 验证到什么程度
+
+- 测试由 PR 的必需检查 backend 执行，检查结果由 Worker 和 CI 记录不写在这里。
+
+---
+
 ## CRM-TASK-059 AI评测样例：导入表格识别列名10个（2026-10-26）
 
 ### 做了什么
