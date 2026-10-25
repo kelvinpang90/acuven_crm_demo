@@ -1818,7 +1818,7 @@ tasks:
     title: 疑似重复客户的判定规则与查询，按可见范围分组
     purpose: >-
       按 docs/contact-duplicate-hints.md 第三、四节与 6.1 节，写疑似重复的规则判定（电话、邮箱、同名同公司）与查询，结果按员工看得到与看不到分开。只做业务规则层：不用 AI、不加接口、不改前端、不加表与迁移、不改 contact_service。
-    status: ready
+    status: done
     depends_on: []
     acceptance_criteria:
       - 新文件 duplicate_service 新增 normalize_name(value)（转小写、去掉标点与全部空白）与 normalize_company(value)：先转小写、把标点换成空格、压缩空白，再从末尾按整词反复去掉常见后缀（sdn bhd、bhd、berhad、plt、enterprise、trading、ltd、limited、co、inc；中文后缀有限公司、公司按末尾子串去掉），最后去掉全部空白；不是整词的部分不去（Zinc 不变）；空值或规范化后为空返回 None
