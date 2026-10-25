@@ -341,3 +341,43 @@ export interface AiFollowUpDraft {
   content: string;
   tasks: AiFollowUpTaskDraft[];
 }
+
+// The CRM fields an import column can be mapped to (docs/contact-import-columns.md section 2).
+export type ImportField =
+  | 'name'
+  | 'company'
+  | 'industry'
+  | 'email'
+  | 'phone'
+  | 'address'
+  | 'notes'
+  | 'tags'
+  | 'assigned_to_email'
+  | 'status'
+  | 'priority'
+  | 'deal_value'
+  | 'deal_title'
+  | 'id';
+
+export interface ContactImportResult {
+  total: number;
+  inserted: number;
+  deals_added: number;
+  skipped: number;
+  errors: Array<{ row: number; field: string; message: string }>;
+}
+
+export interface AiImportColumn {
+  header: string;
+  samples: string[];
+}
+
+export interface AiImportColumnMapping {
+  header: string;
+  field: ImportField | null;
+}
+
+export interface AiImportColumns {
+  request_id: string | null;
+  mappings: AiImportColumnMapping[];
+}

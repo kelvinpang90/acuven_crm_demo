@@ -42,6 +42,29 @@
 
 ---
 
+## CRM-TASK-058 导入页加列对应表与 AI 识别列，修正结果卡片与预览计数（2026-10-25）
+
+### 做了什么
+
+- `frontend/src/pages/Contacts/ExcelImport.tsx`：按 `docs/contact-import-columns.md` 第二节、4.4 节与第九节，改为读工作簿当前选中的工作表（`Workbook.Views[0].activeTab`，没有或越界时取第一张），表头取第 1 行、从 A 列起的原始单元格，只认不带公式的文字单元格（`t` 为 `s`），按第 16 条的九种字符去首尾空白；数字、日期、公式与空单元格按空表头处理。数据行从第 2 行起取单元格显示的文字，整行去空白后都为空的行不进预览与计数。同名表头记下第一列；表头与模板表头一致的列自动对上，其余为「不导入」。
+- 新组件 `frontend/src/pages/Contacts/ImportColumnMap.tsx` 放在预览上方：每列一个下拉框（十四个字段走 `importFields` 文案，加「不导入」），已被其他列选中的字段置灰；表头为空的列与同名的后几列下拉框置灰并注明原因。
+- AI 启用时（`aiApi.getStatus`）显示「AI 识别列」：表头非空、去空白后按码点截到 100 字再去空白后相同的一组只发第一列，按列顺序取前 40 列，每列带第 2 行起前 3 个非空显示文字（去空白、按码点截到 50 字再去空白）；请求中按钮置灰，58 秒超时。成功后按发出的截断表头对回原列，按列顺序只填当前为「不导入」且从没被手动改过的列，字段已被任何一列占用时丢掉该建议，建议为 `null` 的不处理，被填的下拉框旁标「AI」；失败按 `AI_NOT_CONFIGURED`、`AI_UNAVAILABLE` 与超时网络错误、`AI_ERROR` 与其他提示。
+- 导入时提交 `column_map`（键为去空白、不截断的表头，值为字段或 `null`；空表头与同名的后几列不放）；既没有列对应 `name` 也没有列对应 `id` 时导入按钮置灰并提示。
+- 预览计数改为按对应到 `id` 的列计「加商机到已有客户」，其余为新增客户；缺名字按对应到 `name` 的列判断与标红，没有 `name` 列时不标，`id` 列有值的行不标。结果卡片显示 `inserted`、`deals_added`、`skipped` 与错误列表，不再读 `updated`。
+- `frontend/src/services/contacts.ts`：`importContacts` 加 `columnMap` 选项，返回类型改为 `ContactImportResult`；`frontend/src/services/ai.ts` 新增 `suggestImportColumns`（`POST /ai/import/columns`）；`frontend/src/types/index.ts` 新增 `ImportField`、`ContactImportResult`、`AiImportColumn`、`AiImportColumnMapping`、`AiImportColumns`；en 与 zh 的 `contacts` 命名空间加新文案，「新增」改为「新增客户」，`updated` 换成 `dealsAdded`。
+
+### 偏离了什么
+
+- 预览单元格改为显示单元格的显示文字（原来是 SheetJS 的原始值，日期显示为序号）。
+- 结果卡片错误行的「行」字改走 `importErrorRow` 文案，英文界面显示为 Row。
+- AI 识别成功但没有可填的列时，额外提示「AI 没有找到可以再填的列」。
+
+### 验证到什么程度
+
+- 前端类型检查与构建由 PR 的必需检查 frontend 执行，检查结果由 Worker 和 CI 记录不写在这里；没有在浏览器里实际操作过。
+
+---
+
 ## CRM-TASK-057 导入表格识别列名的接口（2026-10-25）
 
 ### 做了什么
