@@ -41,6 +41,24 @@
 
 ---
 
+## 修订 CRM-TASK-059、070 的契约：评测功能登记顺序改为相对断言（2026-10-26）
+
+CRM-TASK-059 的 run `975c16c8` 以 `contract_scope_insufficient` 失败、没有改任何文件：`backend/tests/test_evals_samples_extract.py` 断言 `FEATURE_NAMES` 等于现有 8 项的完整元组，059 加 `import_columns` 后它必挂，而这个文件不在 059 的允许路径里。070 再加 `message_triage` 会撞上同样的问题。Kelvin 2026-10-26 批准按相对断言修订契约。
+
+### 做了什么
+
+- 059：`allowed_change_paths` 加 `backend/tests/test_evals_samples_extract.py`；验收标准第 1 条写明该文件只改一处，把完整元组断言改为只断言 `contact_extract` 紧跟在 `deal_next_step` 之后；新测试第 4 条改为只断言 `import_columns` 紧跟在 `contact_extract` 之后，不断言完整内容。
+- 070：新测试第 4 条改为只断言 `message_triage` 紧跟在 `import_columns` 之后，不需要扩大允许路径。
+- planning-v1 不变。
+
+### 设计闸门与预审
+
+- 设计闸门仍是 kelvinpang90/acuven_crm_demo#135，设计没变。
+- 预审：不适用。只改测试的断言方式与一个测试文件的允许路径，不改功能、数据与设计。
+- `contract_check`：ready to register，planning-v1 `ok, next: CRM-TASK-059`；WARN 只有原有的四条。
+
+---
+
 ## CRM-TASK-058 导入页加列对应表与 AI 识别列，修正结果卡片与预览计数（2026-10-25）
 
 ### 做了什么
