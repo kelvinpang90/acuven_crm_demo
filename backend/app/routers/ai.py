@@ -16,6 +16,7 @@ from app.schemas.ai import (
     DashboardInsightRequest,
     DealNextStepRequest,
     FollowupDraftRequest,
+    ImportColumnsRequest,
     ReplyDraftRequest,
     TranslateRequest,
 )
@@ -28,6 +29,7 @@ from app.services import (
     dashboard_insight_service,
     deal_next_step_service,
     followup_draft_service,
+    import_columns_service,
 )
 from app.utils.response import fail, ok
 
@@ -245,6 +247,21 @@ async def create_dashboard_insight(
     return _result_response(
         result, ("request_id", "headline", "observations", "suggestions", "truncated")
     )
+
+
+@router.post("/import/columns")
+async def create_import_columns(
+    body: ImportColumnsRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    result = await import_columns_service.suggest_import_columns(
+        db,
+        user=current_user,
+        columns=[column.model_dump() for column in body.columns],
+        output_language=body.output_language or _default_output_language(current_user),
+    )
+    return _result_response(result, ("request_id", "mappings"))
 
 
 @router.post("/translate")
