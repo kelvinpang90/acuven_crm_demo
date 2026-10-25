@@ -1790,7 +1790,7 @@ tasks:
     title: AI评测样例：导入表格识别列名10个
     purpose: >-
       按 docs/contact-import-columns.md 第五节与第九节、docs/ai-eval.md 第二节，在评测脚本里加 import_columns 功能并写 10 个自拟样例。只改评测脚本的功能登记与样例：不改 app 下任何文件；样本值里的人名、公司、电话、邮箱全部自拟。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-056
       - CRM-TASK-054
