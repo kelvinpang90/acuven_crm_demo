@@ -1735,7 +1735,7 @@ tasks:
     title: 导入表格识别列名的接口
     purpose: >-
       按 docs/contact-import-columns.md 第 4.3 节，把 CRM-TASK-056 的业务函数接成 POST /api/ai/import/columns，供 CRM-TASK-058 的导入页使用。只做接口层：加在已有的 AI 路由里，不改 main.py、不改业务规则、不改表结构、不改前端。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-056
     acceptance_criteria:
