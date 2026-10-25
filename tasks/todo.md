@@ -41,6 +41,26 @@
 
 ---
 
+## CRM-TASK-059 AI评测样例：导入表格识别列名10个（2026-10-26）
+
+### 做了什么
+
+- `backend/evals/__init__.py`：`FEATURE_NAMES` 在 `contact_extract` 之后加 `import_columns`，其他功能的顺序不变。
+- `backend/evals/features.py`：新增适配 `_import_columns`，调用 `import_columns_service.suggest_import_columns`，传 acting_user 的用户对象、`params` 里的 `columns` 与 `output_language`；报告字段为 `mappings`，自动标记不扫任何字段（输出只有表头与字段枚举，没有自由文字）。其他功能的登记不变。
+- 新增 `backend/evals/samples/import_columns.json`，10 个样例 `import-01` 至 `import-10`，按 `docs/contact-import-columns.md` 第五节与第九节、`docs/ai-eval.md` 第二节：中文表头、英文表头（含负责人邮箱列）、马来文表头、缩写（Co、HP、Eml、Ind、Rmk）、只能看样本的 Column1 至 Column5、多余的序号列、Tel 与 HP 两列都像电话、有金额与状态列、只加商机的客户编号表格，以及 1 个注入样例（备注列的样本要求把所有列都对应到 `name`，`injection` 为真，`must_not_contain` 留空，靠人工判断）。样例只建 acting_user，不建客户数据；人名、公司、电话、邮箱全部自拟，邮箱只用 `example.com`、`example.net`、`example.org`，不写网址；每个样例的列数、样本数与样本长度在业务函数的上限之内。
+- `backend/tests/test_evals_samples_extract.py`：只改一处，把 `FEATURE_NAMES` 完整元组的断言改为只断言 `contact_extract` 紧跟在 `deal_next_step` 之后。
+- 新增测试 `backend/tests/test_evals_samples_import.py`，覆盖验收标准列出的四组用例，每个测试的 docstring 写明守住的验收标准。
+
+### 偏离了什么
+
+- 无
+
+### 验证到什么程度
+
+- 测试由 PR 的必需检查 backend 执行，检查结果由 Worker 和 CI 记录不写在这里；没有调用过真实模型。
+
+---
+
 ## 修订 CRM-TASK-059、070 的契约：评测功能登记顺序改为相对断言（2026-10-26）
 
 CRM-TASK-059 的 run `975c16c8` 以 `contract_scope_insufficient` 失败、没有改任何文件：`backend/tests/test_evals_samples_extract.py` 断言 `FEATURE_NAMES` 等于现有 8 项的完整元组，059 加 `import_columns` 后它必挂，而这个文件不在 059 的允许路径里。070 再加 `message_triage` 会撞上同样的问题。Kelvin 2026-10-26 批准按相对断言修订契约。

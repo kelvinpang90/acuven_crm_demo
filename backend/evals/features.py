@@ -101,6 +101,14 @@ def _contact_extract(user: User, params: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _import_columns(user: User, params: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "user": user,
+        "columns": _param(params, "columns"),
+        "output_language": _param(params, "output_language"),
+    }
+
+
 def _dashboard_insight(user: User, params: dict[str, Any]) -> dict[str, Any]:
     return {"user": user, "output_language": _param(params, "output_language")}
 
@@ -204,6 +212,15 @@ FEATURES: dict[str, Feature] = {
             _contact_extract,
             ("suggestions", "truncated"),
             ("suggestions.value", "suggestions.evidence"),
+        ),
+        # The model only picks a field or null per column: no free text to scan.
+        Feature(
+            "import_columns",
+            "app.services.import_columns_service",
+            "suggest_import_columns",
+            _import_columns,
+            ("mappings",),
+            (),
         ),
         Feature(
             "dashboard_insight",

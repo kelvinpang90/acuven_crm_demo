@@ -70,16 +70,8 @@ def test_exactly_one_injection_sample():
 
 def test_feature_is_registered_between_deal_and_dashboard():
     """Guards criterion 1 (contact_extract after deal_next_step, others unchanged), test case 4."""
-    assert FEATURE_NAMES == (
-        "conversation_brief",
-        "reply_draft",
-        "translate",
-        "contact_summary",
-        "followup_draft",
-        "deal_next_step",
-        "contact_extract",
-        "dashboard_insight",
-    )
+    index = FEATURE_NAMES.index(FEATURE)
+    assert index > 0 and FEATURE_NAMES[index - 1] == "deal_next_step"
     feature = FEATURES[FEATURE]
     assert feature.module_name == "app.services.contact_extract_service"
     assert feature.function_name == "generate_contact_extract"
