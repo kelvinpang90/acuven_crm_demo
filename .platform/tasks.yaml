@@ -1683,7 +1683,7 @@ tasks:
     title: 导入客户接口支持列对应表，并修正导入结果的返回结构
     purpose: >-
       按 docs/contact-import-columns.md 第二节与 4.1 节，导入接口加可选的 column_map，有它时按它取每列对应的字段；没有时行为不变。顺带让 ImportResult 与实际返回一致。只做接口层：不改导入的业务规则、不加表与迁移、不改前端。
-    status: ready
+    status: done
     depends_on: []
     acceptance_criteria:
       - POST /api/contacts/import 新增可选表单字段 column_map：JSON 对象，键为表头原文（去首尾空白后比较），值为 name、company、industry、email、phone、address、notes、tags、assigned_to_email、status、priority、deal_value、deal_title、id 之一或 null；不是合法 JSON 对象、值不在上述范围、同一字段出现两次、没有任何列对应 name 且也没有列对应 id、或写了表格第一行里不存在的表头，返回 422 且不导入；表头与 column_map 的键都按去首尾空白（只去这几种字符：半角空格、制表、换行、回车、垂直制表、换页、U+00A0、U+3000、U+FEFF，前后端逐字一致，设计第九节第 16 条）后比较；表格第一行只认文字单元格作表头，数字、日期、公式与空单元格所在的列一律不能被 column_map 选中；column_map 的键去空白后为空、或有两个键去空白后相同，也返回 422；column_map 为空串按没给处理；文件类型、大小与空文件的现有 400 检查先于 column_map 的检查
