@@ -1,5 +1,5 @@
 import api from './api';
-import type { ApiResponse, PaginatedResponse, Contact, Activity } from '@/types';
+import type { ApiResponse, PaginatedResponse, Contact, Activity, ContactImportResult } from '@/types';
 
 export interface WhatsAppHandover {
   wa_handover_active: boolean;
@@ -43,7 +43,7 @@ export const contactsApi = {
 
   importContacts: (
     file: File,
-    options?: { autoAssign?: boolean; assignStrategy?: string },
+    options?: { autoAssign?: boolean; assignStrategy?: string; columnMap?: string },
   ) => {
     const formData = new FormData();
     formData.append('file', file);
@@ -51,10 +51,10 @@ export const contactsApi = {
       formData.append('auto_assign', 'true');
       formData.append('assign_strategy', options.assignStrategy ?? 'rules');
     }
-    return api.post<ApiResponse<{
-      total: number; inserted: number; updated: number; skipped: number;
-      errors: Array<{ row: number; field: string; message: string }>;
-    }>>('/contacts/import', formData, {
+    if (options?.columnMap) {
+      formData.append('column_map', options.columnMap);
+    }
+    return api.post<ApiResponse<ContactImportResult>>('/contacts/import', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
