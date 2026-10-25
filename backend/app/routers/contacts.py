@@ -1,3 +1,4 @@
+import json
 from io import BytesIO
 from typing import Annotated, Optional
 
@@ -30,6 +31,77 @@ def _not_found():
     # Also the answer for a customer that is not yours, so an id's existence is
     # never confirmed to someone who may not see it.
     return fail("Contact not found", code="NOT_FOUND", status_code=404)
+
+
+# The fields a `column_map` may name (docs/contact-import-columns.md section 2).
+IMPORT_FIELDS = (
+    "name",
+    "company",
+    "industry",
+    "email",
+    "phone",
+    "address",
+    "notes",
+    "tags",
+    "assigned_to_email",
+    "status",
+    "priority",
+    "deal_value",
+    "deal_title",
+    "id",
+)
+
+# Exactly the nine characters the frontend strips too (design section 9, item 16);
+# Python's own str.strip() set differs from JavaScript's trim().
+_HEADER_WHITESPACE = " \t\n\r\x0b\x0c 　﻿"
+
+
+class _JsonPairs(list):
+    """A JSON object's key/value pairs, kept so that repeated keys can be seen."""
+
+
+def _parse_column_map(raw: str) -> tuple[Optional[dict[str, Optional[str]]], Optional[str]]:
+    """`column_map` keyed by stripped header, or the reason it is refused."""
+    try:
+        parsed = json.loads(raw, object_pairs_hook=_JsonPairs)
+    except ValueError:
+        return None, "column_map is not valid JSON"
+    if not isinstance(parsed, _JsonPairs):
+        return None, "column_map must be a JSON object"
+
+    mapping: dict[str, Optional[str]] = {}
+    for key, value in parsed:
+        header = key.strip(_HEADER_WHITESPACE)
+        if not header:
+            return None, "column_map has an empty header"
+        if header in mapping:
+            return None, f"column_map names the header more than once: {header}"
+        if value is not None and not (isinstance(value, str) and value in IMPORT_FIELDS):
+            return None, f"column_map has an unknown field for {header}"
+        mapping[header] = value
+
+    fields = [f for f in mapping.values() if f is not None]
+    if len(fields) != len(set(fields)):
+        return None, "column_map maps the same field to more than one column"
+    if "name" not in fields and "id" not in fields:
+        return None, "column_map must map a column to name or id"
+    return mapping, None
+
+
+def _text_header_columns(ws) -> dict[str, int]:
+    """Stripped text header -> index of the first column carrying it.
+
+    Numbers, dates, formulas and blank cells are left out: the browser reads them
+    differently from openpyxl, so a `column_map` could never match them reliably.
+    """
+    columns: dict[str, int] = {}
+    for idx, cell in enumerate(next(ws.iter_rows(max_row=1), ())):
+        if cell.data_type != "s" or not isinstance(cell.value, str):
+            continue
+        header = cell.value.strip(_HEADER_WHITESPACE)
+        if header and header not in columns:
+            columns[header] = idx
+    return columns
 
 
 @router.get("")
@@ -141,6 +213,7 @@ async def import_contacts(
     file: UploadFile = File(...),
     auto_assign: bool = Form(False),
     assign_strategy: str = Form("rules"),
+    column_map: Optional[str] = Form(None),
 ):
     if not file.filename or not file.filename.endswith((".xlsx", ".xls")):
         return fail("Only .xlsx or .xls files are supported", status_code=400)
@@ -178,12 +251,28 @@ async def import_contacts(
     if not header:
         return fail("File is empty", status_code=400)
 
-    # Map headers
     col_map = {}
-    for idx, cell in enumerate(header):
-        cell_str = str(cell or "").strip()
-        if cell_str in field_map:
-            col_map[idx] = field_map[cell_str]
+    if column_map:
+        # Only the columns the map names are read; anything else in the sheet,
+        # template header or not, is left out.
+        mapping, error = _parse_column_map(column_map)
+        if error is None:
+            header_columns = _text_header_columns(ws)
+            missing = [h for h in mapping if h not in header_columns]
+            if missing:
+                error = f"column_map names a header not in the sheet: {missing[0]}"
+        if error is not None:
+            wb.close()
+            return fail(error, code="INVALID_COLUMN_MAP", status_code=422)
+        for h, field_name in mapping.items():
+            if field_name is not None:
+                col_map[header_columns[h]] = field_name
+    else:
+        # Map headers
+        for idx, cell in enumerate(header):
+            cell_str = str(cell or "").strip()
+            if cell_str in field_map:
+                col_map[idx] = field_map[cell_str]
 
     parsed_rows = []
     for row in rows_iter:

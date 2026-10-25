@@ -45,6 +45,26 @@
 
 ---
 
+## CRM-TASK-055 导入客户接口支持列对应表，并修正导入结果的返回结构（2026-10-25）
+
+### 做了什么
+
+- `backend/app/routers/contacts.py`：`POST /api/contacts/import` 加可选表单字段 `column_map`（`docs/contact-import-columns.md` 第二节、4.1 与第九节第 14、16、17 条）。文件类型、`assign_strategy`、大小与空文件的现有 400 检查之后才看 `column_map`；为空串或没给时走原来的模板表头规则，代码未动。
+- 有 `column_map` 时：键按第 16 条的九种字符去首尾空白；不是合法 JSON 对象、键去空白后为空或两个键相同（含原文完全相同的重复键）、值不是十四个字段之一或 `null`、同一字段出现两次、既没有 `name` 也没有 `id`、键不在表格第一行的文字表头里，一律 422（`INVALID_COLUMN_MAP`），不导入。
+- 表头只认第一行里的文字单元格（openpyxl 的 `data_type` 为 `s`），数字、日期、公式与空单元格所在的列不能被选中；同名文字表头取第一列。只按 `column_map` 里非 `null` 的项取值，取出的每行字典与模板表头取出的形状相同，交给 `contact_service.import_contacts` 不变。
+- `backend/app/schemas/contact.py`：`ImportResult` 的 `updated` 改为 `deals_added`，与 `import_contacts` 实际返回的 `total`、`inserted`、`deals_added`、`skipped`、`errors` 一致。
+- 新增测试 `backend/tests/test_contact_import_column_map.py`，覆盖验收标准列出的六组用例，每个测试的 docstring 写明守住的验收标准。
+
+### 偏离了什么
+
+- 无
+
+### 验证到什么程度
+
+- 测试由 PR 的必需检查 backend 执行，检查结果由 Worker 和 CI 记录不写在这里。
+
+---
+
 ## CRM-TASK-054 AI评测样例：从聊天提取客户资料10个（2026-10-24）
 
 ### 做了什么
