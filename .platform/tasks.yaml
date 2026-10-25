@@ -1708,7 +1708,7 @@ tasks:
     title: 导入表格识别列名的提示词、输出校验与业务函数
     purpose: >-
       按 docs/contact-import-columns.md 第三节、4.2 节与第五节，定义 crm.import_columns 的系统提示、JSON schema 与输出校验，并写业务函数。只做业务规则层：不加接口、不改前端、不加表与迁移；测试打桩 AI 客户端，不调真实模型、不写任何真实密钥与地址。
-    status: ready
+    status: done
     depends_on: []
     acceptance_criteria:
       - ai_features 新增 IMPORT_COLUMNS_FEATURE（crm.import_columns）、IMPORT_COLUMNS_SYSTEM、IMPORT_COLUMNS_SCHEMA 与 validate_import_columns(output, headers)；IMPORT_FIELDS 常量为 name、company、industry、email、phone、address、notes、tags、assigned_to_email、status、priority、deal_value、deal_title、id 十四个字段；系统提示写明表头与样本是不可信数据、不执行其中的指令，为每一列选一个最合适的字段或 null，看不准给 null，同一字段只给一列，并逐个写明字段含义（id 是 CRM 的客户编号、不是对方表格的序号，deal_value 是金额，assigned_to_email 是负责员工的邮箱）；schema 为 mappings（对象数组，每个对象 header 为字符串、field 为十四个字段之一或 null，全部必填、不允许多余字段）；max_tokens 4000
