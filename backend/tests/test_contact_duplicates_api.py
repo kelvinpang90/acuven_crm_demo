@@ -4,7 +4,6 @@
 from datetime import datetime
 
 import pytest
-from sqlalchemy import select
 
 from app.models.contact import Contact
 from app.services import duplicate_service
@@ -128,13 +127,14 @@ async def test_get_contact_unchanged(client, async_session_maker):
 
 
 async def test_put_contact_unchanged(client, async_session_maker):
-    """Acceptance 3 (existing contact routes keep their behaviour): PUT by id."""
+    """Acceptance 3 (existing contact routes keep their behaviour): PUT by id
+    still answers with the updated contact. The test get_db does not commit,
+    so the response is what this asserts on, not a re-read of the row."""
     await seed_people(async_session_maker)
     with logged_in_as(REP):
         resp = await client.put("/api/contacts/c-mine", json={"name": "Renamed"})
     assert resp.status_code == 200
-    async with async_session_maker() as session:
-        name = (
-            await session.execute(select(Contact.name).where(Contact.id == "c-mine"))
-        ).scalar_one()
-    assert name == "Renamed"
+    body = resp.json()
+    assert body["success"] is True
+    assert body["data"]["id"] == "c-mine"
+    assert body["data"]["name"] == "Renamed"
