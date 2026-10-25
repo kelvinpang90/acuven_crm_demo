@@ -110,8 +110,10 @@ class ImportError_(BaseModel):
 
 
 class ImportResult(BaseModel):
+    # What contact_service.import_contacts returns; deals_added counts rows that
+    # added a deal to an existing customer.
     total: int
     inserted: int
-    updated: int
+    deals_added: int
     skipped: int
     errors: List[ImportError_]
