@@ -56,12 +56,13 @@ function outputLanguage(language: string): 'zh-CN' | 'en' | undefined {
 }
 
 function errorMessage(error: unknown, t: TFunction<'contacts'>) {
-  if (!axios.isAxiosError<ApiError>(error) || !error.response) return t('aiTemporarilyUnavailable');
+  // Only axios errors without a response are timeouts or network errors; anything else is AI_ERROR or other.
+  if (!axios.isAxiosError<ApiError>(error)) return t('aiError');
+  if (!error.response) return t('aiTemporarilyUnavailable');
   switch (error.response.data?.error?.code) {
     case 'AI_NOT_CONFIGURED': return t('aiNotEnabled');
     case 'AI_UNAVAILABLE': return t('aiTemporarilyUnavailable');
-    case 'AI_ERROR': return t('aiError');
-    default: return t('aiRequestFailed');
+    default: return t('aiError');
   }
 }
 

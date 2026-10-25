@@ -56,8 +56,9 @@ function textHeader(cell: XLSX.CellObject | undefined) {
 
 // The sheet selected in the workbook, which is what openpyxl's `active` reads.
 function activeSheet(wb: XLSX.WorkBook) {
-  // SheetJS keeps the workbookView attributes but its types only declare RTL.
-  const view = wb.Workbook?.Views?.[0] as unknown as { activeTab?: unknown } | undefined;
+  // SheetJS stores the <workbookView> attributes in Workbook.WBView, which its types do not declare.
+  const workbook = wb.Workbook as unknown as { WBView?: { activeTab?: unknown }[] } | undefined;
+  const view = workbook?.WBView?.[0];
   const tab = Number(view?.activeTab ?? 0);
   const index = Number.isInteger(tab) && tab >= 0 && tab < wb.SheetNames.length ? tab : 0;
   const name = wb.SheetNames[index];
