@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from app.schemas.deal import DealSource
 
@@ -107,6 +107,32 @@ class ImportError_(BaseModel):
     row: int
     field: str
     message: str
+
+
+class DuplicateCheckRequest(BaseModel):
+    # Details of a customer not yet saved; each capped at its contacts column.
+    name: Optional[str] = Field(None, max_length=100)
+    company: Optional[str] = Field(None, max_length=200)
+    email: Optional[str] = Field(None, max_length=200)
+    phone: Optional[str] = Field(None, max_length=30)
+
+
+class DuplicateContactItem(BaseModel):
+    id: str
+    name: str
+    company: Optional[str] = None
+    assigned_to_name: Optional[str] = None
+    rules: List[str]
+
+    model_config = {"from_attributes": True}
+
+
+class DuplicateResultResponse(BaseModel):
+    # Matches the user may not open are only counted (docs/contact-duplicate-hints.md section 4).
+    visible: List[DuplicateContactItem] = []
+    hidden_count: int = 0
+
+    model_config = {"from_attributes": True}
 
 
 class ImportResult(BaseModel):

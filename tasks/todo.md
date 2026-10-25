@@ -39,6 +39,27 @@
 
 ---
 
+## CRM-TASK-061 疑似重复客户的查询接口：新建前检查与客户的疑似重复（2026-10-26）
+
+### 做了什么
+
+- `backend/app/schemas/contact.py`：新增请求模型 `DuplicateCheckRequest`（`name`、`company`、`email`、`phone` 都可空，长度上限按联系人表分别为 100、200、200、30，超长由 FastAPI 返回 422），响应模型 `DuplicateContactItem`（`id`、`name`、`company`、`assigned_to_name`、`rules`）与 `DuplicateResultResponse`（`visible`、`hidden_count`）。
+- `backend/app/routers/contacts.py`，按 `docs/contact-duplicate-hints.md` 6.2 节与第九节第 1 条，两个路由都写在 `/{contact_id}` 路由之前：
+  - `POST /api/contacts/duplicate-check`：要求登录；四项都为空（`None` 或去首尾空白后为空）时直接返回 `{"visible": [], "hidden_count": 0}`，不调 `find_duplicates`；否则用请求体四项调 `find_duplicates`。
+  - `GET /api/contacts/{contact_id}/duplicates`：要求登录；`may_access_contact` 为假，或联系人不存在、已删除（管理员过得了 `may_access_contact`，所以另查一次未删除的联系人）时返回与 `GET /api/contacts/{contact_id}` 相同的 404 `NOT_FOUND`；否则用这个联系人的 `name`、`company`、`email`、`phone` 与 `exclude_id` 调 `find_duplicates`。
+  - 两个接口都把结果经 `DuplicateResultResponse` 转成字典，用现有的 `ok` 返回。现有联系人路由没有改动。
+- 新增测试 `backend/tests/test_contact_duplicates_api.py`，覆盖验收标准列出的五组用例，每个测试的 docstring 写明守住的验收标准。
+
+### 偏离了什么
+
+- 无
+
+### 验证到什么程度
+
+- 测试由 PR 的必需检查 backend 执行，检查结果由 Worker 和 CI 记录不写在这里。
+
+---
+
 ## CRM-TASK-060 疑似重复客户的判定规则与查询，按可见范围分组（2026-10-26）
 
 ### 做了什么
