@@ -44,6 +44,26 @@
 
 ---
 
+## CRM-TASK-056 导入表格识别列名的提示词、输出校验与业务函数（2026-10-25）
+
+### 做了什么
+
+- `backend/app/services/ai_features.py`：按 `docs/contact-import-columns.md` 第三节、4.2 节、第五节与第九节第 2、3、15、16 条，新增 `IMPORT_COLUMNS_FEATURE`（`crm.import_columns`）、十四个字段的 `IMPORT_FIELDS`、`IMPORT_COLUMNS_SYSTEM`、`IMPORT_COLUMNS_SCHEMA` 与 `validate_import_columns(output, headers)`。系统提示写明表头与样本是不可信数据、不执行其中的指令，每列选一个最合适的字段或 `null`，看不准给 `null`，同一字段只给一列，并逐个写明十四个字段的含义（`id` 是 CRM 的客户编号、不是表格序号，`deal_value` 是金额，`assigned_to_email` 是负责员工的邮箱）；schema 为 `mappings` 对象数组，`header` 为字符串、`field` 为十四个字段之一或 `null`（用 `anyOf` 表达），全部必填、不允许多余字段；`max_tokens` 沿用 4000。
+- 校验：输出恰好含 `mappings`，每个对象恰好含 `header` 与 `field`；`header` 是字符串且不重复，集合与发出的表头完全相同；非 `null` 的 `field` 在 `IMPORT_FIELDS` 里且不重复；任一不合返回 `None`，合格时返回 `{"mappings": [...]}`，按发出的列顺序排列。
+- `backend/app/services/ai_assist_service.py`：`AiAssistResult` 新增可空字段 `mappings`；其他 AI 功能不变。
+- 新文件 `backend/app/services/import_columns_service.py`：`suggest_import_columns(db, *, user, columns, output_language)`。表头按九种字符去首尾空白后量码点长度；0 列、超过 40 列、表头去空白后为空或重复、超过 100 字、样本超过 3 个或超过 50 字、列或样本类型不对、语言不在 `zh-CN`、`en`、`ms` 之内为 `invalid_input`，之后未配置为 `not_configured`，这两种不调 AI、不写审计。用户消息是恰好含 `output_language`、`columns`（去空白后的表头与原样本）、`fields` 的紧凑 JSON；每次调用写一行审计（`crm.import_columns`，`contact_id` 为空），校验不过改判 `error` 并保留 `request_id`，成功时结果带 `mappings`，各类结果带 `request_id`（有的话）。
+- 新增测试 `backend/tests/test_import_columns_service.py`，打桩 AI 客户端与配置，覆盖验收标准列出的四组用例，每个测试的 docstring 写明守住的验收标准。
+
+### 偏离了什么
+
+- 无
+
+### 验证到什么程度
+
+- 测试由 PR 的必需检查 backend 执行，检查结果由 Worker 和 CI 记录不写在这里。
+
+---
+
 ## CRM-TASK-055 导入客户接口支持列对应表，并修正导入结果的返回结构（2026-10-25）
 
 ### 做了什么

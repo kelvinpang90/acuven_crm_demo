@@ -75,6 +75,7 @@ class AiAssistResult:
     observations: list[str] | None = None
     suggestions: list[Any] | None = None
     truncated: bool | None = None
+    mappings: list[dict[str, Any]] | None = None
 
 
 def _truncate(value: str | None, limit: int) -> tuple[str | None, bool]:
