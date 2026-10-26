@@ -2033,7 +2033,7 @@ tasks:
     title: 收件箱消息列表返回会话标签，未读页可按紧急度排序
     purpose: >-
       按 docs/inbox-ai-triage.md 4.3 节，GET /api/messages 每条消息带所属会话的标签，并在只看未读时支持按紧急度排序。只做接口层：不改权限与分页规则、不改表结构、不改前端。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-065
     acceptance_criteria:
