@@ -32,6 +32,24 @@
 
 ---
 
+## CRM-TASK-068 收件箱消息列表返回会话标签，未读页可按紧急度排序（2026-10-26）
+
+### 做了什么
+
+- `backend/app/routers/messages.py`：按 `docs/inbox-ai-triage.md` 4.3，`GET /api/messages` 每条消息新增 `triage`：所属客户（`contact_id`）在 `conversation_triage` 有一行时为 `{"intent", "urgency", "triaged_at"}`（`triaged_at` 为 UTC 到秒、带 `Z`），否则（含没有 `contact_id` 的消息）为 `null`；一页涉及的客户用一次 `IN` 查询取出（新增 `_triage_by_contact`），页为空时不查。
+- 同文件新增查询参数 `sort: Literal["time", "urgency"]`，缺省 `time`，其他值由 FastAPI 校验返回 422。`sort=urgency` 且 `is_read=false` 时，翻页查询左连接 `conversation_triage`（每个客户一行，不会多出行），按 `urgent`、`high`、`normal`、`low`、没有标签的顺序，再按创建时间倒序；其他情况仍按创建时间倒序。总数在排序之前、按原查询计算；权限范围、筛选与分页未改；其他消息接口未改。
+- 新增 `backend/tests/test_messages_triage.py`，覆盖验收标准列出的五个用例，每个测试在 docstring 写明守住的验收标准。
+
+### 偏离了什么
+
+- 无
+
+### 验证到什么程度
+
+- 测试由 PR 的必需检查 backend 执行，检查结果由 Worker 和 CI 记录不写在这里。
+
+---
+
 ## CRM-TASK-073 商机AI下一步建议的提示词把每条下一步写成一句且不超过150字符（2026-10-26）
 
 ### 做了什么
