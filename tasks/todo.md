@@ -37,6 +37,29 @@
 
 ---
 
+## CRM-TASK-063 新建客户表单与详情面板显示疑似重复提示（2026-10-26）
+
+### 做了什么
+
+- `frontend/src/types/index.ts`：新增 `DuplicateRule`、`DuplicateContact`（`id`、`name`、`company`、`assigned_to_name`、`rules`）、`DuplicateResult`（`visible`、`hidden_count`）与 `DuplicateCheckRequest`，与 CRM-TASK-061 的响应、请求模型一致。
+- `frontend/src/services/contacts.ts`：新增 `checkDuplicates`（`POST /contacts/duplicate-check`）与 `getDuplicates`（`GET /contacts/{id}/duplicates`）。
+- 新组件 `frontend/src/pages/Contacts/DuplicateHint.tsx`：输入 `visible` 与 `hidden_count`，按 `docs/contact-duplicate-hints.md` 第四节列出看得到的客户（名字、公司、负责人、命中的规则），只有传了 `onSelect` 时每项可点；`hidden_count` 大于 0 时只显示「另有 N 个客户可能是同一人，归属其他同事，请联系经理确认」，不显示对方资料；两者都为空时不渲染。
+- `frontend/src/pages/Contacts/ContactForm.tsx`：仅新建模式下，名字、公司、邮箱、电话失焦时查重：四项去首尾空白后都为空则清掉提示、不发请求；否则 300 毫秒后发 `duplicate-check`，期间再次失焦会取消待发的请求，并以序号丢弃被新请求取代的旧结果；结果以 `DuplicateHint`（不可点）显示在表单上方。保存不等也不看查重结果；编辑模式不查。新建页 `NewContact.tsx` 使用的就是这个表单，本身未改。
+- `frontend/src/pages/Contacts/ContactDetailPanel.tsx`：新增可选回调 `onSelectContact`；打开或切换客户时调 `GET duplicates`，切换时先清空并丢弃上一个客户还没回来的结果；有结果时在名字一块下面显示可点的 `DuplicateHint`。面板其余内容（电话冲突标记、AI 卡片等）未改。
+- `frontend/src/pages/Contacts/index.tsx`：新增 `selectContact`，按 id 读出被点的客户并设为当前选中（面板已关时不再打开），编辑、归档、删除随之指向它；传给面板的 `onSelectContact`。
+- `frontend/src/locales/en/contacts.json`、`frontend/src/locales/zh/contacts.json`：`contacts` 命名空间新增 `duplicateTitle`、`duplicateOwner`、`duplicateRules`（三条规则）与 `duplicateHidden`。
+
+### 偏离了什么
+
+- 无
+
+### 验证到什么程度
+
+- 前端类型检查与构建由 PR 的必需检查 frontend 执行，检查结果由 Worker 和 CI 记录不写在这里。
+- 没有在浏览器里实际操作过。
+
+---
+
 ## CRM-TASK-062 导入客户时按电话或邮箱跳过疑似重复，可选择照导（2026-10-26）
 
 ### 做了什么

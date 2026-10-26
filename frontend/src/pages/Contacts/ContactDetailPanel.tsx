@@ -6,11 +6,13 @@ import Modal from '@/components/common/Modal';
 import ActivityTimeline from './ActivityTimeline';
 import ContactAiSummary from './ContactAiSummary';
 import ContactAiExtract from './ContactAiExtract';
+import DuplicateHint from './DuplicateHint';
 import { useAuthStore } from '@/store/authStore';
 import { dealsApi } from '@/services/deals';
 import { autocountApi } from '@/services/autocount';
+import { contactsApi } from '@/services/contacts';
 import { formatMYR } from '@/utils/currency';
-import type { Contact, Deal, AutocountDocument } from '@/types';
+import type { Contact, Deal, AutocountDocument, DuplicateResult } from '@/types';
 import clsx from 'clsx';
 
 const STATUSES = ['lead', 'following', 'negotiating', 'won', 'lost'];
@@ -24,9 +26,10 @@ interface Props {
   onArchive: (is_archived: boolean) => void;
   onRefresh?: () => void;
   onContactUpdated?: () => void;
+  onSelectContact?: (id: string) => void;
 }
 
-export default function ContactDetailPanel({ contact, onClose, onEdit, onDelete, onArchive, onRefresh, onContactUpdated }: Props) {
+export default function ContactDetailPanel({ contact, onClose, onEdit, onDelete, onArchive, onRefresh, onContactUpdated, onSelectContact }: Props) {
   const { t } = useTranslation('contacts');
   const isMobile = useIsMobile();
   const user = useAuthStore((s) => s.user);
@@ -40,6 +43,18 @@ export default function ContactDetailPanel({ contact, onClose, onEdit, onDelete,
   const [showNewDeal, setShowNewDeal] = useState(false);
   const [newDeal, setNewDeal] = useState({ title: '', status: 'lead', priority: 'mid', amount: '0' });
   const [savingDeal, setSavingDeal] = useState(false);
+  const [duplicates, setDuplicates] = useState<DuplicateResult | null>(null);
+
+  // Possible duplicates (docs/contact-duplicate-hints.md 5.2, 6.4); a result for a
+  // previous contact that arrives after switching is dropped.
+  useEffect(() => {
+    let current = true;
+    setDuplicates(null);
+    contactsApi.getDuplicates(contact.id)
+      .then((res) => { if (current) setDuplicates(res.data.data); })
+      .catch(() => { /* ignore */ });
+    return () => { current = false; };
+  }, [contact.id]);
 
   const loadDeals = async () => {
     setDealsLoading(true);
@@ -122,6 +137,14 @@ export default function ContactDetailPanel({ contact, onClose, onEdit, onDelete,
               <p className="text-sm text-text-muted">{contact.company || '-'}</p>
             </div>
           </div>
+
+          {duplicates && (
+            <DuplicateHint
+              visible={duplicates.visible}
+              hidden_count={duplicates.hidden_count}
+              onSelect={onSelectContact}
+            />
+          )}
 
           {/* Info Grid */}
           <div className="space-y-3 text-sm">

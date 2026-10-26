@@ -110,6 +110,15 @@ export default function ContactsPage() {
     } catch { /* ignore */ }
   };
 
+  // A possible duplicate clicked in the detail panel becomes the selected contact, so
+  // edit, archive and delete act on it (docs/contact-duplicate-hints.md 9.7).
+  const selectContact = async (contactId: string) => {
+    try {
+      const res = await contactsApi.getContact(contactId);
+      setSelected((current) => (current ? res.data.data : current));
+    } catch { /* ignore */ }
+  };
+
   const handleSort = (field: SortField) => {
     const nextOrder = sortField === field && sortOrder === 'desc' ? 'asc' : 'desc';
     setSortField(field);
@@ -325,6 +334,7 @@ export default function ContactsPage() {
           onArchive={handleArchive}
           onRefresh={load}
           onContactUpdated={() => refreshSelected(selected.id)}
+          onSelectContact={selectContact}
         />
       )}
 

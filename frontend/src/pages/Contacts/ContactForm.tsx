@@ -1,8 +1,12 @@
-import { useState, useEffect, type FormEvent, type KeyboardEvent } from 'react';
+import { useState, useEffect, useRef, type FormEvent, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/store/authStore';
 import { usersApi } from '@/services/users';
-import type { Contact } from '@/types';
+import { contactsApi } from '@/services/contacts';
+import DuplicateHint from './DuplicateHint';
+import type { Contact, DuplicateResult } from '@/types';
+
+const DUPLICATE_CHECK_DELAY_MS = 300;
 
 const INDUSTRIES = [
   '科技/IT', '金融/保险', '医疗/健康', '教育/培训', '零售/电商',
@@ -56,6 +60,47 @@ export default function ContactForm({ initial, onSubmit, submitting }: Props) {
     usersApi.getUsers().then((res) => setUserOptions(res.data.data ?? []));
   }, [canSelectUser]);
 
+  // Possible duplicates, new contacts only (docs/contact-duplicate-hints.md 5.1, 6.4, 9.6):
+  // a hint, never a block on saving.
+  const [duplicates, setDuplicates] = useState<DuplicateResult | null>(null);
+  const duplicateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const duplicateSeq = useRef(0);
+
+  useEffect(() => () => {
+    if (duplicateTimer.current) clearTimeout(duplicateTimer.current);
+    duplicateSeq.current += 1;
+  }, []);
+
+  const scheduleDuplicateCheck = () => {
+    if (isEditing) return;
+    if (duplicateTimer.current) clearTimeout(duplicateTimer.current);
+    duplicateTimer.current = null;
+    // Any newer blur supersedes a request still in flight.
+    const seq = ++duplicateSeq.current;
+    const query = {
+      name: form.name.trim(),
+      company: form.company.trim(),
+      email: form.email.trim(),
+      phone: form.phone.trim(),
+    };
+    if (!query.name && !query.company && !query.email && !query.phone) {
+      setDuplicates(null);
+      return;
+    }
+    duplicateTimer.current = setTimeout(async () => {
+      duplicateTimer.current = null;
+      try {
+        const res = await contactsApi.checkDuplicates({
+          name: query.name || null,
+          company: query.company || null,
+          email: query.email || null,
+          phone: query.phone || null,
+        });
+        if (seq === duplicateSeq.current) setDuplicates(res.data.data);
+      } catch { /* ignore */ }
+    }, DUPLICATE_CHECK_DELAY_MS);
+  };
+
   const set = (key: string, value: unknown) => {
     setForm((p) => ({ ...p, [key]: value }));
     if (errors[key]) setErrors((p) => { const n = { ...p }; delete n[key]; return n; });
@@ -108,12 +153,15 @@ export default function ContactForm({ initial, onSubmit, submitting }: Props) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {!isEditing && duplicates && (
+        <DuplicateHint visible={duplicates.visible} hidden_count={duplicates.hidden_count} />
+      )}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Field label={`${t('common:name')} *`} error={errors.name}>
-          <input className="input" value={form.name} onChange={(e) => set('name', e.target.value)} />
+          <input className="input" value={form.name} onChange={(e) => set('name', e.target.value)} onBlur={scheduleDuplicateCheck} />
         </Field>
         <Field label={t('common:company')}>
-          <input className="input" value={form.company} onChange={(e) => set('company', e.target.value)} />
+          <input className="input" value={form.company} onChange={(e) => set('company', e.target.value)} onBlur={scheduleDuplicateCheck} />
         </Field>
         <Field label={t('common:industry')}>
           <select className="input" value={form.industry} onChange={(e) => set('industry', e.target.value)}>
@@ -130,10 +178,10 @@ export default function ContactForm({ initial, onSubmit, submitting }: Props) {
           </Field>
         )}
         <Field label={t('common:email')} error={errors.email}>
-          <input type="email" className="input" value={form.email} onChange={(e) => set('email', e.target.value)} />
+          <input type="email" className="input" value={form.email} onChange={(e) => set('email', e.target.value)} onBlur={scheduleDuplicateCheck} />
         </Field>
         <Field label={t('common:phone')}>
-          <input className="input" value={form.phone} onChange={(e) => set('phone', e.target.value)} />
+          <input className="input" value={form.phone} onChange={(e) => set('phone', e.target.value)} onBlur={scheduleDuplicateCheck} />
         </Field>
       </div>
 

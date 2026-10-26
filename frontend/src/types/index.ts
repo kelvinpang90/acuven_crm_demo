@@ -367,6 +367,29 @@ export interface ContactImportResult {
   errors: Array<{ row: number; field: string; message: string }>;
 }
 
+export type DuplicateRule = 'phone' | 'email' | 'name_company';
+
+export interface DuplicateContact {
+  id: string;
+  name: string;
+  company: string | null;
+  assigned_to_name: string | null;
+  rules: DuplicateRule[];
+}
+
+// Matches the user may not open are only counted (docs/contact-duplicate-hints.md section 4).
+export interface DuplicateResult {
+  visible: DuplicateContact[];
+  hidden_count: number;
+}
+
+export interface DuplicateCheckRequest {
+  name?: string | null;
+  company?: string | null;
+  email?: string | null;
+  phone?: string | null;
+}
+
 export interface AiImportColumn {
   header: string;
   samples: string[];

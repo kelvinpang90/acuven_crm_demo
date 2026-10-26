@@ -1,5 +1,13 @@
 import api from './api';
-import type { ApiResponse, PaginatedResponse, Contact, Activity, ContactImportResult } from '@/types';
+import type {
+  ApiResponse,
+  PaginatedResponse,
+  Contact,
+  Activity,
+  ContactImportResult,
+  DuplicateCheckRequest,
+  DuplicateResult,
+} from '@/types';
 
 export interface WhatsAppHandover {
   wa_handover_active: boolean;
@@ -28,6 +36,12 @@ export const contactsApi = {
 
   handbackWhatsApp: (id: string) =>
     api.post<ApiResponse<WhatsAppHandover>>(`/contacts/${id}/whatsapp/handback`),
+
+  checkDuplicates: (data: DuplicateCheckRequest) =>
+    api.post<ApiResponse<DuplicateResult>>('/contacts/duplicate-check', data),
+
+  getDuplicates: (id: string) =>
+    api.get<ApiResponse<DuplicateResult>>(`/contacts/${id}/duplicates`),
 
   createContact: (data: Partial<Contact>) =>
     api.post<ApiResponse<Contact>>('/contacts', data),
