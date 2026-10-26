@@ -2053,17 +2053,41 @@ tasks:
     creates_branch: true
     creates_pull_request: true
 
-  - id: CRM-TASK-069
-    title: 收件箱显示会话意图与紧急度标签，未读页可按紧急度排序
+  - id: CRM-TASK-074
+    title: 收件箱会话列表返回会话标签，未读页可按紧急度排序
     purpose: >-
-      按 docs/inbox-ai-triage.md 4.4 节，在收件箱消息列表显示 CRM-TASK-068 返回的标签，并在未读页签加按时间与按紧急度的切换。只改前端：不改后端。
+      按 docs/inbox-ai-triage.md 第十节，GET /api/messages/conversations 每行带这个客户的会话标签，并在只看未读时支持按紧急度排序；收件箱页面用的是这个接口，CRM-TASK-068 加在了 GET /api/messages 上。只做接口层：不改权限与分页规则、不改表结构、不改前端。
     status: ready
     depends_on:
       - CRM-TASK-068
     acceptance_criteria:
+      - GET /api/messages/conversations 每行新增 triage，按这一行的 contact_id 取；在 conversation_triage 有一行时为含 intent、urgency、triaged_at（UTC 到秒带 Z）的对象，否则（含 contact_id 为空的行）为 null；格式与 GET /api/messages 的 triage 相同，复用同文件已有的取标签函数，一页的标签用一次查询取出，不按行逐条查
+      - 新增查询参数 sort，取值 time（缺省）或 urgency，其他值返回 422；urgency 只在 unread 为 true 时生效，按这一行 contact_id 的紧急度 urgent、high、normal、low、没有标签的顺序，再按最新消息的创建时间倒序、同一时间按 id 倒序；unread 不是 true 时给了 urgency 仍按时间倒序
+      - 权限范围、channel 与 unread 筛选、每个客户一行、unread_count、分页与总数的计算不变；GET /api/messages 与其他消息接口不变
+      - 新测试文件 test_conversations_triage 覆盖：1 有标签、没标签与 contact_id 为空的行各自的 triage；2 unread 为 true 且 sort 为 urgency 时的顺序（四个紧急度加没有标签，同紧急度按时间倒序）；3 unread 不为 true 时 sort 为 urgency 仍按时间；4 sort 为非法值返回 422；5 销售只看到自己的会话，unread_count 与分页总数正确。测试只需覆盖这些用例，每个测试写明守住的是哪一条验收标准；清单之外的补充覆盖只算非阻塞意见；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
+      - tasks/todo.md 新增 CRM-TASK-074 记录段（做了什么、偏离了什么、验证到什么程度）；偏离段只列两类、每条一句：与验收标准或设计文档不一致的做法，以及验收标准没有要求、但改变了现有接口或页面行为的改动；验收标准要求的改动与重构、命名、格式调整不算偏离，没有就写无；偏离段漏列只算非阻塞意见，除非漏列的改动本身违反某条验收标准（那时按那一条判）；验证段只写测试由 PR 的必需检查 backend 执行、检查结果由 Worker 和 CI 记录不写在这里，不写任何检查是否运行或通过；不改 planning-v1 块；复选框只允许 [ ] / [x]；改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不加表、不加迁移、不改前端；allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#PRNUM），不合并、不直推
+    allowed_change_paths:
+      - backend/app/routers/messages.py
+      - backend/tests/test_conversations_triage.py
+      - tasks/todo.md
+    allowed_commands:
+      - lint.check
+      - format.check
+      - format.apply
+    creates_branch: true
+    creates_pull_request: true
+
+  - id: CRM-TASK-069
+    title: 收件箱显示会话意图与紧急度标签，未读页可按紧急度排序
+    purpose: >-
+      按 docs/inbox-ai-triage.md 4.4 节与第十节，在收件箱会话列表显示 CRM-TASK-074 返回的标签，并在未读页签加按时间与按紧急度的切换。只改前端：不改后端。
+    status: ready
+    depends_on:
+      - CRM-TASK-074
+    acceptance_criteria:
       - MessageList 的入站消息行在 triage 不为 null 时显示意图小标签，紧急度为 urgent 时加红色紧急标签、high 时加橙色较急标签，normal 与 low 不显示紧急度标签；旁注 AI，悬停显示意图、紧急度、AI 自动判断未核实与判断时间；出站消息与 triage 为 null 时不显示
-      - 收件箱的未读页签加按时间与按紧急度的切换（只在未读页签显示），选按紧急度时请求带 sort=urgency，其他页签不带 sort；切换后回到第一页；选择存在本页状态里，切到别的页签再回来保持原选择，离开收件箱后回到按时间
-      - services/messages.ts 的列表函数增加 sort 参数，types 加 triage 类型；现有的筛选、分页、标为已读与会话视图的行为不变
+      - 收件箱的未读页签加按时间与按紧急度的切换（只在未读页签显示），选按紧急度时会话列表请求带 sort=urgency，其他页签不带 sort；切换后回到第一页；选择存在本页状态里，切到别的页签再回来保持原选择，离开收件箱后回到按时间
+      - services/messages.ts 的会话列表函数增加 sort 参数，types 加 triage 类型并加到会话类型上；现有的筛选、分页、标为已读与会话视图的行为不变
       - 新文案同时加在 en 与 zh 的 inbox 命名空间，不写硬编码文字；前端类型检查与构建由 PR 的必需 CI 检查 frontend 执行并通过（Worker 沙箱不跑 npm）
       - tasks/todo.md 新增 CRM-TASK-069 记录段（做了什么、偏离了什么、验证到什么程度）；偏离段只列两类、每条一句：与验收标准或设计文档不一致的做法，以及验收标准没有要求、但改变了现有接口或页面行为的改动；验收标准要求的改动与重构、命名、格式调整不算偏离，没有就写无；偏离段漏列只算非阻塞意见，除非漏列的改动本身违反某条验收标准（那时按那一条判）；验证段只写前端类型检查与构建由 PR 的必需检查 frontend 执行、检查结果由 Worker 和 CI 记录不写在这里、没有在浏览器里实际操作过，不写任何检查是否运行或通过；不改 planning-v1 块；复选框只允许 [ ] / [x]；改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不改后端；allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#135），不合并、不直推
     allowed_change_paths:

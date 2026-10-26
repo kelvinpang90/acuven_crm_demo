@@ -133,3 +133,13 @@ Billing Hub AI 模块的已批准契约是 `{"format": {"type": "json_schema", "
 **教训**：
 1. **加迁移之前先查 `.platform/tasks.yaml` 里 ready 任务预留的编号**（搜 `新增迁移` 与 `alembic/versions`），不只看 `versions/` 目录里已有的文件。
 2. 人工 PR 必须占用已预留的编号时，同一个 PR 里把受影响任务的契约与设计文档一起顺延。
+
+## L7 · 设计文档把接口改动写在了页面不用的接口上 → 前端任务做不出来（2026-10-26）
+
+**经过**：收件箱意图标签的设计（`docs/inbox-ai-triage.md` 4.3）把标签与按紧急度排序写在 `GET /api/messages` 上，CRM-TASK-068 照此实现、合并部署。
+收件箱页面的列表其实来自 `GET /api/messages/conversations`（每个客户一行），`GET /api/messages` 只有新消息提醒在用。
+前端任务 CRM-TASK-069 的 run 以 `contract_scope_insufficient` 停下，只能改设计、补登记接口任务 CRM-TASK-074。
+
+**教训**：
+1. **设计里写「某页面要显示什么、接口加什么」之前，先查这个页面实际调的是哪个接口**（从页面组件追到 `services/` 里的函数与路径），把路径写进设计。
+2. 一个功能拆成接口层与前端层时，登记接口任务前对照前端任务的 `allowed_change_paths` 走一遍数据流：前端改的文件拿到的数据，是不是接口任务改的那个接口返回的。
