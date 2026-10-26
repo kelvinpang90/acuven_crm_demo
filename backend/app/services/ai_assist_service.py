@@ -45,6 +45,8 @@ INVALID_INPUT = "invalid_input"
 DEAL_CLOSED = "deal_closed"
 NO_DATA = "no_data"
 NOTHING_TO_FILL = "nothing_to_fill"
+SKIPPED = "skipped"
+SUPERSEDED = "superseded"
 
 
 @dataclass(frozen=True)
@@ -76,6 +78,8 @@ class AiAssistResult:
     suggestions: list[Any] | None = None
     truncated: bool | None = None
     mappings: list[dict[str, Any]] | None = None
+    intent: str | None = None
+    urgency: str | None = None
 
 
 def _truncate(value: str | None, limit: int) -> tuple[str | None, bool]:
@@ -214,14 +218,17 @@ async def build_conversation_snapshot(
 async def write_ai_request(
     db: AsyncSession,
     *,
-    user_id: str,
+    user_id: str | None,
     contact_id: str | None,
     feature: str,
     request_id: str | None,
     outcome: str,
     created_at: datetime | None = None,
 ) -> AiRequest:
-    """Add exactly one minimal AI audit row; transaction ownership stays with caller."""
+    """Add exactly one minimal AI audit row; transaction ownership stays with caller.
+
+    user_id is None for requests the system triggers without a staff member.
+    """
     request = AiRequest(
         user_id=user_id,
         contact_id=contact_id,
@@ -242,7 +249,7 @@ def _as_of(now: datetime | None = None) -> str:
 async def _record_result(
     db: AsyncSession,
     *,
-    user_id: str,
+    user_id: str | None,
     contact_id: str | None,
     feature: str,
     api_result: ai_api_client.AiApiResult,

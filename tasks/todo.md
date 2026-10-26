@@ -34,6 +34,28 @@
 
 ---
 
+## CRM-TASK-066 会话意图与紧急度的快照、提示词、校验与打标签函数（2026-10-26）
+
+### 做了什么
+
+- 新增 `backend/app/services/message_triage_service.py`：`build_triage_snapshot` 只含 `contact`（`name` 截 100 字、`company` 截 200 字）与 `messages`（这个客户最近 10 条，从旧到新，每条 `at`、`direction`、`author_kind`（为空时按方向推断）、`channel`、`body` 截 500 字），不调 AI。
+- 同文件 `classify_conversation`：按「客户不存在或已删除 / 消息不存在、不属于这个客户或不是入站 → skipped；有更新的入站消息（只算创建时间不晚于当前 UTC 加 5 分钟的）→ superseded；AI 未配置 → not_configured」的顺序预检，都不调 AI、不写审计；之后发 `{"as_of", "snapshot"}`，每次调用写一行 `user_id` 为空的 `crm.message_triage` 审计，校验不过改判 error 并保留 `request_id`；成功时写入前再查一次更新的入站消息与已有一行覆盖的消息（同样只看不晚于当前加 5 分钟的），任一成立则不写、返回 superseded，否则插入或覆盖 `conversation_triage` 这一行；失败不改原有的行；不提交。
+- 同文件 `TRIAGE_DELAY_SECONDS = 20` 与 `run_triage`：开关为假或 AI 未配置时直接返回；否则等 `delay` 秒（为 0 时不等），用 `AsyncSessionLocal` 开会话调 `classify_conversation` 并提交，异常只记日志。
+- `ai_features.py`：新增 `MESSAGE_TRIAGE_FEATURE`、`TRIAGE_INTENTS`、`TRIAGE_URGENCIES`、`MESSAGE_TRIAGE_SYSTEM`（不可信数据声明、按顾客最新诉求判断、七个意图与四个紧急度的含义、拿不准选 other / normal）、`MESSAGE_TRIAGE_SCHEMA` 与 `validate_message_triage`；`max_tokens` 用现有的 `MAX_TOKENS`（4000）。
+- `ai_assist_service.py`：`AiAssistResult` 新增可空 `intent`、`urgency`；新增 `SKIPPED`、`SUPERSEDED`；`write_ai_request` 与 `_record_result` 的 `user_id` 可为 `None`。其他 AI 功能未改。
+- `config.py`：新增 `ai_triage_enabled`（`AI_TRIAGE_ENABLED`，缺省为假）。
+- 新增 `backend/tests/test_message_triage_service.py`，覆盖验收标准列出的用例，每个测试在 docstring 写明守住的验收标准；AI 客户端、配置与会话工厂均打桩。
+
+### 偏离了什么
+
+- 无
+
+### 验证到什么程度
+
+- 测试由 PR 的必需检查 backend 执行，检查结果由 Worker 和 CI 记录不写在这里。
+
+---
+
 ## CRM-TASK-065 会话意图与紧急度标签表，以及AI审计表的员工字段改为可空（2026-10-26）
 
 ### 做了什么
