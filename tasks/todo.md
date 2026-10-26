@@ -43,7 +43,7 @@
 
 ### 设计闸门与预审
 
-- 设计闸门：`docs/inbox-ai-triage.md` 第十节、074 的登记与 069 的修改，Kelvin 2026-10-26 在会话里批准改动方案（原话「批准，按这个方案改」），074 引用本 PR（kelvinpang90/acuven_crm_demo#PRNUM）。第十节第 5 条「标签按会话显示」是预审之后补的，待 Kelvin 在本 PR 上确认。
+- 设计闸门：`docs/inbox-ai-triage.md` 第十节、074 的登记与 069 的修改，Kelvin 2026-10-26 在会话里批准改动方案（原话「批准，按这个方案改」），074 引用本 PR（kelvinpang90/acuven_crm_demo#201）。第十节第 5 条「标签按会话显示」是预审之后补的，待 Kelvin 在本 PR 上确认。
 - `contract_check`：ready to register，074 没有拆分 WARN；planning-v1 `ok, next: CRM-TASK-074`。WARN 只有原有的四条，与本次无关。
 - 预审（设计文件 `docs/inbox-ai-triage.md`，对登记分支的干净检出）：074 第 1 轮 READY。069 第 1 轮 NOT_READY，一条 DESIGN_DEFECT：会话行显示的是最新一条，chatbot 在每条顾客消息后都存一条 AI 回复，只在入站行显示会让多数会话看不到标签、排序时却排在前面。核实属实，改为「triage 不为 null 就显示」（第十节第 5 条与 069 第一条验收标准），第 2 轮 READY。这一改动只涉及前端规则，没有改 074 的契约，074 未重跑。预审调模型、不是确定性的，READY 不保证没有缺陷。
 
