@@ -38,6 +38,24 @@
 
 ---
 
+## CRM-TASK-062 导入客户时按电话或邮箱跳过疑似重复，可选择照导（2026-10-26）
+
+### 做了什么
+
+- `backend/app/services/contact_service.py`：`import_contacts` 新增参数 `skip_duplicates`（缺省为真）。按 `docs/contact-duplicate-hints.md` 5.3、6.3 与第九节第 3、9 条，新建客户的行通过名字、邮箱格式等校验后、插入前，由新函数 `_import_duplicate` 依次比较：电话与本次已插入的行、电话与库里未删除的客户、邮箱与本次已插入的行、邮箱与库里未删除的客户，取第一个命中的；电话用 `normalize_phone`，邮箱去首尾空白转小写，与 `duplicate_service` 相同，空的不比。命中且 `skip_duplicates` 为真时跳过并记 `{"row": 行号, "field": "phone" 或 "email", "message": "Possible duplicate: ..."}`，不写对方的名字与 id；本次插入的行记下规范化后的电话、邮箱与表格行号。只填 `id` 的行、已因校验失败跳过的行不查重；`skip_duplicates` 为假时照常插入；不用 `name_company`；返回结构不变。
+- `backend/app/routers/contacts.py`：`POST /api/contacts/import` 新增表单字段 `skip_duplicates`（缺省为真），传给 `import_contacts`；`column_map` 的处理不变。
+- 新增测试 `backend/tests/test_contact_import_duplicates.py`，覆盖验收标准列出的七组用例，每个测试的 docstring 写明守住的验收标准。
+
+### 偏离了什么
+
+- 无
+
+### 验证到什么程度
+
+- 测试由 PR 的必需检查 backend 执行，检查结果由 Worker 和 CI 记录不写在这里。
+
+---
+
 ## CRM-TASK-061 疑似重复客户的查询接口：新建前检查与客户的疑似重复（2026-10-26）
 
 ### 做了什么
