@@ -2008,7 +2008,7 @@ tasks:
     title: chatbot顾客消息进来后在后台触发会话意图与紧急度标注
     purpose: >-
       按 docs/inbox-ai-triage.md 第二节与 4.2 节，chatbot 事件接口在新存入一条顾客消息并提交后，把 CRM-TASK-066 的 run_triage 排进后台任务；开关缺省关。并在部署文档写明新配置。只改事件接口与部署文档：不改事件处理规则、不改收件箱接口、不改前端。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-066
     acceptance_criteria:

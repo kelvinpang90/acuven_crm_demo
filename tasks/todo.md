@@ -14,7 +14,6 @@
 <!-- openclaw:planning-v1:begin -->
 ### 当前计划
 
-1. `CRM-TASK-067` chatbot顾客消息进来后在后台触发会话意图与紧急度标注
 
 ### 已阻塞
 
