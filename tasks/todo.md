@@ -32,6 +32,46 @@
 
 ---
 
+## CRM-TASK-069 第一次 run 失败后改设计，登记 CRM-TASK-074（2026-10-26）
+
+### 做了什么
+
+- 069 的 run（0dc0e968）以 `contract_scope_insufficient` 停下，没改文件。核实属实：收件箱列表来自 `GET /api/messages/conversations`（每个客户一行），`docs/inbox-ai-triage.md` 4.3 却把标签与排序写在 `GET /api/messages` 上（只有新消息提醒在用），068 照此实现；只改前端，标签永远是空的、按紧急度排序被忽略。
+- 设计文档新增第十节（4.3 加指向第十节的说明）：会话列表每行带 `triage`、`unread=true` 时支持 `sort=urgency`；068 在 `GET /api/messages` 上加的保留不动；标签在会话行上按会话显示，不再只限入站消息行。
+- 新登记 CRM-TASK-074（接口层，`routers/messages.py` 与新测试文件），排在「当前计划」第一项；069 改为依赖 074，目的与验收标准改成接会话列表、标签按会话行显示；070 顺延为第三项。
+- `tasks/lessons.md` 新增 L7。
+
+### 设计闸门与预审
+
+- 设计闸门：`docs/inbox-ai-triage.md` 第十节、074 的登记与 069 的修改，Kelvin 2026-10-26 在会话里批准改动方案（原话「批准，按这个方案改」），074 引用本 PR（kelvinpang90/acuven_crm_demo#PRNUM）。第十节第 5 条「标签按会话显示」是预审之后补的，待 Kelvin 在本 PR 上确认。
+- `contract_check`：ready to register，074 没有拆分 WARN；planning-v1 `ok, next: CRM-TASK-074`。WARN 只有原有的四条，与本次无关。
+- 预审（设计文件 `docs/inbox-ai-triage.md`，对登记分支的干净检出）：074 第 1 轮 READY。069 第 1 轮 NOT_READY，一条 DESIGN_DEFECT：会话行显示的是最新一条，chatbot 在每条顾客消息后都存一条 AI 回复，只在入站行显示会让多数会话看不到标签、排序时却排在前面。核实属实，改为「triage 不为 null 就显示」（第十节第 5 条与 069 第一条验收标准），第 2 轮 READY。这一改动只涉及前端规则，没有改 074 的契约，074 未重跑。预审调模型、不是确定性的，READY 不保证没有缺陷。
+
+```text
+第 1 轮 CRM-TASK-074:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 6.8 万 token（其中缓存读取 5 万），折合 API 价约 $0.18；周额度读数 23%。
+退出码 0
+
+第 1 轮 CRM-TASK-069:
+PRECHECK_FINDING: DESIGN_DEFECT 十.5 :: Rows show the latest message, which is usually the outbound ai_reply stored right after each customer message, so the inbound-only rule hides tags on most chatbot conversations while sort=urgency still floats them to the top; show the tag whenever triage is non-null.
+session verdict: NOT_READY
+PRECHECK_RESULT: NOT_READY
+用量：Claude 会话 1 次，共 19.5 万 token（其中缓存读取 16.3 万），折合 API 价约 $0.34；周额度读数 23%。
+退出码 1
+
+第 2 轮 CRM-TASK-069:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 11.4 万 token（其中缓存读取 9.3 万），折合 API 价约 $0.22；周额度读数 23%。
+退出码 0
+```
+
+---
+
 ## CRM-TASK-068 收件箱消息列表返回会话标签，未读页可按紧急度排序（2026-10-26）
 
 ### 做了什么
