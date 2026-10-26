@@ -117,6 +117,14 @@
     "id": "客户编号（只加商机）"
   },
   "phoneConflict": "号码冲突",
+  "duplicateTitle": "可能重复",
+  "duplicateOwner": "负责人：{{name}}",
+  "duplicateRules": {
+    "phone": "电话相同",
+    "email": "邮箱相同",
+    "name_company": "同名同公司"
+  },
+  "duplicateHidden": "另有 {{number}} 个客户可能是同一人，归属其他同事，请联系经理确认",
   "aiCustomerSummary": "AI 客户摘要",
   "aiSummaryGenerate": "生成摘要",
   "aiSummaryRegenerate": "重新生成",

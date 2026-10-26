@@ -117,6 +117,14 @@
     "id": "Customer ID (add deal only)"
   },
   "phoneConflict": "Phone conflict",
+  "duplicateTitle": "Possible duplicates",
+  "duplicateOwner": "Owner: {{name}}",
+  "duplicateRules": {
+    "phone": "Same phone",
+    "email": "Same email",
+    "name_company": "Same name and company"
+  },
+  "duplicateHidden": "{{number}} other customers may be the same person and belong to other colleagues. Please check with your manager.",
   "aiCustomerSummary": "AI Customer Summary",
   "aiSummaryGenerate": "Generate summary",
   "aiSummaryRegenerate": "Regenerate",
