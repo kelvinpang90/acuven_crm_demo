@@ -222,6 +222,7 @@ async def import_contacts(
     auto_assign: bool = Form(False),
     assign_strategy: str = Form("rules"),
     column_map: Optional[str] = Form(None),
+    skip_duplicates: bool = Form(True),
 ):
     if not file.filename or not file.filename.endswith((".xlsx", ".xls")):
         return fail("Only .xlsx or .xls files are supported", status_code=400)
@@ -299,6 +300,7 @@ async def import_contacts(
         current_user,
         auto_assign=auto_assign,
         assign_strategy=assign_strategy,
+        skip_duplicates=skip_duplicates,
     )
     return ok(data=result)
 

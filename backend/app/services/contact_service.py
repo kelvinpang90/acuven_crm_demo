@@ -310,11 +310,14 @@ async def import_contacts(
     current_user: User,
     auto_assign: bool = False,
     assign_strategy: str = "rules",
+    skip_duplicates: bool = True,
 ) -> dict:
     """Import contacts from parsed Excel rows.
 
     Row with customer_id: only add a new Deal to the existing Contact.
-    Row without customer_id: create new Contact + initial Deal.
+    Row without customer_id: create new Contact + initial Deal, unless
+    `skip_duplicates` and its phone or email is already taken
+    (docs/contact-duplicate-hints.md 5.3, 6.3, 9.3 and 9.9).
     """
     from app.models.deal import Deal as DealModel
     from app.models.user import User as UserModel
@@ -331,6 +334,10 @@ async def import_contacts(
     )
     for uid, uemail in user_result.all():
         active_users[uemail] = uid
+
+    # Normalized phone and email of the contacts this import inserted -> sheet row.
+    imported_phones: dict[str, int] = {}
+    imported_emails: dict[str, int] = {}
 
     for i, row in enumerate(rows, start=2):
         row_errors = []
@@ -423,6 +430,20 @@ async def import_contacts(
                 skipped += 1
                 continue
 
+            normalized_phone = normalize_phone(row.get("phone") or None)
+            normalized_email = email.lower() or None
+            if skip_duplicates:
+                duplicate = await _import_duplicate(
+                    db, normalized_phone, normalized_email, imported_phones, imported_emails
+                )
+                if duplicate is not None:
+                    field, reason = duplicate
+                    errors.append(
+                        {"row": i, "field": field, "message": f"Possible duplicate: {reason}"}
+                    )
+                    skipped += 1
+                    continue
+
             try:
                 amount = float(row.get("deal_value") or 0)
             except (ValueError, TypeError):
@@ -475,6 +496,10 @@ async def import_contacts(
             )
             db.add(deal)
             inserted += 1
+            if normalized_phone is not None:
+                imported_phones.setdefault(normalized_phone, i)
+            if normalized_email is not None:
+                imported_emails.setdefault(normalized_email, i)
 
     await db.flush()
     return {
@@ -484,6 +509,44 @@ async def import_contacts(
         "skipped": skipped,
         "errors": errors,
     }
+
+
+async def _import_duplicate(
+    db: AsyncSession,
+    phone: Optional[str],
+    email: Optional[str],
+    imported_phones: dict[str, int],
+    imported_emails: dict[str, int],
+) -> Optional[tuple[str, str]]:
+    """The field and reason of the first rule a new import row hits, in the
+    order of docs/contact-duplicate-hints.md 9.9, or None. Rules and
+    normalization are duplicate_service's `phone` and `email`; the other
+    customer is never named.
+
+    The rows this import inserted are already flushed, so the database checks
+    see them too, but any of them sharing the value is caught by the sheet
+    check that comes first.
+    """
+    if phone is not None:
+        if phone in imported_phones:
+            return "phone", f"same phone as row {imported_phones[phone]}"
+        # Stored numbers are already normalized (CRM-TASK-009).
+        taken = await db.execute(
+            select(Contact.id).where(Contact.deleted_at.is_(None), Contact.phone == phone).limit(1)
+        )
+        if taken.first() is not None:
+            return "phone", "same phone as an existing contact"
+    if email is not None:
+        if email in imported_emails:
+            return "email", f"same email as row {imported_emails[email]}"
+        taken = await db.execute(
+            select(Contact.id)
+            .where(Contact.deleted_at.is_(None), func.lower(func.trim(Contact.email)) == email)
+            .limit(1)
+        )
+        if taken.first() is not None:
+            return "email", "same email as an existing contact"
+    return None
 
 
 async def _validate_assigned_user(db: AsyncSession, user_id: str) -> None:
