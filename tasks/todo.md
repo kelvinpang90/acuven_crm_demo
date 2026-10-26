@@ -51,7 +51,7 @@
 
 ### 设计闸门与预审
 
-- 设计闸门：`docs/deal-next-step.md` 第十节在本 PR 上由 Kelvin 批准，073 引用本 PR。只改系统提示里一处上限的写法，不碰钱、个人数据、状态机与表结构。
+- 设计闸门：`docs/deal-next-step.md` 第十节在本 PR 上由 Kelvin 批准，073 引用本 PR（kelvinpang90/acuven_crm_demo#196）。只改系统提示里一处上限的写法，不碰钱、个人数据、状态机与表结构。
 - `contract_check`：ready to register，073 没有拆分 WARN；planning-v1 `ok, next: CRM-TASK-073`。WARN 只有原有的四条，与本次无关。第一次检查时 073 有一条验收标准写了「冒号加空格」被 YAML 解析成映射、契约加载失败，改写后通过。
 - 预审（设计文件 `docs/deal-next-step.md`，对登记分支的干净检出）：第 1 轮 READY，无发现。它调模型、不是确定性的，READY 不保证没有缺陷。
 
