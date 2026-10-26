@@ -640,21 +640,22 @@ tasks:
       一次迁移删掉 contacts.is_gateway 与它的索引。只做迁移：不改模型、服务、接口、前端。
       迁移编号原为 015，登记 CRM-TASK-021 时 015 给了 ai_requests 建表，顺延为 016（docs/inbox-ai-assist.md 第八节第 4 条）；
       登记 CRM-TASK-039 时 016 给了审计表 contact_id 改可空，顺延为 017（docs/dashboard-ai-insight.md 第七节）；
-      登记 CRM-TASK-065 时 017 给了会话标签表，再顺延为 018（docs/inbox-ai-triage.md 第三节）。
+      登记 CRM-TASK-065 时 017 给了会话标签表，再顺延为 018（docs/inbox-ai-triage.md 第三节）；
+      017 后来被商机来源占用、065 改为 018，再顺延为 019。
     status: ready
     depends_on:
       - CRM-TASK-019
       - CRM-TASK-065
     acceptance_criteria:
-      - 新增迁移 018，down_revision 为 017（CRM-TASK-065 的会话标签表）：upgrade 删掉 contacts 的 is_gateway 列与 idx_contacts_is_gateway 索引；downgrade 重建该列（布尔，非空，带数据库默认值 false）与索引，不还原原来为真的值，在迁移的 docstring 写明
+      - 新增迁移 019，down_revision 为 018（CRM-TASK-065 的会话标签表）：upgrade 删掉 contacts 的 is_gateway 列与 idx_contacts_is_gateway 索引；downgrade 重建该列（布尔，非空，带数据库默认值 false）与索引，不还原原来为真的值，在迁移的 docstring 写明
       - 不改模型（CRM-TASK-019 已取消映射）、服务、接口与前端
-      - 新增测试：用 Alembic 的 Operations 在内存 SQLite 上对含 id 与 is_gateway 的最小 contacts 表执行 018 的 upgrade 再 downgrade，断言列与索引先消失后回来、回来后全部为 false；每条测试写明守住的是哪一条验收标准；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
+      - 新增测试：用 Alembic 的 Operations 在内存 SQLite 上对含 id 与 is_gateway 的最小 contacts 表执行 019 的 upgrade 再 downgrade，断言列与索引先消失后回来、回来后全部为 false；每条测试写明守住的是哪一条验收标准；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
       - tasks/todo.md 新增 CRM-TASK-020 记录段（做了什么、偏离了什么、验证到什么程度）；不改 planning-v1 块；复选框只允许 [ ] / [x]
       - 改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖
       - allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#28），不合并、不直推
     allowed_change_paths:
-      - backend/alembic/versions/018_drop_contact_is_gateway.py
-      - backend/tests/test_migration_018.py
+      - backend/alembic/versions/019_drop_contact_is_gateway.py
+      - backend/tests/test_migration_019.py
       - tasks/todo.md
     allowed_commands:
       - lint.check
@@ -1543,7 +1544,7 @@ tasks:
   # 优先 5 的四个设计（Kelvin 2026-10-21 批准，均按建议，PR kelvinpang90/acuven_crm_demo#135）：
   # 050–054 从聊天提取客户资料（docs/contact-ai-extract.md）；055–059 导入识别列名（docs/contact-import-columns.md）；
   # 060–064 疑似重复提示（docs/contact-duplicate-hints.md，不用 AI）；065–070 收件箱意图与紧急度（docs/inbox-ai-triage.md）。
-  # 迁移编号：065 取 017（conversation_triage 建表、ai_requests.user_id 改可空），被 017 阻塞的 CRM-TASK-020 删列迁移顺延为 018。
+  # 迁移编号：065 原取 017，017 已被商机来源（#146）占用，改取 018（conversation_triage 建表、ai_requests.user_id 改可空）；被 017 阻塞的 CRM-TASK-020 删列迁移顺延为 019。
   # 设计预审的完整输出在 tasks/todo.md「登记 CRM-TASK-050 至 070」。
   - id: CRM-TASK-050
     title: 从聊天提取客户资料的快照组装与行业常量
@@ -1955,17 +1956,17 @@ tasks:
     status: ready
     depends_on: []
     acceptance_criteria:
-      - 新增迁移 017，down_revision 为 016：upgrade 新建 conversation_triage 表（contact_id 字符串 36 主键；intent 枚举 inquiry、quotation、order、complaint、after_sales、appointment、other，非空；urgency 枚举 low、normal、high、urgent，非空；message_id 字符串 36 非空；request_id 字符串 32 可空；triaged_at 时间非空，无时区 UTC），不加外键；并把 ai_requests.user_id 改为可空（用 batch_alter_table 并给出 existing_type，MySQL 与 SQLite 都能执行）
+      - 新增迁移 018，down_revision 为 017（017 是商机来源，已上线）：upgrade 新建 conversation_triage 表（contact_id 字符串 36 主键；intent 枚举 inquiry、quotation、order、complaint、after_sales、appointment、other，非空；urgency 枚举 low、normal、high、urgent，非空；message_id 字符串 36 非空；request_id 字符串 32 可空；triaged_at 时间非空，无时区 UTC），不加外键；并把 ai_requests.user_id 改为可空（用 batch_alter_table 并给出 existing_type，MySQL 与 SQLite 都能执行）
       - downgrade：删除 user_id 为空的审计行后把 user_id 改回非空，再删掉 conversation_triage 表与它的枚举；迁移的 docstring 写明 downgrade 会丢掉这些审计行与全部标签
       - 新增模型 ConversationTriage 并在 models 包里导出，枚举用 validate_strings；AiRequest.user_id 改为可空；其他模型不变
-      - 新测试文件 test_migration_017 用 Alembic 的 Operations 在内存 SQLite 上覆盖：1 依次执行 015、016、017 的 upgrade 后表与列存在、user_id 可空、能插入 user_id 为空的审计行；2 017 的 downgrade 后表消失、user_id 为空的行被删、其他行保留、user_id 回到非空；3 按模型建表后 intent 与 urgency 只接受枚举值。现有的 test_migration_015 与 test_migration_016_ai_requests 不改且照常通过。测试只需覆盖这些用例，每个测试写明守住的是哪一条验收标准；清单之外的补充覆盖只算非阻塞意见；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
+      - 新测试文件 test_migration_018 用 Alembic 的 Operations 在内存 SQLite 上覆盖：1 依次执行 015、016、018 的 upgrade（017 只改 deals 表、与本测试无关，不执行）后表与列存在、user_id 可空、能插入 user_id 为空的审计行；2 018 的 downgrade 后表消失、user_id 为空的行被删、其他行保留、user_id 回到非空；3 按模型建表后 intent 与 urgency 只接受枚举值。现有的 test_migration_015 与 test_migration_016_ai_requests 不改且照常通过。测试只需覆盖这些用例，每个测试写明守住的是哪一条验收标准；清单之外的补充覆盖只算非阻塞意见；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
       - tasks/todo.md 新增 CRM-TASK-065 记录段（做了什么、偏离了什么、验证到什么程度）；偏离段只列两类、每条一句：与验收标准或设计文档不一致的做法，以及验收标准没有要求、但改变了现有接口或页面行为的改动；验收标准要求的改动与重构、命名、格式调整不算偏离，没有就写无；偏离段漏列只算非阻塞意见，除非漏列的改动本身违反某条验收标准（那时按那一条判）；验证段只写测试由 PR 的必需检查 backend 执行、检查结果由 Worker 和 CI 记录不写在这里，不写任何检查是否运行或通过；不改 planning-v1 块；复选框只允许 [ ] / [x]；改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不改服务、接口与前端；allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#135），不合并、不直推
     allowed_change_paths:
-      - backend/alembic/versions/017_add_conversation_triage.py
+      - backend/alembic/versions/018_add_conversation_triage.py
       - backend/app/models/conversation_triage.py
       - backend/app/models/__init__.py
       - backend/app/models/ai_request.py
-      - backend/tests/test_migration_017.py
+      - backend/tests/test_migration_018.py
       - tasks/todo.md
     allowed_commands:
       - lint.check
