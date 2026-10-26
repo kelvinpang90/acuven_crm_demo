@@ -2085,7 +2085,7 @@ tasks:
     depends_on:
       - CRM-TASK-074
     acceptance_criteria:
-      - MessageList 的入站消息行在 triage 不为 null 时显示意图小标签，紧急度为 urgent 时加红色紧急标签、high 时加橙色较急标签，normal 与 low 不显示紧急度标签；旁注 AI，悬停显示意图、紧急度、AI 自动判断未核实与判断时间；出站消息与 triage 为 null 时不显示
+      - MessageList 的会话行在 triage 不为 null 时显示意图小标签（不论这一行最新一条是入站还是出站），紧急度为 urgent 时加红色紧急标签、high 时加橙色较急标签，normal 与 low 不显示紧急度标签；旁注 AI，悬停显示意图、紧急度、AI 自动判断未核实与判断时间；triage 为 null 时不显示
       - 收件箱的未读页签加按时间与按紧急度的切换（只在未读页签显示），选按紧急度时会话列表请求带 sort=urgency，其他页签不带 sort；切换后回到第一页；选择存在本页状态里，切到别的页签再回来保持原选择，离开收件箱后回到按时间
       - services/messages.ts 的会话列表函数增加 sort 参数，types 加 triage 类型并加到会话类型上；现有的筛选、分页、标为已读与会话视图的行为不变
       - 新文案同时加在 en 与 zh 的 inbox 命名空间，不写硬编码文字；前端类型检查与构建由 PR 的必需 CI 检查 frontend 执行并通过（Worker 沙箱不跑 npm）

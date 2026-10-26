@@ -153,5 +153,7 @@ CRM-TASK-069 的第一次 run 以 `contract_scope_insufficient` 停下：收件�
    再按最新消息的创建时间倒序、同一时间按 id 倒序；其他情况给了 `urgency` 也按时间排，不报错。
 3. 权限范围、`channel` 与 `unread` 筛选、每个客户一行、`unread_count`、分页与总数不变。
 4. CRM-TASK-068 在 `GET /api/messages` 上加的 `triage` 与 `sort` 保留不动：已部署、不影响新消息提醒，删掉只多一次改动。
-5. 前端（4.4、第九节第 8 条）不变，只是接会话列表：未读页签的条件是 `unread=true`，选按紧急度时会话列表请求带 `sort=urgency`，会话类型加 `triage`。
+5. 前端（4.4、第九节第 8 条）接会话列表：未读页签的条件是 `unread=true`，选按紧急度时会话列表请求带 `sort=urgency`，会话类型加 `triage`。
+   **标签按会话显示**：会话行在 `triage` 不为 `null` 时就显示，不论这一行的最新一条是入站还是出站；`triage` 为 `null` 时不显示。chatbot 在每条顾客消息之后都存一条 AI 回复，
+   会话行的最新一条多半是出站，照 4.4 与第九节第 8 条的「入站消息行」显示会让大部分 chatbot 会话看不到标签、按紧急度排序时却排在前面。那两处的「入站消息行」作废，颜色与悬停说明不变。
 6. **拆分**：新增接口任务 CRM-TASK-074（`backend/app/routers/messages.py`、`backend/tests/test_conversations_triage.py`（新）、`tasks/todo.md`），有设计闸门；CRM-TASK-069 改为依赖 074。
