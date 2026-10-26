@@ -33,6 +33,24 @@
 
 ---
 
+## CRM-TASK-067 chatbot顾客消息进来后在后台触发会话意图与紧急度标注（2026-10-26）
+
+### 做了什么
+
+- `backend/app/routers/internal_chatbot.py`：事件接口加 `BackgroundTasks` 参数；提交之后，事件类型为 `customer_message`、结果为 `stored`、`ai_triage_enabled` 为真且 AI 已配置时，按 `external_id`（`wa_message_id`）查出刚存入的消息，把 `message_triage_service.run_triage(contact_id, id)` 排进后台任务；其他事件类型、`duplicate` / `ignored`、开关为假或 AI 未配置时都不排。查消息或排任务出错只记日志；给 chatbot 的响应内容与状态码不变。事件处理规则未改。
+- `DEPLOY.md`：生产 `.env` 清单加 `AI_TRIAGE_ENABLED=false` 与说明（缺省关；打开后顾客消息进来约 20 秒后自动调用一次 AI，20 秒内的连发只调一次；只在 AI 四项配置齐全时生效；20 秒内重启会漏打、不补跑）。
+- 新增 `backend/tests/test_chatbot_event_triage.py`，`run_triage` 与签名检查打桩，覆盖验收标准列出的四组用例，每个测试在 docstring 写明守住的验收标准；另把 `ai_reply` 放进「其他事件不排」的参数里。
+
+### 偏离了什么
+
+- 无
+
+### 验证到什么程度
+
+- 测试由 PR 的必需检查 backend 执行，检查结果由 Worker 和 CI 记录不写在这里。
+
+---
+
 ## CRM-TASK-066 会话意图与紧急度的快照、提示词、校验与打标签函数（2026-10-26）
 
 ### 做了什么

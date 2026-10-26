@@ -13,15 +13,17 @@ import re
 import time
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, Header, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, Request
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import get_db
+from app.models.message import Message
 from app.schemas.chatbot_event import ChatbotEvent
-from app.services import chatbot_event_service
+from app.services import ai_api_client, chatbot_event_service, message_triage_service
 from app.utils.response import fail
 
 router = APIRouter()
@@ -69,10 +71,31 @@ def signature_ok(
     return matched
 
 
+async def _queue_triage(
+    db: AsyncSession, background_tasks: BackgroundTasks, wa_message_id: str
+) -> None:
+    """After the commit: queue run_triage for the customer message just stored
+    (docs/inbox-ai-triage.md 4.2). Any error is only logged."""
+    try:
+        if not settings.ai_triage_enabled or not ai_api_client.is_ai_configured():
+            return
+        result = await db.execute(
+            select(Message.id, Message.contact_id).where(Message.external_id == wa_message_id)
+        )
+        row = result.one_or_none()
+        if row is None:
+            logger.warning("triage not queued: no message with external_id %s", wa_message_id)
+            return
+        background_tasks.add_task(message_triage_service.run_triage, row.contact_id, row.id)
+    except Exception:
+        logger.exception("triage not queued for external_id %s", wa_message_id)
+
+
 @router.post("/events")
 async def chatbot_event(
     request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
+    background_tasks: BackgroundTasks,
     x_acuven_timestamp: Annotated[Optional[str], Header()] = None,
     x_acuven_signature: Annotated[Optional[str], Header()] = None,
 ):
@@ -104,5 +127,7 @@ async def chatbot_event(
     else:
         result = await chatbot_event_service.process_event(db, **event.service_kwargs())
     await db.commit()
+    if event.type == "customer_message" and result == chatbot_event_service.STORED:
+        await _queue_triage(db, background_tasks, event.message.wa_message_id)
     logger.info("chatbot event %s type=%s result=%s", event.event_id, event.type, result)
     return JSONResponse({"result": result})

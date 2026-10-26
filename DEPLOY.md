@@ -159,6 +159,10 @@ AI_CLIENT_ID=
 AI_CLIENT_TOKEN=
 AI_MODEL=
 
+# 收件箱意图与紧急度标签：缺省关（false）。打开后，顾客消息进来约 20 秒后自动调用一次 AI，
+# 20 秒内的连发只调一次（最后一条）；只在上面 AI 四项配置齐全时生效。进程在这 20 秒内重启会漏打，不补跑。
+AI_TRIAGE_ENABLED=false
+
 # 前端
 VITE_API_BASE_URL=https://crm.kelvinpeng.com/api
 VITE_APP_NAME=CRM Pro
