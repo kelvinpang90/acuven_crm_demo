@@ -102,9 +102,10 @@ def test_validate_deal_next_step_boundaries_and_shape(output, stalled, expected)
     assert (validate_deal_next_step(output, stalled) is not None) is expected
 
 
-def test_next_step_system_states_200_character_limit():
-    """Guards CRM-TASK-071 criterion 2: system prompt states the 200-character next-step limit."""
-    assert "each 1-200 characters" in DEAL_NEXT_STEP_SYSTEM
+def test_next_step_system_states_one_sentence_150_character_limit():
+    """Guards CRM-TASK-073 criterion 2: system prompt asks for one sentence of at most 150 characters."""
+    assert "each one sentence of at most 150 characters" in DEAL_NEXT_STEP_SYSTEM
+    assert "each 1-200 characters" not in DEAL_NEXT_STEP_SYSTEM
     assert "1-120" not in DEAL_NEXT_STEP_SYSTEM
 
 
