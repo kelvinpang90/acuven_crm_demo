@@ -33,6 +33,23 @@
 
 ---
 
+## CRM-TASK-073 商机AI下一步建议的提示词把每条下一步写成一句且不超过150字符（2026-10-26）
+
+### 做了什么
+
+- `backend/app/services/ai_features.py`：按 `docs/deal-next-step.md` 第十节，`DEAL_NEXT_STEP_SYSTEM` 末尾 `next_steps` 的上限由 `each 1-200 characters` 改为 `each one sentence of at most 150 characters`；条数 1-3、`assessment` 与 `stall_reason` 的写法及其余文字不变。`validate_deal_next_step`（每条仍按 1 至 200 字校验）与 `DEAL_NEXT_STEP_SCHEMA` 未改。
+- `backend/tests/test_deal_next_step_service.py`：CRM-TASK-071 加的系统提示断言改为含 `each one sentence of at most 150 characters`、不含 `each 1-200 characters` 与 `1-120`，测试函数随之改名、docstring 写明守住的验收标准；校验边界的参数化用例（单条 200 字通过、201 字不通过）未改。
+
+### 偏离了什么
+
+- 无
+
+### 验证到什么程度
+
+- 测试由 PR 的必需检查 backend 执行，检查结果由 Worker 和 CI 记录不写在这里；没有调用过真实模型。
+
+---
+
 ## AI 质量评测第二轮与登记 CRM-TASK-073（2026-10-26）
 
 ### 做了什么
