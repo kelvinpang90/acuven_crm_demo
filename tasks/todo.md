@@ -35,6 +35,25 @@
 
 ---
 
+## CRM-TASK-065 会话意图与紧急度标签表，以及AI审计表的员工字段改为可空（2026-10-26）
+
+### 做了什么
+
+- 新增迁移 `backend/alembic/versions/018_add_conversation_triage.py`（`down_revision` 为 017）：按 `docs/inbox-ai-triage.md` 第三节新建 `conversation_triage`（`contact_id` 字符串 36 主键；`intent` 七值枚举 `conversation_triage_intent`、`urgency` 四值枚举 `conversation_triage_urgency`，都非空；`message_id` 字符串 36 非空；`request_id` 字符串 32 可空；`triaged_at` 无时区时间非空），不加外键；用 `batch_alter_table` 把 `ai_requests.user_id` 改为可空，`existing_type` 为 `String(36)`。
+- `downgrade` 先删除 `user_id` 为空的审计行再把 `user_id` 改回非空，然后删掉 `conversation_triage` 表与两个枚举；docstring 写明会丢掉这些审计行与全部标签。
+- 新增模型 `backend/app/models/conversation_triage.py` 的 `ConversationTriage`（枚举用 `validate_strings=True`，`triaged_at` 缺省 `datetime.utcnow`，与 `AiRequest.created_at` 一致），在 `app.models` 里导出；`AiRequest.user_id` 改为 `Mapped[str | None]`、`nullable=True`，其他模型不变。
+- 新增测试 `backend/tests/test_migration_018.py`，覆盖验收标准列出的三个用例，每个测试在 docstring 写明守住的验收标准；`test_migration_015` 与 `test_migration_016_ai_requests` 未改。服务、接口、前端与审计写入函数都没改（留给 CRM-TASK-066）。
+
+### 偏离了什么
+
+- 无
+
+### 验证到什么程度
+
+- 测试由 PR 的必需检查 backend 执行，检查结果由 Worker 和 CI 记录不写在这里。
+
+---
+
 ## 修订 CRM-TASK-065、020 的迁移编号：065 改为 018，020 顺延为 019（2026-10-26）
 
 CRM-TASK-065 的 run `e696e7ad` 以 `design_defect` 失败、没有改任何文件：契约要求新增迁移 017（`down_revision` 016），而 017 已被商机来源（kelvinpang90/acuven_crm_demo#146，`017_add_deal_source.py`）占用并上线，再加一个 017 会让 Alembic 出现重复编号。Kelvin 2026-10-26 批准整体顺延一位。
