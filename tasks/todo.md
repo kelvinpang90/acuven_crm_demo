@@ -36,6 +36,25 @@
 
 ---
 
+## CRM-TASK-064 导入页加疑似重复的也导入勾选框（2026-10-26）
+
+### 做了什么
+
+- `frontend/src/services/contacts.ts`：`importContacts` 的选项新增 `skipDuplicates`，传了就作为表单字段 `skip_duplicates`（`true` 或 `false`）提交给 CRM-TASK-062 的导入接口；不传时不带该字段，由接口按缺省为真处理。
+- `frontend/src/pages/Contacts/ExcelImport.tsx`：按 `docs/contact-duplicate-hints.md` 第五节第 3 条与 6.4 节，在自动指派选项下方加勾选框「疑似重复的也导入」，默认不勾，下面一句说明按电话或邮箱判断；导入时提交 `skip_duplicates` 为 `!勾选`（不勾为 true，勾上为 false）。结果卡片的错误列表未改，疑似重复的原因照接口返回的 `message` 显示。列对应表、AI 识别列、自动指派、模板下载与结果卡片的其余行为未改。
+- `frontend/src/locales/en/contacts.json`、`frontend/src/locales/zh/contacts.json`：`contacts` 命名空间新增 `importDuplicates` 与 `importDuplicatesHint`。
+
+### 偏离了什么
+
+- 无
+
+### 验证到什么程度
+
+- 前端类型检查与构建由 PR 的必需检查 frontend 执行，检查结果由 Worker 和 CI 记录不写在这里。
+- 没有在浏览器里实际操作过。
+
+---
+
 ## CRM-TASK-063 新建客户表单与详情面板显示疑似重复提示（2026-10-26）
 
 ### 做了什么

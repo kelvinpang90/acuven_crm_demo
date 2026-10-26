@@ -81,6 +81,8 @@
   },
   "importAutoAssign": "Auto-assign an owner",
   "importAutoAssignHint": "Only applies to rows that leave the owner column blank.",
+  "importDuplicates": "Import possible duplicates too",
+  "importDuplicatesHint": "Duplicates are judged by phone or email, against existing customers and earlier rows in the sheet; unchecked, possible duplicates are skipped and listed with the reason in the result.",
   "importAssignStrategy": "Assignment logic",
   "importStrategyRules": "Use the configured routing rules",
   "importStrategyWorkload": "Balance workload",
