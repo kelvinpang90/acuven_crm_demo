@@ -1,4 +1,4 @@
-from typing import Annotated, Optional
+from typing import Annotated, Literal, Optional
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.models.contact import Contact
+from app.models.conversation_triage import ConversationTriage
 from app.models.message import Message
 from app.models.user import User
 from app.schemas.message import EmailSendRequest, WhatsAppSendRequest
@@ -23,6 +24,15 @@ NOT_YOURS = (
 )
 NOT_YOURS_TO_READ = "This conversation is not assigned to you."
 
+# urgent first, untagged conversations last.
+URGENCY_RANK = case(
+    (ConversationTriage.urgency == "urgent", 0),
+    (ConversationTriage.urgency == "high", 1),
+    (ConversationTriage.urgency == "normal", 2),
+    (ConversationTriage.urgency == "low", 3),
+    else_=4,
+)
+
 
 @router.get("")
 async def list_messages(
@@ -31,6 +41,7 @@ async def list_messages(
     channel: Optional[str] = None,
     is_read: Optional[bool] = None,
     contact_id: Optional[str] = None,
+    sort: Literal["time", "urgency"] = "time",
     page: int = 1,
     page_size: int = 20,
 ):
@@ -56,13 +67,22 @@ async def list_messages(
     count_q = select(func.count()).select_from(query.subquery())
     total = (await db.execute(count_q)).scalar() or 0
 
-    # Paginate
-    query = query.order_by(Message.created_at.desc())
+    # Paginate. Urgency order applies to the unread view only (docs/inbox-ai-triage.md 4.3);
+    # conversation_triage has one row per contact, so the outer join adds no rows.
+    if sort == "urgency" and is_read is False:
+        query = query.outerjoin(
+            ConversationTriage, ConversationTriage.contact_id == Message.contact_id
+        ).order_by(URGENCY_RANK, Message.created_at.desc())
+    else:
+        query = query.order_by(Message.created_at.desc())
     query = query.offset((page - 1) * page_size).limit(page_size)
     result = await db.execute(query)
     messages = result.scalars().all()
 
     items = await _message_dicts(db, messages, include_contact_name=True)
+    triage = await _triage_by_contact(db, {m.contact_id for m in messages if m.contact_id})
+    for item in items:
+        item["triage"] = triage.get(item["contact_id"])
 
     return ok(
         data={
@@ -358,6 +378,25 @@ async def _message_dicts(
             item["contact_name"] = contact_names.get(message.contact_id)
         items.append(item)
     return items
+
+
+async def _triage_by_contact(db: AsyncSession, contact_ids: set[str]) -> dict[str, dict]:
+    """The conversation tags of these contacts, in one query."""
+    if not contact_ids:
+        return {}
+    rows = (
+        await db.execute(
+            select(ConversationTriage).where(ConversationTriage.contact_id.in_(contact_ids))
+        )
+    ).scalars()
+    return {
+        row.contact_id: {
+            "intent": row.intent,
+            "urgency": row.urgency,
+            "triaged_at": row.triaged_at.isoformat(timespec="seconds") + "Z",
+        }
+        for row in rows
+    }
 
 
 async def _send_result(db: AsyncSession, result: chatbot_send_service.SendReplyResult):
