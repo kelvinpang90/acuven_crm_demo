@@ -1926,7 +1926,7 @@ tasks:
     title: 导入页加疑似重复的也导入勾选框
     purpose: >-
       按 docs/contact-duplicate-hints.md 第五节第 3 条与 6.4 节，在导入页加勾选框，把 CRM-TASK-062 的 skip_duplicates 传给导入接口。只改前端：不改后端。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-062
       - CRM-TASK-058
