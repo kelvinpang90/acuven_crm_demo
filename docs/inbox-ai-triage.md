@@ -46,7 +46,7 @@
 - 不加外键（与现有表一致）。客户删除后标签留着没人看，不清理。
 - 审计照常写 `ai_requests`：`feature` 为 `crm.message_triage`、`contact_id` 为这个客户；**`user_id` 为空**（系统自动触发，没有员工）——要把 `ai_requests.user_id` 改为可空。
 
-迁移取 **017**（`conversation_triage` 建表与 `ai_requests.user_id` 改可空放在一个迁移里），被 017 阻塞的 CRM-TASK-020 删列迁移再顺延为 **018**（登记 PR 里改，同 CRM-TASK-039 那次）。
+迁移取 **018**（`conversation_triage` 建表与 `ai_requests.user_id` 改可空放在一个迁移里），被 017 阻塞的 CRM-TASK-020 删列迁移再顺延为 **019**（登记 PR 里改，同 CRM-TASK-039 那次）。原定 017，登记后 017 被商机来源（`deals.source`，kelvinpang90/acuven_crm_demo#146）占用，2026-10-26 改为 018 / 019，只改编号。
 
 ## 四、CRM 侧设计
 
@@ -102,14 +102,14 @@
 
 ## 七、登记时怎么拆
 
-1. 数据库：迁移 017（`conversation_triage` 建表、`ai_requests.user_id` 改可空）与模型。路径：`backend/alembic/versions/017_add_conversation_triage.py`（新）、`backend/app/models/conversation_triage.py`（新）、`backend/app/models/__init__.py`、`backend/app/models/ai_request.py`、`backend/tests/test_migration_017.py`（新）、`tasks/todo.md`
+1. 数据库：迁移 018（`conversation_triage` 建表、`ai_requests.user_id` 改可空）与模型。路径：`backend/alembic/versions/018_add_conversation_triage.py`（新）、`backend/app/models/conversation_triage.py`（新）、`backend/app/models/__init__.py`、`backend/app/models/ai_request.py`、`backend/tests/test_migration_018.py`（新）、`tasks/todo.md`
 2. 业务：4.1 与第五节。路径：`backend/app/services/message_triage_service.py`（新）、`backend/app/services/ai_features.py`、`backend/app/services/ai_assist_service.py`、`backend/app/config.py`、`backend/tests/test_message_triage_service.py`（新）、`tasks/todo.md`；依赖 1
 3. 接口：触发（4.2）。路径：`backend/app/routers/internal_chatbot.py`、`DEPLOY.md`、`backend/tests/test_chatbot_event_triage.py`（新）、`tasks/todo.md`；依赖 2
 4. 接口：收件箱返回标签与排序（4.3）。路径：`backend/app/routers/messages.py`、`backend/tests/test_messages_triage.py`（新）、`tasks/todo.md`；依赖 1
 5. 前端：4.4。路径：`frontend/src/pages/Inbox/MessageList.tsx`、`frontend/src/pages/Inbox/index.tsx`、`frontend/src/services/messages.ts`、`frontend/src/types/index.ts`、`frontend/src/locales/en/inbox.json`、`frontend/src/locales/zh/inbox.json`、`tasks/todo.md`；依赖 4
 6. 评测样例：`backend/evals/samples/message_triage.json`（新）、`backend/evals/features.py`、`backend/tests/test_evals_samples_triage.py`（新）、`tasks/todo.md`；依赖 2
 
-全部有设计闸门，登记前跑设计预审。登记 PR 同时把 CRM-TASK-020 的迁移改为 018。
+全部有设计闸门，登记前跑设计预审。登记 PR 同时把 CRM-TASK-020 的迁移改为 018（后因 017 被占用，再改为 019）。
 
 ## 八、需要 Kelvin 拍板（2026-10-21 已定：Q1 至 Q6 均按建议）
 

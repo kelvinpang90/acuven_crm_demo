@@ -35,6 +35,41 @@
 
 ---
 
+## 修订 CRM-TASK-065、020 的迁移编号：065 改为 018，020 顺延为 019（2026-10-26）
+
+CRM-TASK-065 的 run `e696e7ad` 以 `design_defect` 失败、没有改任何文件：契约要求新增迁移 017（`down_revision` 016），而 017 已被商机来源（kelvinpang90/acuven_crm_demo#146，`017_add_deal_source.py`）占用并上线，再加一个 017 会让 Alembic 出现重复编号。Kelvin 2026-10-26 批准整体顺延一位。
+
+### 做了什么
+
+- 065：迁移改为 `018_add_conversation_triage.py`，`down_revision` 017；测试改名 `test_migration_018.py`，第 1 条改为依次执行 015、016、018 的 upgrade（017 只改 deals 表、与本测试无关，不执行）。表结构与其余验收标准不变。
+- 020：迁移顺延为 `019_drop_contact_is_gateway.py`，`down_revision` 018；测试改名 `test_migration_019.py`；purpose 补一句顺延原因。
+- `tasks.yaml` 第 050 至 070 段的编号注释与 `docs/inbox-ai-triage.md` 第三节、第七节第 1 项与其后一句同步改编号，只改编号。
+- `tasks/lessons.md` 新增 L6。planning-v1 不变。
+
+### 设计闸门与预审
+
+- 设计闸门：065 仍为 kelvinpang90/acuven_crm_demo#135，020 仍为 kelvinpang90/acuven_crm_demo#28；只改迁移编号，设计内容不变，Kelvin 同意沿用原批准。
+- `contract_check`：ready to register，planning-v1 `ok, next: CRM-TASK-065`；WARN 只有原有的四条。
+- 预审（对登记分支的干净检出；设计文件分别为 `docs/inbox-ai-triage.md`、`docs/chatbot-replies.md`）：第 1 轮都 READY，无发现。它调模型、不是确定性的，READY 不保证没有缺陷。
+
+```text
+第 1 轮 CRM-TASK-065:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 19.9 万 token（其中缓存读取 17.5 万），折合 API 价约 $0.28；周额度读数 15%。
+退出码 0
+
+第 1 轮 CRM-TASK-020:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 23.7 万 token（其中缓存读取 19.4 万），折合 API 价约 $0.43；周额度读数 15%。
+退出码 0
+```
+
+---
+
 ## CRM-TASK-064 导入页加疑似重复的也导入勾选框（2026-10-26）
 
 ### 做了什么
