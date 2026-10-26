@@ -1979,7 +1979,7 @@ tasks:
     title: 会话意图与紧急度的快照、提示词、校验与打标签函数
     purpose: >-
       按 docs/inbox-ai-triage.md 第四节 4.1 与第五节、第九节，写会话快照、crm.message_triage 的提示词与校验、给一个会话打标签并写入 conversation_triage 的函数，以及后台任务用的包装函数与开关配置。只做业务规则层：不改事件接口与收件箱接口、不改前端；测试打桩 AI 客户端，不调真实模型、不写任何真实密钥与地址。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-065
     acceptance_criteria:
