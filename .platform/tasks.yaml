@@ -1894,7 +1894,7 @@ tasks:
     title: 新建客户表单与详情面板显示疑似重复提示
     purpose: >-
       按 docs/contact-duplicate-hints.md 第四节、第五节第 1、2 条与 6.4 节，调用 CRM-TASK-061 的两个接口，在新建客户表单与客户详情面板显示疑似重复。只提示不拦。只改前端：不改后端、不加页面或路由。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-061
       - CRM-TASK-053
