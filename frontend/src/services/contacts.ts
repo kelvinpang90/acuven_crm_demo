@@ -57,7 +57,7 @@ export const contactsApi = {
 
   importContacts: (
     file: File,
-    options?: { autoAssign?: boolean; assignStrategy?: string; columnMap?: string },
+    options?: { autoAssign?: boolean; assignStrategy?: string; columnMap?: string; skipDuplicates?: boolean },
   ) => {
     const formData = new FormData();
     formData.append('file', file);
@@ -67,6 +67,9 @@ export const contactsApi = {
     }
     if (options?.columnMap) {
       formData.append('column_map', options.columnMap);
+    }
+    if (options?.skipDuplicates !== undefined) {
+      formData.append('skip_duplicates', options.skipDuplicates ? 'true' : 'false');
     }
     return api.post<ApiResponse<ContactImportResult>>('/contacts/import', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },

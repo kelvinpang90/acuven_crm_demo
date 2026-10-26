@@ -81,6 +81,8 @@
   },
   "importAutoAssign": "自动指派负责人",
   "importAutoAssignHint": "仅对表格里未填负责人的行生效。",
+  "importDuplicates": "疑似重复的也导入",
+  "importDuplicatesHint": "按电话或邮箱判断是否与已有客户或表格里前面的行重复；不勾时疑似重复的行会跳过，并在结果里列出原因。",
   "importAssignStrategy": "指派逻辑",
   "importStrategyRules": "按现有路由规则",
   "importStrategyWorkload": "平均工作量",

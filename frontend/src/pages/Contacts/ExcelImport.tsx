@@ -119,6 +119,7 @@ export default function ExcelImport() {
   const [result, setResult] = useState<ContactImportResult | null>(null);
   const [autoAssign, setAutoAssign] = useState(false);
   const [assignStrategy, setAssignStrategy] = useState('rules');
+  const [importDuplicates, setImportDuplicates] = useState(false);
 
   const handleDownloadTemplate = async () => {
     try {
@@ -180,6 +181,7 @@ export default function ExcelImport() {
         autoAssign,
         assignStrategy,
         columnMap: JSON.stringify(columnMap),
+        skipDuplicates: !importDuplicates,
       });
       setResult(res.data.data);
     } catch { /* ignore */ }
@@ -272,6 +274,16 @@ export default function ExcelImport() {
             )}
 
             <p className="pl-6 text-xs text-text-muted">{t('importAutoAssignHint')}</p>
+
+            <label className="flex items-center gap-2 text-sm text-text-secondary">
+              <input
+                type="checkbox"
+                checked={importDuplicates}
+                onChange={(e) => setImportDuplicates(e.target.checked)}
+              />
+              {t('importDuplicates')}
+            </label>
+            <p className="pl-6 text-xs text-text-muted">{t('importDuplicatesHint')}</p>
           </div>
 
           {!canImport && <p className="text-sm text-yellow-400">{t('importNeedNameOrId')}</p>}
