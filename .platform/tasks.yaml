@@ -1868,7 +1868,7 @@ tasks:
     title: 导入客户时按电话或邮箱跳过疑似重复，可选择照导
     purpose: >-
       按 docs/contact-duplicate-hints.md 第五节第 3 条与 6.3 节，导入新建客户的行在插入前按电话与邮箱查重，命中默认跳过并记错误，导入接口加 skip_duplicates 可关闭。只改导入：不改其他联系人接口、不加表与迁移、不改前端。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-060
       - CRM-TASK-055
