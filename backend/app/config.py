@@ -75,6 +75,10 @@ class Settings(BaseSettings):
     ai_client_id: str = ""
     ai_client_token: str = ""
     ai_model: str = ""
+    # Automatic inbox intent and urgency labels (docs/inbox-ai-triage.md, Q1).
+    # Off by default; with it on, customer conversations are sent to the AI
+    # module without a staff click. Missing AI settings also count as off.
+    ai_triage_enabled: bool = False
 
     @property
     def database_url(self) -> str:
