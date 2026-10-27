@@ -2241,7 +2241,7 @@ tasks:
     purpose: >-
       按 docs/followup-from-chat.md 第 4.4 节，把 CRM-TASK-075 的业务函数接成 POST /api/ai/contacts/{contact_id}/followup-from-chat，供 CRM-TASK-077 的跟进表单使用。
       只做接口层：加在已有的 AI 路由里，不改 main.py、不改业务规则、不改表结构、不改前端、不改跟进整理接口。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-075
     acceptance_criteria:
