@@ -14,8 +14,7 @@
 <!-- openclaw:planning-v1:begin -->
 ### 当前计划
 
-1. `CRM-TASK-079` 起草回复发给模型的数据带上客户最近的AutoCount发票与报价单
-2. `CRM-TASK-080` AI评测样例：起草回复加6个带AutoCount单据的样例
+1. `CRM-TASK-080` AI评测样例：起草回复加6个带AutoCount单据的样例
 
 ### 已阻塞
 
