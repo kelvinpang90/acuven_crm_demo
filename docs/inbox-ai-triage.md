@@ -69,6 +69,8 @@
 
 ### 4.3 收件箱接口（`routers/messages.py`）
 
+> 2026-10-26：收件箱列表实际用的是 `GET /api/messages/conversations`，本节写成了 `GET /api/messages`，见第十节修订；冲突处以第十节为准。
+
 - `GET /api/messages` 每条消息多返回 `triage`：所属客户有标签时为 `{"intent", "urgency", "triaged_at"}`，否则 `null`（一次查询取这一页涉及的客户）。
 - 新查询参数 `sort`：缺省 `time`（现状）；`urgency` 只在 `is_read=false` 时生效：按所属会话的紧急度（`urgent` > `high` > `normal` > `low` > 没有标签）、再按时间倒序。
   其他情况给了 `urgency` 也按时间排（不报错）。
@@ -139,3 +141,19 @@
 8. **前端标签**：`urgent` 显示红色「紧急」、`high` 显示橙色「较急」，`normal` 与 `low` 不显示紧急度标签；悬停显示意图、紧急度、「AI 自动判断，未核实」与时间。排序选择在页面状态里保留，切页签回来不变，离开收件箱后回到按时间；只有未读页签带 `sort`。
 9. **评测样例引用消息**：评测脚本的建数据把参数里的 `message` 也按 key 换成消息 id（`seed.py` 的参数引用表加一项）。
 10. **写入前检查也只看不晚于当前加 5 分钟的消息**：判断「已有的一行覆盖的消息是否更新」时同第 5 条，避免一条未来时间的消息被打上标签后，后面所有消息都写不进去。
+
+## 十、第一次实现后的修订（2026-10-26）
+
+CRM-TASK-069 的第一次 run 以 `contract_scope_insufficient` 停下：收件箱页面的列表来自 `GET /api/messages/conversations`（每个客户一行，带最新一条消息与 `unread_count`），
+4.3 却写成了 `GET /api/messages`，CRM-TASK-068 照此实现在后者上（前端只有新消息提醒用它）。只改前端做不出 4.4。下面几条与正文、第九节冲突处以本节为准。
+
+1. **会话列表带标签**：`GET /api/messages/conversations` 每行新增 `triage`，按这一行（该客户最新一条消息）的 `contact_id` 取 `conversation_triage`；有一行时为 `{"intent", "urgency", "triaged_at"}`，
+   否则（含 `contact_id` 为空的行）为 `null`。格式与 `GET /api/messages` 的 `triage` 相同，一页的标签一次查询取出。
+2. **会话列表按紧急度排序**：新查询参数 `sort`，取值 `time`（缺省）或 `urgency`，其他值返回 422。`urgency` 只在 `unread=true` 时生效：按 `urgent` > `high` > `normal` > `low` > 没有标签，
+   再按最新消息的创建时间倒序、同一时间按 id 倒序；其他情况给了 `urgency` 也按时间排，不报错。
+3. 权限范围、`channel` 与 `unread` 筛选、每个客户一行、`unread_count`、分页与总数不变。
+4. CRM-TASK-068 在 `GET /api/messages` 上加的 `triage` 与 `sort` 保留不动：已部署、不影响新消息提醒，删掉只多一次改动。
+5. 前端（4.4、第九节第 8 条）接会话列表：未读页签的条件是 `unread=true`，选按紧急度时会话列表请求带 `sort=urgency`，会话类型加 `triage`。
+   **标签按会话显示**：会话行在 `triage` 不为 `null` 时就显示，不论这一行的最新一条是入站还是出站；`triage` 为 `null` 时不显示。chatbot 在每条顾客消息之后都存一条 AI 回复，
+   会话行的最新一条多半是出站，照 4.4 与第九节第 8 条的「入站消息行」显示会让大部分 chatbot 会话看不到标签、按紧急度排序时却排在前面。那两处的「入站消息行」作废，颜色与悬停说明不变。
+6. **拆分**：新增接口任务 CRM-TASK-074（`backend/app/routers/messages.py`、`backend/tests/test_conversations_triage.py`（新）、`tasks/todo.md`），有设计闸门；CRM-TASK-069 改为依赖 074。
