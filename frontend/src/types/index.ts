@@ -360,6 +360,11 @@ export interface AiFollowUpDraft {
   tasks: AiFollowUpTaskDraft[];
 }
 
+export interface AiFollowUpFromChat extends AiFollowUpDraft {
+  since: string | null;
+  truncated: boolean;
+}
+
 // The CRM fields an import column can be mapped to (docs/contact-import-columns.md section 2).
 export type ImportField =
   | 'name'

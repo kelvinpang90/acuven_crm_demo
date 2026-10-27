@@ -1,5 +1,5 @@
 import api from './api';
-import type { AiContactExtract, AiContactSummary,AiConversationBrief, AiDashboardInsight, AiDealNextStep, AiFollowUpDraft, AiImportColumn, AiImportColumns, AiLanguage, AiReplyDraft, AiStatus, AiTranslation, ApiResponse } from '@/types';
+import type { AiContactExtract, AiContactSummary,AiConversationBrief, AiDashboardInsight, AiDealNextStep, AiFollowUpDraft, AiFollowUpFromChat, AiImportColumn, AiImportColumns, AiLanguage, AiReplyDraft, AiStatus, AiTranslation, ApiResponse } from '@/types';
 
 let aiStatusPromise: Promise<AiStatus> | null = null;
 
@@ -50,6 +50,11 @@ export const aiApi = {
     contactId: string,
     data: { deal_id: string; note: string; today: string; output_language?: 'zh-CN' | 'en' },
   ) => api.post<ApiResponse<AiFollowUpDraft>>(`/ai/contacts/${contactId}/followup-draft`, data, { timeout: 58000 }),
+
+  createFollowUpFromChat: (
+    contactId: string,
+    data: { deal_id: string; today: string; utc_offset_minutes: number; output_language?: 'zh-CN' | 'en' },
+  ) => api.post<ApiResponse<AiFollowUpFromChat>>(`/ai/contacts/${contactId}/followup-from-chat`, data, { timeout: 58000 }),
 
   createReplyDraft: (contactId: string, channel: 'whatsapp' | 'email', instruction: string | undefined, outputLanguage: AiLanguage) =>
     api.post<ApiResponse<AiReplyDraft>>(`/ai/conversations/${contactId}/reply-draft`, { channel, ...(instruction ? { instruction } : {}), output_language: outputLanguage }, { timeout: 58000 }),

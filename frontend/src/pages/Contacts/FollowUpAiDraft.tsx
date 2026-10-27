@@ -3,9 +3,12 @@ import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 import type { TFunction } from 'i18next';
+import dayjs from 'dayjs';
 import { aiApi } from '@/services/ai';
 import { tasksApi } from '@/services/tasks';
-import type { ActivityType, AiFollowUpDraft, ApiError, Priority } from '@/types';
+import type { ActivityType, AiFollowUpDraft, AiFollowUpFromChat, ApiError, Priority } from '@/types';
+
+type DraftSource = 'note' | 'chat';
 
 interface Props {
   contactId: string;
@@ -39,13 +42,15 @@ function localToday() {
   return `${date.getFullYear()}-${month}-${day}`;
 }
 
-function errorMessage(error: unknown, t: TFunction<'contacts'>) {
+function errorMessage(error: unknown, t: TFunction<'contacts'>, source: DraftSource) {
   if (!axios.isAxiosError<ApiError>(error) || !error.response) return t('aiTemporarilyUnavailable');
-  switch (error.response.data?.error?.code) {
+  const code = error.response.data?.error?.code;
+  if (source === 'chat' && code === 'NO_MESSAGES') return t('aiFromChatNoMessages');
+  switch (code) {
     case 'AI_NOT_CONFIGURED': return t('aiNotEnabled');
     case 'AI_UNAVAILABLE': return t('aiTemporarilyUnavailable');
-    case 'INVALID_INPUT': return t('aiFollowUpInvalidInput');
-    case 'AI_ERROR': return t('aiError');
+    case 'INVALID_INPUT': return t(source === 'chat' ? 'aiFromChatInvalidInput' : 'aiFollowUpInvalidInput');
+    case 'AI_ERROR': return t(source === 'chat' ? 'aiRequestFailed' : 'aiError');
     default: return t('aiRequestFailed');
   }
 }
@@ -61,8 +66,9 @@ export default function FollowUpAiDraft({
 }: Props) {
   const { t, i18n } = useTranslation('contacts');
   const [enabled, setEnabled] = useState(false);
-  const [generating, setGenerating] = useState(false);
+  const [generating, setGenerating] = useState<DraftSource | null>(null);
   const [draft, setDraft] = useState<AiFollowUpDraft | null>(null);
+  const [basis, setBasis] = useState<{ since: string | null; truncated: boolean } | null>(null);
   const [tasks, setTasks] = useState<EditableTask[]>([]);
   const [restore, setRestore] = useState<{ activityType: Exclude<ActivityType, 'status change'>; note: string } | null>(null);
   const requestVersion = useRef(0);
@@ -84,8 +90,9 @@ export default function FollowUpAiDraft({
   useEffect(() => {
     requestVersion.current += 1;
     cardVersion.current += 1;
-    setGenerating(false);
+    setGenerating(null);
     setDraft(null);
+    setBasis(null);
     setTasks([]);
   }, [contactId, dealId]);
 
@@ -98,10 +105,24 @@ export default function FollowUpAiDraft({
     cardVersion.current += 1;
   }, []);
 
+  const showDraft = (result: AiFollowUpDraft, resultBasis: { since: string | null; truncated: boolean } | null) => {
+    cardVersion.current += 1;
+    setDraft(result);
+    setBasis(resultBasis);
+    setTasks(result.tasks.map((task) => ({
+      title: task.title,
+      dueDate: task.due_date || '',
+      priority: task.priority,
+      added: false,
+      adding: false,
+      error: null,
+    })));
+  };
+
   const generate = async () => {
     if (generating || !note.trim() || Array.from(note).length > 2000 || !dealId) return;
     const version = ++requestVersion.current;
-    setGenerating(true);
+    setGenerating('note');
     try {
       const response = await aiApi.createFollowUpDraft(contactId, {
         deal_id: dealId,
@@ -109,22 +130,33 @@ export default function FollowUpAiDraft({
         today: localToday(),
         ...(outputLanguage(i18n.language) ? { output_language: outputLanguage(i18n.language) } : {}),
       });
+      if (requestVersion.current === version) showDraft(response.data.data, null);
+    } catch (error: unknown) {
+      if (requestVersion.current === version) toast.error(errorMessage(error, t, 'note'));
+    } finally {
+      if (requestVersion.current === version) setGenerating(null);
+    }
+  };
+
+  const generateFromChat = async () => {
+    if (generating || !dealId) return;
+    const version = ++requestVersion.current;
+    setGenerating('chat');
+    try {
+      const response = await aiApi.createFollowUpFromChat(contactId, {
+        deal_id: dealId,
+        today: localToday(),
+        utc_offset_minutes: 0 - new Date().getTimezoneOffset(),
+        ...(outputLanguage(i18n.language) ? { output_language: outputLanguage(i18n.language) } : {}),
+      });
       if (requestVersion.current === version) {
-        cardVersion.current += 1;
-        setDraft(response.data.data);
-        setTasks(response.data.data.tasks.map((task) => ({
-          title: task.title,
-          dueDate: task.due_date || '',
-          priority: task.priority,
-          added: false,
-          adding: false,
-          error: null,
-        })));
+        const result: AiFollowUpFromChat = response.data.data;
+        showDraft(result, { since: result.since, truncated: result.truncated });
       }
     } catch (error: unknown) {
-      if (requestVersion.current === version) toast.error(errorMessage(error, t));
+      if (requestVersion.current === version) toast.error(errorMessage(error, t, 'chat'));
     } finally {
-      if (requestVersion.current === version) setGenerating(false);
+      if (requestVersion.current === version) setGenerating(null);
     }
   };
 
@@ -166,17 +198,30 @@ export default function FollowUpAiDraft({
   if (!enabled) return null;
 
   const tooLong = Array.from(note).length > 2000;
-  const disabled = generating || !note.trim() || tooLong || !dealId;
+  const disabled = !!generating || !note.trim() || tooLong || !dealId;
 
   return (
     <div className="space-y-2">
-      <button type="button" className="btn-secondary text-xs px-3 py-1" disabled={disabled} onClick={generate}>
-        {generating ? t('aiFollowUpLoading') : t('aiFollowUpGenerate')}
-      </button>
+      <div className="flex gap-2">
+        <button type="button" className="btn-secondary text-xs px-3 py-1" disabled={disabled} onClick={generate}>
+          {generating === 'note' ? t('aiFollowUpLoading') : t('aiFollowUpGenerate')}
+        </button>
+        <button type="button" className="btn-secondary text-xs px-3 py-1" disabled={!!generating || !dealId} onClick={generateFromChat}>
+          {generating === 'chat' ? t('aiFromChatLoading') : t('aiFromChatGenerate')}
+        </button>
+      </div>
       {tooLong && <p className="text-xs text-red-500">{t('aiFollowUpTooLong')}</p>}
       {draft && (
         <div className="rounded-lg border border-dark-border bg-dark-hover p-3 text-sm space-y-3">
           <p className="text-xs font-medium text-text-secondary">{t('aiGeneratedUnverified')}</p>
+          {basis && (
+            <p className="text-xs text-text-muted">
+              {basis.since
+                ? t('aiFromChatBasisSince', { time: dayjs(basis.since).format('YYYY-MM-DD HH:mm') })
+                : t('aiFromChatBasisAll')}
+              {basis.truncated && ` ${t('aiFromChatTruncated')}`}
+            </p>
+          )}
           <p><span className="font-medium">{t('followType')}: </span>{t(`followTypes.${draft.activity_type}`)}</p>
           <p className="whitespace-pre-wrap text-text-secondary">{draft.content}</p>
           <div className="flex gap-2">

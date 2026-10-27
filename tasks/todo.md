@@ -30,6 +30,25 @@
 
 ---
 
+## CRM-TASK-077 跟进表单加从聊天生成，沿用AI整理的预览卡片（2026-10-27）
+
+### 做了什么
+
+- `frontend/src/types/index.ts`：新增 `AiFollowUpFromChat`，在 `AiFollowUpDraft` 的字段上加 `since`（`string | null`）与 `truncated`（`boolean`），与接口返回一致。
+- `frontend/src/services/ai.ts`：新增 `createFollowUpFromChat`，调用 `POST /ai/contacts/{contact_id}/followup-from-chat`，请求体为 `deal_id`、`today`、`utc_offset_minutes`、可选的 `output_language`，58 秒超时。
+- `frontend/src/pages/Contacts/FollowUpAiDraft.tsx`：按 `docs/followup-from-chat.md` 4.5 节在「AI 整理」旁边加「从聊天生成」，与「AI 整理」同在 AI 启用后才显示；不看文本框，只在没有选中的商机时置灰；进行中的请求改为记录是哪一个按钮发起的，任一个进行中两个按钮都置灰，发起的那个显示加载中。请求带表单选中的 `deal_id`、浏览器本地日期 `today`、`0 - new Date().getTimezoneOffset()` 与按界面语言映射的 `output_language`。结果与「AI 整理」共用写入卡片的逻辑（替换整张卡片、清掉「已加」），填入、还原速记、任务草稿加为任务、换联系人或商机与卸载时丢弃、提交前提醒没加的任务草稿都沿用现有实现。卡片多一行依据：`since` 不为 null 时显示依据上次跟进（本地时间）之后的消息，为 null 时显示依据这个客户的聊天消息，`truncated` 为真时加一句消息较多或较长、只用了一部分；「AI 整理」的结果不显示这一行。错误提示：`NO_MESSAGES` 为上次跟进之后没有新消息，`INVALID_INPUT` 为商机无效、请检查后再试，`AI_NOT_CONFIGURED` 为 AI 未启用，`AI_UNAVAILABLE`、超时与网络错误为 AI 暂时不可用，`AI_ERROR` 与其他错误码一律为 AI 请求失败；「AI 整理」的错误提示不变。
+- `frontend/src/locales/en/contacts.json`、`frontend/src/locales/zh/contacts.json`：新增 `aiFromChat*` 文案。
+
+### 偏离了什么
+
+- 无
+
+### 验证到什么程度
+
+- 前端类型检查与构建由 PR 的必需检查 frontend 执行，检查结果由 Worker 和 CI 记录不写在这里；没有在浏览器里实际操作过。
+
+---
+
 ## CRM-TASK-076 从聊天生成跟进记录的接口（2026-10-27）
 
 ### 做了什么
