@@ -50,7 +50,7 @@ function errorMessage(error: unknown, t: TFunction<'contacts'>, source: DraftSou
     case 'AI_NOT_CONFIGURED': return t('aiNotEnabled');
     case 'AI_UNAVAILABLE': return t('aiTemporarilyUnavailable');
     case 'INVALID_INPUT': return t(source === 'chat' ? 'aiFromChatInvalidInput' : 'aiFollowUpInvalidInput');
-    case 'AI_ERROR': return t('aiError');
+    case 'AI_ERROR': return t(source === 'chat' ? 'aiRequestFailed' : 'aiError');
     default: return t('aiRequestFailed');
   }
 }
