@@ -14,7 +14,6 @@
 <!-- openclaw:planning-v1:begin -->
 ### 当前计划
 
-1. `CRM-TASK-070` AI评测样例：会话意图与紧急度12个
 
 ### 已阻塞
 
