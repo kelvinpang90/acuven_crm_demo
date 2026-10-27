@@ -2268,7 +2268,7 @@ tasks:
     purpose: >-
       按 docs/followup-from-chat.md 第 4.5 节，在联系人面板跟进表单的 AI 整理旁边加从聊天生成，调用 CRM-TASK-076 的接口，结果用 AI 整理同一张预览卡片（填入、还原速记、任务草稿改后加为任务）。
       保存仍走现有的提交与建任务。AI 未配置时不显示。只改前端：不改后端、不加页面或路由、不改 services/tasks.ts，AI 整理的现有行为不变。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-076
     acceptance_criteria:
