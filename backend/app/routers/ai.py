@@ -16,6 +16,7 @@ from app.schemas.ai import (
     DashboardInsightRequest,
     DealNextStepRequest,
     FollowupDraftRequest,
+    FollowupFromChatRequest,
     ImportColumnsRequest,
     ReplyDraftRequest,
     TranslateRequest,
@@ -209,6 +210,29 @@ async def create_followup_draft(
         output_language=body.output_language or _default_output_language(current_user),
     )
     return _result_response(result, ("request_id", "activity_type", "content", "tasks"))
+
+
+@router.post("/contacts/{contact_id}/followup-from-chat")
+async def create_followup_from_chat(
+    contact_id: str,
+    body: FollowupFromChatRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    if not await _may_use_ai_for_contact(db, current_user, contact_id):
+        return _not_assigned()
+    result = await followup_draft_service.generate_followup_from_chat(
+        db,
+        user=current_user,
+        contact_id=contact_id,
+        deal_id=body.deal_id,
+        today=body.today,
+        utc_offset_minutes=body.utc_offset_minutes,
+        output_language=body.output_language or _default_output_language(current_user),
+    )
+    return _result_response(
+        result, ("request_id", "activity_type", "content", "tasks", "since", "truncated")
+    )
 
 
 @router.post("/conversations/{contact_id}/reply-draft")

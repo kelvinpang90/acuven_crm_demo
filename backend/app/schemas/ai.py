@@ -40,6 +40,13 @@ class FollowupDraftRequest(BaseModel):
         return value
 
 
+class FollowupFromChatRequest(BaseModel):
+    deal_id: str = Field(min_length=1)
+    today: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
+    utc_offset_minutes: int = Field(strict=True, ge=-720, le=840)
+    output_language: Language | None = None
+
+
 class ReplyDraftRequest(BaseModel):
     channel: Channel
     instruction: str | None = None
