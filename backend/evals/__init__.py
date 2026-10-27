@@ -15,6 +15,7 @@ FEATURE_NAMES = (
     "translate",
     "contact_summary",
     "followup_draft",
+    "followup_from_chat",
     "deal_next_step",
     "contact_extract",
     "import_columns",
