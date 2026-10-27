@@ -14,7 +14,6 @@
 <!-- openclaw:planning-v1:begin -->
 ### 当前计划
 
-1. `CRM-TASK-078` AI评测样例：从聊天生成跟进记录10个
 
 ### 已阻塞
 

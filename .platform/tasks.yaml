@@ -2298,7 +2298,7 @@ tasks:
     title: AI评测样例：从聊天生成跟进记录10个
     purpose: >-
       按 docs/followup-from-chat.md 第五节、docs/ai-eval.md 第二节，在评测脚本里加 followup_from_chat 功能并写 10 个自拟样例。只改评测脚本的功能登记与样例：不改 app 下任何文件；样例里的人名、公司、电话、邮箱全部自拟。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-075
     acceptance_criteria:
