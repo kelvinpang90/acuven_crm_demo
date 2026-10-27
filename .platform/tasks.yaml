@@ -2109,7 +2109,7 @@ tasks:
     title: AI评测样例：会话意图与紧急度12个
     purpose: >-
       按 docs/inbox-ai-triage.md 第五节与第九节、docs/ai-eval.md 第二节，在评测脚本里加 message_triage 功能并写 12 个自拟样例。只改评测脚本的功能登记与样例：不改 app 下任何文件；样例里的人名、公司、电话、邮箱全部自拟。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-066
       - CRM-TASK-059
