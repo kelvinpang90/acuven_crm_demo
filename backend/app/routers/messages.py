@@ -100,6 +100,7 @@ async def list_conversations(
     db: Annotated[AsyncSession, Depends(get_db)],
     channel: Optional[str] = None,
     unread: Optional[bool] = None,
+    sort: Literal["time", "urgency"] = "time",
     page: int = 1,
     page_size: int = 20,
 ):
@@ -135,19 +136,24 @@ async def list_conversations(
     latest = latest.subquery()
 
     total = (await db.execute(select(func.count()).select_from(latest))).scalar() or 0
-    rows = (
-        await db.execute(
-            select(Message, latest.c.unread_count)
-            .join(latest, Message.id == latest.c.id)
-            .order_by(Message.created_at.desc(), Message.id.desc())
-            .offset((page - 1) * page_size)
-            .limit(page_size)
-        )
-    ).all()
+    page_q = select(Message, latest.c.unread_count).join(latest, Message.id == latest.c.id)
+    newest_first = (Message.created_at.desc(), Message.id.desc())
+    # Urgency order applies to the unread view only (docs/inbox-ai-triage.md section 10);
+    # conversation_triage has one row per contact, so the outer join adds no rows.
+    if sort == "urgency" and unread is True:
+        page_q = page_q.outerjoin(
+            ConversationTriage, ConversationTriage.contact_id == Message.contact_id
+        ).order_by(URGENCY_RANK, *newest_first)
+    else:
+        page_q = page_q.order_by(*newest_first)
+    rows = (await db.execute(page_q.offset((page - 1) * page_size).limit(page_size))).all()
 
-    items = await _message_dicts(db, [row[0] for row in rows], include_contact_name=True)
+    messages = [row[0] for row in rows]
+    items = await _message_dicts(db, messages, include_contact_name=True)
+    triage = await _triage_by_contact(db, {m.contact_id for m in messages if m.contact_id})
     for item, row in zip(items, rows):
         item["unread_count"] = int(row[1] or 0)
+        item["triage"] = triage.get(item["contact_id"])
     return ok(data={"data": items, "total": total, "page": page, "page_size": page_size})
 
 

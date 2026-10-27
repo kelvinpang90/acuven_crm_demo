@@ -32,6 +32,24 @@
 
 ---
 
+## CRM-TASK-074 收件箱会话列表返回会话标签，未读页可按紧急度排序（2026-10-27）
+
+### 做了什么
+
+- `backend/app/routers/messages.py`：按 `docs/inbox-ai-triage.md` 第十节，`GET /api/messages/conversations` 每行新增 `triage`，按这一行（该客户最新一条消息）的 `contact_id` 取；有 `conversation_triage` 行时为 `{"intent", "urgency", "triaged_at"}`，否则（含 `contact_id` 为空的行）为 `null`。复用同文件的 `_triage_by_contact`，一页的标签一次 `IN` 查询取出，格式与 `GET /api/messages` 相同。
+- 同接口新增查询参数 `sort: Literal["time", "urgency"]`，缺省 `time`，其他值由 FastAPI 校验返回 422。`sort=urgency` 且 `unread=true` 时，翻页查询左连接 `conversation_triage`（每个客户一行，不会多出行），复用 `URGENCY_RANK` 按 `urgent`、`high`、`normal`、`low`、没有标签排序，再按最新消息创建时间倒序、同一时间按 id 倒序；其他情况仍按时间倒序。权限范围、`channel` 与 `unread` 筛选、每个客户一行、`unread_count`、总数与分页的计算未改；`GET /api/messages` 与其他消息接口未改。
+- 新增 `backend/tests/test_conversations_triage.py`，覆盖验收标准列出的五个用例，每个测试在 docstring 写明守住的验收标准。
+
+### 偏离了什么
+
+- 无
+
+### 验证到什么程度
+
+- 测试由 PR 的必需检查 backend 执行，检查结果由 Worker 和 CI 记录不写在这里。
+
+---
+
 ## CRM-TASK-069 第一次 run 失败后改设计，登记 CRM-TASK-074（2026-10-26）
 
 ### 做了什么
