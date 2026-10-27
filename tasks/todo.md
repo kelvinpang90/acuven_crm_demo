@@ -32,6 +32,25 @@
 
 ---
 
+## CRM-TASK-075 从聊天生成跟进记录的消息范围、提示词、输出校验与业务函数（2026-10-27）
+
+### 做了什么
+
+- `backend/app/services/ai_features.py`：按 `docs/followup-from-chat.md` 第五节新增 `FOLLOWUP_CHAT_FEATURE`（`crm.followup_from_chat`）、`FOLLOWUP_CHAT_SYSTEM`、`FOLLOWUP_CHAT_SCHEMA`（`content` 与 `tasks`，没有 `activity_type`，各层不允许多余字段）与 `validate_followup_chat(output, today)`。`content` 与 `tasks` 的规则抽成 `_followup_content_and_tasks`，`validate_followup_draft` 与新函数共用，前者的行为不变。
+- `backend/app/services/ai_assist_service.py`：`AiAssistResult` 新增可空字段 `since`，其他不变。
+- `backend/app/services/followup_draft_service.py`：新增 `generate_followup_from_chat`。先查联系人，再按跟进整理的规则查 `output_language`、`today`、`deal_id`，加查 `utc_offset_minutes`（整数、不是布尔值、-720 至 840），之后是配置与消息。起点取这个联系人类型不是 `status change` 的跟进记录里最新的 `created_at`；取严格晚于起点的消息，倒序取 41 条判断是否多于 40 条，留最新 40 条按时间正序，用 `_snapshot_message` 转换，`at` 与 `since` 换成带偏移的本地时间；整个数据块超过 16 KiB 时从最早的丢起、至少留一条。跟进方式按丢消息之后的数据块定。审计、三类结果与校验不过改判 `error` 的处理与跟进整理相同；成功结果带 UTC 的 `since` 与 `truncated`。
+- 新增 `backend/tests/test_followup_from_chat_service.py`，覆盖验收标准列出的用例，每个测试的 docstring 写明守住的验收标准。
+
+### 偏离了什么
+
+- 无
+
+### 验证到什么程度
+
+- 测试由 PR 的必需检查 backend 执行，检查结果由 Worker 和 CI 记录不写在这里。
+
+---
+
 ## 登记 CRM-TASK-075 至 078：从聊天记录生成跟进记录（2026-10-27）
 
 ### 做了什么
