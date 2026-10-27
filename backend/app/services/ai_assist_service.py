@@ -80,6 +80,7 @@ class AiAssistResult:
     mappings: list[dict[str, Any]] | None = None
     intent: str | None = None
     urgency: str | None = None
+    since: str | None = None
 
 
 def _truncate(value: str | None, limit: int) -> tuple[str | None, bool]:
