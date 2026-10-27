@@ -31,6 +31,28 @@
 
 ---
 
+## CRM-TASK-069 收件箱显示会话意图与紧急度标签，未读页可按紧急度排序（2026-10-27）
+
+### 做了什么
+
+- `frontend/src/types/index.ts`：新增 `TriageIntent`（第一节七个意图）、`TriageUrgency`（四个紧急度）与 `ConversationTriage`（`intent`、`urgency`、`triaged_at`），`Conversation` 新增 `triage: ConversationTriage | null`，与 CRM-TASK-074 的响应一致。
+- `frontend/src/services/messages.ts`：`ConversationListParams` 新增 `sort`（新类型 `ConversationSort`，`time` 或 `urgency`），`getConversations` 照原样把参数传给 `GET /api/messages/conversations`。
+- `frontend/src/pages/Inbox/MessageList.tsx`：按 `docs/inbox-ai-triage.md` 4.4、第九节第 8 条与第十节第 5 条，会话行在 `triage` 不为 `null` 时（不论最新一条是入站还是出站）显示意图小标签，`urgent` 加红色「紧急」、`high` 加橙色「较急」，`normal` 与 `low` 不显示紧急度标签；旁注「AI」，悬停显示意图、紧急度、「AI 自动判断，未核实」与判断时间；`triage` 为 `null` 时不显示。
+- `frontend/src/pages/Inbox/index.tsx`：只在未读页签显示「按时间 / 按紧急度」切换；选按紧急度时会话列表请求带 `sort=urgency`，其他页签不带 `sort`；切换后回到第一页。选择记在本页状态里，切页签不重置，离开收件箱（页面卸载）后回到按时间。筛选、分页、标为已读与会话视图未改。
+- `frontend/src/locales/en/inbox.json`、`frontend/src/locales/zh/inbox.json`：`inbox` 命名空间新增 `sortByTime`、`sortByUrgency`、`triageAi`、`triageHint`、`triageIntent`、`triageUrgency`。
+
+### 偏离了什么
+
+- 页签那一行加了 `flex-wrap`，窄屏上未读页签多出的切换放不下时换行而不是溢出；其他页签宽度够时排版不变。
+- 设计文档 4.4 写「AI 未启用时什么都不显示」，这里按验收标准只看 `triage` 是否为 `null`，关掉开关后接口仍返回的旧标签照样显示。
+
+### 验证到什么程度
+
+- 前端类型检查与构建由 PR 的必需检查 frontend 执行，检查结果由 Worker 和 CI 记录不写在这里。
+- 没有在浏览器里实际操作过。
+
+---
+
 ## CRM-TASK-074 收件箱会话列表返回会话标签，未读页可按紧急度排序（2026-10-27）
 
 ### 做了什么

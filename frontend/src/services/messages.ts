@@ -9,9 +9,13 @@ export interface MessageListParams {
   page_size?: number;
 }
 
+export type ConversationSort = 'time' | 'urgency';
+
 export interface ConversationListParams {
   channel?: string;
   unread?: boolean;
+  // `urgency` only takes effect together with `unread=true`.
+  sort?: ConversationSort;
   page?: number;
   page_size?: number;
 }
