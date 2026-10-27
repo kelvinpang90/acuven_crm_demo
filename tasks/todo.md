@@ -14,6 +14,10 @@
 <!-- openclaw:planning-v1:begin -->
 ### 当前计划
 
+1. `CRM-TASK-075` 从聊天生成跟进记录的消息范围、提示词、输出校验与业务函数
+2. `CRM-TASK-076` 从聊天生成跟进记录的接口
+3. `CRM-TASK-077` 跟进表单加从聊天生成，沿用AI整理的预览卡片
+4. `CRM-TASK-078` AI评测样例：从聊天生成跟进记录10个
 
 ### 已阻塞
 
@@ -27,6 +31,71 @@
 <!-- openclaw:planning-v1:end -->
 
 ---
+
+## 登记 CRM-TASK-075 至 078：从聊天记录生成跟进记录（2026-10-27）
+
+### 做了什么
+
+- 新设计 `docs/followup-from-chat.md`：联系人详情面板跟进表单里「AI 整理」旁边加「从聊天生成」，用这个客户上次跟进之后的聊天消息生成跟进记录与任务草稿，沿用跟进整理的预览卡片；跟进方式由 CRM 按消息渠道定。
+- `.platform/tasks.yaml` 登记四项，都是 `ready`：075 业务（消息范围、提示词、校验、业务函数）、076 接口（依赖 075）、077 前端（依赖 076）、078 评测样例 10 个（依赖 075）。planning-v1「当前计划」为 075、076、077、078。
+- 任务八表格加一行。
+
+### 设计闸门与预审
+
+- 设计闸门：Kelvin 2026-10-27 在本 PR 上批准设计，原话「按建议批准，去登记吧」（第八节 Q1 至 Q4 按建议）；预审后补的第九节（含给接口加必填的 `utc_offset_minutes`）Kelvin 同日确认，原话「第九节确认，预审过了就合并」。四项都引用本 PR（kelvinpang90/acuven_crm_demo#209）。
+- `contract_check`：ready to register，四项都没有拆分 WARN；planning-v1 `ok, next: CRM-TASK-075`。WARN 只有原有的四条，与本次无关。
+- 预审（设计文件 `docs/followup-from-chat.md`，对登记分支的干净检出）：第 1 轮 076、077、078 READY；075 NOT_READY，三条发现核实都成立，按设计第九节处理：生成之后、保存之前进来的消息下次用不上，写明为已知限制（要接上得改表或改建跟进记录的接口，超出范围）；消息时间是 UTC 而 `today` 是本地日期，加 `utc_offset_minutes`、由 CRM 把消息时间换成本地时间；`truncated` 的触发写死。四项的契约都随之改了，第 2 轮四项都 READY。第 1 轮的退出码没有记下来（脚本取错了），结论以 PRECHECK_RESULT 为准。预审调模型、不是确定性的，READY 不保证没有缺陷。
+
+```text
+第 1 轮 CRM-TASK-075:
+PRECHECK_FINDING: DESIGN_DEFECT 第六节 :: The start point is the saved record's created_at, so messages arriving between generation and save (or in the same second) are never used again; "再点一次即可" only holds before saving.
+PRECHECK_FINDING: DESIGN_DEFECT 第五节 :: Relative dates are computed from the message's UTC `at`, but `today` is the browser-local date and no timezone is sent, so due dates near midnight (e.g. UTC+8) come out a day early.
+PRECHECK_FINDING: UNDECIDED 第三节 :: Not decided whether body/subject truncation reported by the reused _snapshot_message, or a deal title over 100 characters, also sets truncated; section 3 names only the 40-message and 16 KiB triggers.
+session verdict: READY
+judged from the findings, not the session's verdict: NOT_READY
+PRECHECK_RESULT: NOT_READY
+用量：Claude 会话 1 次，共 27.1 万 token（其中缓存读取 23.8 万），折合 API 价约 $0.37；周额度读数 29%。
+第 1 轮 CRM-TASK-076:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 5.2 万 token（其中缓存读取 3.3 万），折合 API 价约 $0.18；周额度读数 29%。
+第 1 轮 CRM-TASK-077:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 12.4 万 token（其中缓存读取 10 万），折合 API 价约 $0.25；周额度读数 29%。
+第 1 轮 CRM-TASK-078:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 57 万 token（其中缓存读取 52.2 万），折合 API 价约 $0.56；周额度读数 29%。
+
+第 2 轮 CRM-TASK-075:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 23 万 token（其中缓存读取 19.6 万），折合 API 价约 $0.37；周额度读数 29%。
+退出码 0
+第 2 轮 CRM-TASK-076:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 12.3 万 token（其中缓存读取 10.2 万），折合 API 价约 $0.22；周额度读数 29%。
+退出码 0
+第 2 轮 CRM-TASK-077:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 14.5 万 token（其中缓存读取 10.9 万），折合 API 价约 $0.35；周额度读数 29%。
+退出码 0
+第 2 轮 CRM-TASK-078:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 41.3 万 token（其中缓存读取 35.9 万），折合 API 价约 $0.57；周额度读数 29%。
+退出码 0
+```
 
 ## AI 质量评测第三轮（2026-10-27）
 
@@ -2775,6 +2844,7 @@ PRECHECK_RESULT: READY
 | 4 | 仪表盘 | 经理看板的数据解读：数字由 CRM 算好，AI 只写解读 | 设计 `docs/dashboard-ai-insight.md` 2026-10-18 已批准（PR kelvinpang90/acuven_crm_demo#108，Q4 选 B 放每人停滞商机数，其余按建议），登记为 CRM-TASK-039 至 044 |
 | 5 | 联系人 | 从聊天里提取客户资料作为建议填入；表格导入时识别列名；疑似重复客户提示（不自动合并，B-05） | 三份设计 2026-10-21 已批准（PR kelvinpang90/acuven_crm_demo#135，均按建议）：`docs/contact-ai-extract.md`、`docs/contact-import-columns.md`、`docs/contact-duplicate-hints.md`（查重建议第一版不用 AI） |
 | 5 | 收件箱 | 意图和紧急度标签、按紧急度排序（每条入站消息都要调一次 AI，成本另议） | 设计 `docs/inbox-ai-triage.md` 2026-10-21 已批准（PR kelvinpang90/acuven_crm_demo#135，均按建议；自动调用加开关，缺省关） |
+| 5 | 跟进记录 | 从聊天记录生成跟进记录与任务草稿（跟进整理设计第一节留下的想法） | 设计 `docs/followup-from-chat.md` 2026-10-27 已批准（PR kelvinpang90/acuven_crm_demo#209，Q1 至 Q4 按建议），登记为 CRM-TASK-075 至 078 |
 | 6 | 分配规则、屋顶项目、AutoCount | 建议分配给谁；根据勘察和完工照片起草报告；汇总客户的单据 | 想法 |
 
 - [x] Kelvin 批准 `docs/inbox-ai-assist.md`（2026-10-13，第三节 Q1 至 Q6 均按建议）
