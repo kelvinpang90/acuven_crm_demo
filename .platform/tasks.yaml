@@ -2211,7 +2211,7 @@ tasks:
       按 docs/followup-from-chat.md 第三节、4.1 至 4.3 节与第五节，定义 crm.followup_from_chat 的系统提示、JSON schema 与输出校验，按上次跟进之后的消息组装发给模型的数据，
       并串成一个可调用的业务函数。复用跟进整理（CRM-TASK-032）的参数检查、open_tasks 取法与校验规则，以及收件箱快照里转换单条消息的函数。只做业务规则层：
       不加接口、不改前端、不加表与迁移、不改跟进整理与收件箱的行为；测试打桩 AI 客户端，不调真实模型、不写任何真实密钥与地址。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-032
     acceptance_criteria:
