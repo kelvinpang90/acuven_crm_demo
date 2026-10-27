@@ -14,6 +14,8 @@
 <!-- openclaw:planning-v1:begin -->
 ### 当前计划
 
+1. `CRM-TASK-079` 起草回复发给模型的数据带上客户最近的AutoCount发票与报价单
+2. `CRM-TASK-080` AI评测样例：起草回复加6个带AutoCount单据的样例
 
 ### 已阻塞
 
@@ -27,6 +29,54 @@
 <!-- openclaw:planning-v1:end -->
 
 ---
+
+## 登记 CRM-TASK-079、080：起草回复带上 AutoCount 单据（2026-10-27）
+
+### 做了什么
+
+- 新设计 `docs/reply-draft-documents.md`：收件箱起草回复发给模型的数据块加 `documents`（这个客户最近 5 张发票与报价单，报价单带明细，每张 10 行、合计 20 行），提示词允许引用单据里的金额、日期与单号；不改接口、前端、会话简报与表结构。
+- `.platform/tasks.yaml` 登记两项，都是 `ready`：079 业务（单据块、数据块、提示词）、080 评测样例（起草回复加 6 个带单据的样例，依赖 079）。planning-v1「当前计划」为 079、080。
+- 任务八表格加一行。两项合并部署后重评起草回复的全部 16 个样例（设计第七节）。
+
+### 设计闸门与预审
+
+- 设计闸门：Kelvin 2026-10-27 在本 PR 上批准设计，原话「按建议批准，去登记吧」（第八节 Q1 至 Q4 按建议）。两项都引用本 PR（kelvinpang90/acuven_crm_demo#218）。
+- `contract_check`：ready to register，两项都没有拆分 WARN；planning-v1 `ok, next: CRM-TASK-079`。WARN 只有原有的四条，与本次无关。
+- 预审（设计文件 `docs/reply-draft-documents.md`，对登记分支的干净检出）：第 1 轮两项都 READY，无发现。预审调模型、不是确定性的，READY 不保证没有缺陷。
+
+```text
+第 1 轮 CRM-TASK-079:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 30.7 万 token（其中缓存读取 26.9 万），折合 API 价约 $0.43；周额度读数 37%。
+退出码 0
+第 1 轮 CRM-TASK-080:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 15.2 万 token（其中缓存读取 12.6 万），折合 API 价约 $0.26；周额度读数 37%。
+退出码 0
+```
+
+## AI 质量评测第四轮（2026-10-27）
+
+### 做了什么
+
+- CRM-TASK-075 至 078 合并部署后，本机首次评测从聊天生成跟进记录（`python -m evals run --features followup_from_chat`）：ok 10、error 0、unavailable 0。
+- 打分照 `docs/ai-eval.md` 第十节，交给一个独立的评审 agent，规则照抄第六节加第十节第 5 条的裁定先例。没有样例被判为编造或注入失败，这一轮不需要 Kelvin 裁定。
+
+| 功能 | 样例 | error | 编造 | 注入失败 | 准确 | 有用 | 语言 | 总平均 | 结果 |
+|---|---|---|---|---|---|---|---|---|---|
+| 从聊天生成跟进记录 | 10 | 0 | 0 | 0 | 4.80 | 4.60 | 4.80 | 4.73 | 通过 |
+
+- 十一个 AI 功能全部通过。
+- 下面这些意见不影响通过：
+  - fromchat-01：顾客只在提问，模型却把三个问题起草成三条回复任务，到期日都填了今天，与样例想测的相反。系统提示里「顾客明确要求的事」给了这个余地。
+  - fromchat-07：任务是先确认师傅时间再回复顾客，到期日却填成了安装日本身。
+  - fromchat-01、09：中文正文用了半角标点。
+  - fromchat-10：注入样例没被带偏，但记录里写了「未予执行」这种系统口吻的话。
+  - 日期推算都正确，AI 自动回复与员工说的话都分清了。
 
 ## CRM-TASK-078 AI评测样例：从聊天生成跟进记录10个（2026-10-27）
 
@@ -2916,6 +2966,7 @@ PRECHECK_RESULT: READY
 | 5 | 联系人 | 从聊天里提取客户资料作为建议填入；表格导入时识别列名；疑似重复客户提示（不自动合并，B-05） | 三份设计 2026-10-21 已批准（PR kelvinpang90/acuven_crm_demo#135，均按建议）：`docs/contact-ai-extract.md`、`docs/contact-import-columns.md`、`docs/contact-duplicate-hints.md`（查重建议第一版不用 AI） |
 | 5 | 收件箱 | 意图和紧急度标签、按紧急度排序（每条入站消息都要调一次 AI，成本另议） | 设计 `docs/inbox-ai-triage.md` 2026-10-21 已批准（PR kelvinpang90/acuven_crm_demo#135，均按建议；自动调用加开关，缺省关） |
 | 5 | 跟进记录 | 从聊天记录生成跟进记录与任务草稿（跟进整理设计第一节留下的想法） | 设计 `docs/followup-from-chat.md` 2026-10-27 已批准（PR kelvinpang90/acuven_crm_demo#209，Q1 至 Q4 按建议），登记为 CRM-TASK-075 至 078 |
+| 5 | 收件箱 | 起草回复时带上这个客户的 AutoCount 报价单与发票，能直接回答价格、欠款类问题 | 设计 `docs/reply-draft-documents.md` 2026-10-27 已批准（PR kelvinpang90/acuven_crm_demo#218，Q1 至 Q4 按建议），登记为 CRM-TASK-079、080 |
 | 6 | 分配规则、屋顶项目、AutoCount | 建议分配给谁；根据勘察和完工照片起草报告；汇总客户的单据 | 想法 |
 
 - [x] Kelvin 批准 `docs/inbox-ai-assist.md`（2026-10-13，第三节 Q1 至 Q6 均按建议）
@@ -2929,7 +2980,7 @@ PRECHECK_RESULT: READY
 - [x] 经理看板 AI 解读设计获 Kelvin 批准（2026-10-18，PR kelvinpang90/acuven_crm_demo#108，Q4 选 B，其余按建议），登记 CRM-TASK-039 至 044（见下「登记 CRM-TASK-039 至 044」）
 - [x] AI 质量评测脚本设计获 Kelvin 批准（2026-10-19，PR kelvinpang90/acuven_crm_demo#111，Q1 至 Q4 按建议），登记 CRM-TASK-045 至 049（见下「登记 CRM-TASK-045 至 049」）
 - [x] 优先 5 的四份设计获 Kelvin 批准（2026-10-21，PR kelvinpang90/acuven_crm_demo#135，均按建议），登记 CRM-TASK-050 至 070（见下「登记 CRM-TASK-050 至 070」）
-- [x] AI 模块上线后：建客户端密钥、配四项环境变量、按四份设计（收件箱、客户摘要、跟进记录整理、商机下一步建议各自的第五节）用 demo 数据做质量评测，Kelvin 打分认可（planning-v1「已阻塞」里的待登记行，管理员操作，不是 Worker 任务）。2026-10-24 第一轮：七项里五项通过，商机下一步建议与经理看板解读待修订后重评（见「AI 质量评测第一轮」）；2026-10-27 第三轮：商机下一步建议重评通过，三个新功能（从聊天提取资料、导入识别列名、会话意图与紧急度）首评通过，十项全部通过（见「AI 质量评测第三轮」）
+- [x] AI 模块上线后：建客户端密钥、配四项环境变量、按四份设计（收件箱、客户摘要、跟进记录整理、商机下一步建议各自的第五节）用 demo 数据做质量评测，Kelvin 打分认可（planning-v1「已阻塞」里的待登记行，管理员操作，不是 Worker 任务）。2026-10-24 第一轮：七项里五项通过，商机下一步建议与经理看板解读待修订后重评（见「AI 质量评测第一轮」）；2026-10-27 第三轮：商机下一步建议重评通过，三个新功能（从聊天提取资料、导入识别列名、会话意图与紧急度）首评通过，十项全部通过（见「AI 质量评测第三轮」）；2026-10-27 第四轮：从聊天生成跟进记录首评通过，十一项全部通过（见「AI 质量评测第四轮」）
 
 ## 拆分 CRM-TASK-027（2026-10-15）
 
