@@ -1,14 +1,23 @@
 """Database-side building blocks shared by inbox AI assistance features."""
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta
-from decimal import Decimal
+from datetime import date, datetime, timedelta
+from decimal import (
+    MAX_EMAX,
+    MAX_PREC,
+    MIN_EMIN,
+    ROUND_HALF_UP,
+    Decimal,
+    InvalidOperation,
+    localcontext,
+)
 from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.ai_request import AiRequest
+from app.models.autocount_document import AutocountDocument
 from app.models.contact import Contact
 from app.models.deal import Deal
 from app.models.message import Message
@@ -34,6 +43,10 @@ from app.services.ai_features import (
 )
 
 SNAPSHOT_LIMIT_BYTES = 16 * 1024
+# docs/reply-draft-documents.md section 3: documents sent with a reply draft.
+DRAFT_DOCUMENT_LIMIT = 5
+DRAFT_LINES_PER_QUOTATION = 10
+DRAFT_LINES_TOTAL = 20
 LANGUAGES = {"zh-CN", "en", "ms"}
 OK = "ok"
 ERROR = "error"
@@ -216,6 +229,125 @@ async def build_conversation_snapshot(
     return snapshot
 
 
+def _date_string(value: date | None) -> str | None:
+    return value.isoformat() if value else None
+
+
+def _amount_string(value: Decimal) -> str:
+    return format(Decimal(value), ".2f")
+
+
+def _line_decimal(value: Any) -> Decimal | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, float):
+        value = str(value)
+    if isinstance(value, int):
+        number = Decimal(value)
+    elif isinstance(value, str):
+        try:
+            number = Decimal(value)
+        except InvalidOperation:
+            return None
+    else:
+        return None
+    return number if number.is_finite() else None
+
+
+def _line_number(value: Any, *, quantity: bool) -> str | None:
+    number = _line_decimal(value)
+    if number is None:
+        return None
+    with localcontext() as context:
+        context.prec = MAX_PREC
+        context.Emax = MAX_EMAX
+        context.Emin = MIN_EMIN
+        context.rounding = ROUND_HALF_UP
+        if quantity:
+            return format(number.normalize(), "f")
+        return format(number.quantize(Decimal("0.01")), "f")
+
+
+def _draft_document_lines(value: Any, limit: int) -> tuple[list[dict[str, Any]], bool]:
+    if not isinstance(value, list):
+        return [], False
+    items = [item for item in value if isinstance(item, dict)]
+    truncated = len(items) > limit
+    lines = []
+    for item in items[:limit]:
+        description = item.get("description")
+        description, description_truncated = (
+            _truncate(description, 60) if isinstance(description, str) else ("", False)
+        )
+        unit = item.get("unit")
+        unit, unit_truncated = _truncate(unit, 10) if isinstance(unit, str) else (None, False)
+        truncated = truncated or description_truncated or unit_truncated
+        lines.append(
+            {
+                "description": description,
+                "qty": _line_number(item.get("qty"), quantity=True),
+                "unit": unit,
+                "unit_price": _line_number(item.get("unit_price"), quantity=False),
+                "discount": _line_number(item.get("discount_amt"), quantity=False),
+                "sub_total": _line_number(item.get("sub_total"), quantity=False),
+            }
+        )
+    return lines, truncated
+
+
+async def _build_draft_documents(
+    db: AsyncSession, contact_id: str
+) -> tuple[list[dict[str, Any]], bool]:
+    """Recent AutoCount documents for a reply draft (docs/reply-draft-documents.md section 3)."""
+    documents = (
+        (
+            await db.execute(
+                select(AutocountDocument)
+                .where(AutocountDocument.contact_id == contact_id)
+                .order_by(
+                    AutocountDocument.doc_date.is_(None),
+                    AutocountDocument.doc_date.desc(),
+                    AutocountDocument.id.desc(),
+                )
+                .limit(DRAFT_DOCUMENT_LIMIT + 1)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    truncated = len(documents) > DRAFT_DOCUMENT_LIMIT
+    lines_left = DRAFT_LINES_TOTAL
+    items = []
+    for document in documents[:DRAFT_DOCUMENT_LIMIT]:
+        item: dict[str, Any] = {
+            "type": document.doc_type,
+            "doc_no": document.doc_no,
+            "status": document.status,
+            "currency": document.currency_code,
+            "total": _amount_string(document.total_amount),
+            "doc_date": _date_string(document.doc_date),
+            "synced_at": _as_utc_string(document.synced_at),
+        }
+        if document.doc_type == "invoice":
+            item["outstanding"] = (
+                _amount_string(document.outstanding_amount)
+                if document.outstanding_amount is not None
+                else None
+            )
+            item["due_date"] = _date_string(document.due_date)
+        elif document.doc_type == "quotation":
+            validity, validity_truncated = _truncate(document.validity or None, 100)
+            lines, lines_truncated = _draft_document_lines(
+                document.line_items, min(DRAFT_LINES_PER_QUOTATION, lines_left)
+            )
+            lines_left -= len(lines)
+            item["validity"] = validity
+            item["lines"] = lines
+            truncated = truncated or validity_truncated or lines_truncated
+        items.append(item)
+    return items, truncated
+
+
 async def write_ai_request(
     db: AsyncSession,
     *,
@@ -352,10 +484,13 @@ async def generate_reply_draft(
     snapshot = await build_conversation_snapshot(db, contact_id, user_id=user_id)
     if not snapshot["messages"]:
         return AiAssistResult(NO_MESSAGES)
+    documents, documents_truncated = await _build_draft_documents(db, contact_id)
     payload: dict[str, Any] = {
         "as_of": _as_of(),
         "output_language": output_language,
         "snapshot": snapshot,
+        "documents": documents,
+        "documents_truncated": documents_truncated,
         "channel": channel,
     }
     if normalized_instruction is not None:
