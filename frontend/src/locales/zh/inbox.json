@@ -92,5 +92,19 @@
   "aiLanguageMs": "马来语",
   "newMessages": "新消息",
   "moreNewMessages": "还有 {{count}} 个会话",
-  "newMessagesCount": "{{count}} 条新消息"
+  "newMessagesCount": "{{count}} 条新消息",
+  "sortByTime": "按时间",
+  "sortByUrgency": "按紧急度",
+  "triageAi": "AI",
+  "triageHint": "意图：{{intent}} · 紧急度：{{urgency}} · AI 自动判断，未核实 · {{time}}",
+  "triageIntent": {
+    "inquiry": "咨询",
+    "quotation": "要报价",
+    "order": "下单",
+    "complaint": "投诉",
+    "after_sales": "售后",
+    "appointment": "预约",
+    "other": "其他"
+  },
+  "triageUrgency": { "low": "低", "normal": "普通", "high": "较急", "urgent": "紧急" }
 }

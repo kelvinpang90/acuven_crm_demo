@@ -1,5 +1,6 @@
 import dayjs from 'dayjs';
-import type { Conversation } from '@/types';
+import { useTranslation } from 'react-i18next';
+import type { Conversation, ConversationTriage, TriageUrgency } from '@/types';
 import { customerOf, farEndOf } from '@/utils/conversation';
 
 interface Props {
@@ -12,6 +13,36 @@ const CHANNEL_ICONS: Record<string, string> = {
   whatsapp: '💬',
   email: '📧',
 };
+
+// Only these urgencies get a tag of their own; normal and low show in the hover only.
+const URGENCY_CLASSES: Partial<Record<TriageUrgency, string>> = {
+  urgent: 'bg-red-500/15 text-red-400',
+  high: 'bg-orange-500/15 text-orange-400',
+};
+
+// The conversation's AI labels, shown whatever the direction of the latest message.
+function TriageTags({ triage }: { triage: ConversationTriage }) {
+  const { t } = useTranslation('inbox');
+  const urgencyClass = URGENCY_CLASSES[triage.urgency];
+  const hint = t('triageHint', {
+    intent: t(`triageIntent.${triage.intent}`),
+    urgency: t(`triageUrgency.${triage.urgency}`),
+    time: dayjs(triage.triaged_at).format('YYYY-MM-DD HH:mm'),
+  });
+  return (
+    <span className="flex items-center gap-1 shrink-0" title={hint}>
+      <span className="px-1.5 py-0.5 rounded bg-dark-hover text-text-secondary text-[10px] leading-none">
+        {t(`triageIntent.${triage.intent}`)}
+      </span>
+      {urgencyClass && (
+        <span className={`px-1.5 py-0.5 rounded text-[10px] leading-none ${urgencyClass}`}>
+          {t(`triageUrgency.${triage.urgency}`)}
+        </span>
+      )}
+      <span className="text-[10px] text-text-muted leading-none">{t('triageAi')}</span>
+    </span>
+  );
+}
 
 // One row per customer: their latest message and how many inbound are unread.
 export default function MessageList({ conversations, selectedCustomer, onSelect }: Props) {
@@ -43,6 +74,7 @@ export default function MessageList({ conversations, selectedCustomer, onSelect 
               <p className={`text-xs truncate flex-1 ${unread ? 'text-text-secondary' : 'text-text-muted'}`}>
                 {conversation.subject || conversation.body}
               </p>
+              {conversation.triage && <TriageTags triage={conversation.triage} />}
               {unread && (
                 <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-primary text-white text-[10px] leading-[18px] text-center shrink-0">
                   {conversation.unread_count > 99 ? '99+' : conversation.unread_count}

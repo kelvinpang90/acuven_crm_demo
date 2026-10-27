@@ -160,9 +160,27 @@ export interface Message {
   sent_by_name: string | null;
 }
 
+export type TriageIntent =
+  | 'inquiry'
+  | 'quotation'
+  | 'order'
+  | 'complaint'
+  | 'after_sales'
+  | 'appointment'
+  | 'other';
+export type TriageUrgency = 'low' | 'normal' | 'high' | 'urgent';
+
+// The AI's intent and urgency labels for a customer's conversation.
+export interface ConversationTriage {
+  intent: TriageIntent;
+  urgency: TriageUrgency;
+  triaged_at: string;
+}
+
 // A customer's latest message, as one row of the grouped inbox.
 export interface Conversation extends Message {
   unread_count: number;
+  triage: ConversationTriage | null;
 }
 
 // === Routing Rule ===

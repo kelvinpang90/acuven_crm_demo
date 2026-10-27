@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { messagesApi, type ConversationListParams } from '@/services/messages';
+import { messagesApi, type ConversationListParams, type ConversationSort } from '@/services/messages';
 import type { Conversation, Message, PaginatedResponse } from '@/types';
 import MessageList from './MessageList';
 import ConversationView from './ConversationView';
@@ -20,6 +20,8 @@ export default function InboxPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const [filter, setFilter] = useState<ChannelFilter>('all');
+  // The unread tab's order; kept across tab switches, back to time on leaving the inbox.
+  const [unreadSort, setUnreadSort] = useState<ConversationSort>('time');
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -45,6 +47,7 @@ export default function InboxPage() {
         params.channel = filter;
       } else if (filter === 'unread') {
         params.unread = true;
+        if (unreadSort === 'urgency') params.sort = 'urgency';
       }
       const res = await messagesApi.getConversations(params);
       const paged: PaginatedResponse<Conversation> = res.data.data;
@@ -55,7 +58,7 @@ export default function InboxPage() {
       }
     } catch { /* ignore */ }
     if (seq === requestSeq.current) setLoading(false);
-  }, [filter, page]);
+  }, [filter, page, unreadSort]);
 
   useEffect(() => { load(); }, [load]);
   useInboxChanges(() => { void load(true); });
@@ -65,6 +68,16 @@ export default function InboxPage() {
     setPage(1);
     setSelected(null);
   };
+
+  const handleSortChange = (sort: ConversationSort) => {
+    setUnreadSort(sort);
+    setPage(1);
+  };
+
+  const sorts: { key: ConversationSort; label: string }[] = [
+    { key: 'time', label: t('sortByTime') },
+    { key: 'urgency', label: t('sortByUrgency') },
+  ];
 
   // Reads the whole conversation; one without a contact can only read this row.
   const markRead = async (message: Message) => {
@@ -112,7 +125,7 @@ export default function InboxPage() {
       </div>
 
       {/* Filter Tabs */}
-      <div className="flex gap-2 mb-4">
+      <div className="flex flex-wrap gap-2 mb-4">
         {filters.map((f) => (
           <button
             key={f.key}
@@ -126,6 +139,23 @@ export default function InboxPage() {
             {f.label}
           </button>
         ))}
+        {filter === 'unread' && (
+          <div className="flex ml-auto rounded-lg border border-dark-border overflow-hidden">
+            {sorts.map((s) => (
+              <button
+                key={s.key}
+                onClick={() => handleSortChange(s.key)}
+                className={`px-3 py-1.5 text-sm transition-colors ${
+                  unreadSort === s.key
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-text-secondary hover:bg-dark-hover'
+                }`}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Content: List + Conversation */}

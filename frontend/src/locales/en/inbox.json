@@ -92,5 +92,19 @@
   "aiLanguageMs": "Malay",
   "newMessages": "New messages",
   "moreNewMessages": "+{{count}} more conversations",
-  "newMessagesCount": "{{count}} new"
+  "newMessagesCount": "{{count}} new",
+  "sortByTime": "By time",
+  "sortByUrgency": "By urgency",
+  "triageAi": "AI",
+  "triageHint": "Intent: {{intent}} · Urgency: {{urgency}} · AI judged automatically, not verified · {{time}}",
+  "triageIntent": {
+    "inquiry": "Inquiry",
+    "quotation": "Quotation",
+    "order": "Order",
+    "complaint": "Complaint",
+    "after_sales": "After-sales",
+    "appointment": "Appointment",
+    "other": "Other"
+  },
+  "triageUrgency": { "low": "Low", "normal": "Normal", "high": "High", "urgent": "Urgent" }
 }
