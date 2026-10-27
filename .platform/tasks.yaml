@@ -2081,7 +2081,7 @@ tasks:
     title: 收件箱显示会话意图与紧急度标签，未读页可按紧急度排序
     purpose: >-
       按 docs/inbox-ai-triage.md 4.4 节与第十节，在收件箱会话列表显示 CRM-TASK-074 返回的标签，并在未读页签加按时间与按紧急度的切换。只改前端：不改后端。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-074
     acceptance_criteria:
