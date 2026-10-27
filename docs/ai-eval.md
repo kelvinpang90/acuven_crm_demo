@@ -31,7 +31,7 @@
 | 文件 | 功能 | 业务函数 | 样例 | 要覆盖（照原设计） |
 |---|---|---|---|---|
 | `conversation_brief.json` | 会话简报 | `generate_conversation_brief` | 10 | 收件箱第五节；含 1 段注入 |
-| `reply_draft.json` | 起草回复 | `generate_reply_draft` | 10 | 收件箱第五节；WhatsApp 与邮件都有；含 1 段注入 |
+| `reply_draft.json` | 起草回复 | `generate_reply_draft` | 16 | 收件箱第五节；WhatsApp 与邮件都有；其中 6 个带 AutoCount 单据（`docs/reply-draft-documents.md` 第七节）；共含 2 段注入 |
 | `translate.json` | 翻译 | `translate_text` | 10 | 收件箱第五节；中、英、马来文互译；含 1 段注入 |
 | `contact_summary.json` | 客户摘要 | `generate_contact_summary` | 10 | 赢单与输单、逾期待办、未付发票、只有聊天没有商机、记录多会被截断；别人名下的商机（验证只放本人可见）；含 1 个注入 |
 | `followup_draft.json` | 跟进记录整理 | `generate_followup_draft` | 10 | 中英混写、只有一句话、相对日期、提到已有待办、注入 |
