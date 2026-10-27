@@ -55,7 +55,7 @@ SAMPLE_KEYS = {
     "must_not_contain",
 }
 # Params naming a record by key; they are passed on with the key replaced by its id.
-PARAM_REFERENCES = {"contact": "contacts", "deal": "deals"}
+PARAM_REFERENCES = {"contact": "contacts", "deal": "deals", "message": "messages"}
 
 
 class SampleError(ValueError):
