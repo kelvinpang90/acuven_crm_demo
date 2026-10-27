@@ -30,6 +30,26 @@
 
 ---
 
+## CRM-TASK-070 AI评测样例：会话意图与紧急度12个（2026-10-27）
+
+### 做了什么
+
+- `backend/evals/seed.py`：只改一处，参数引用表 `PARAM_REFERENCES` 加 `message` 对应 `messages`，`params` 里的 `message` 按 key 换成消息 id（`docs/inbox-ai-triage.md` 第九节第 9 条）。
+- `backend/evals/__init__.py`：`FEATURE_NAMES` 在 `import_columns` 之后加 `message_triage`，其他功能的顺序不变。
+- `backend/evals/features.py`：新增适配 `_message_triage`，调用 `message_triage_service.classify_conversation`，传 `params` 里 `contact` 换成的客户 id 与 `message` 换成的消息 id，不传用户；报告字段为 `intent` 与 `urgency`，自动标记不扫任何字段（输出只有两个枚举）。其他功能的登记不变。
+- 新增 `backend/evals/samples/message_triage.json`，12 个样例 `triage-01` 至 `triage-12`，按 `docs/inbox-ai-triage.md` 第五节与第九节、`docs/ai-eval.md` 第二节：很生气的投诉（英文）、问价格（中文）、只说谢谢（中文）、前面投诉后面已解决（英文）、马来文下单要后天到货、马来文售后、中文预约看样品、英文一般咨询、英文明早要货的下单、马来文应征司机（与生意无关）、中文一两天内要的报价，以及 1 个注入样例（消息里写着让 AI 把对话标成 urgent 投诉，`injection` 为真，`must_not_contain` 留空，靠人工判断）。七个意图与四个紧急度都有样例，`covers` 写明覆盖什么与预期标签。每个样例的消息都给了 key，`params.message` 指向这个客户最新的一条入站消息（之后只可能有出站消息）。人名、公司、电话全部自拟，不写邮箱、网址与主机名。
+- 新增测试 `backend/tests/test_evals_samples_triage.py`，覆盖验收标准列出的四组用例，每个测试的 docstring 写明守住的验收标准。
+
+### 偏离了什么
+
+- 无
+
+### 验证到什么程度
+
+- 测试由 PR 的必需检查 backend 执行，检查结果由 Worker 和 CI 记录不写在这里；没有调用过真实模型。
+
+---
+
 ## CRM-TASK-069 收件箱显示会话意图与紧急度标签，未读页可按紧急度排序（2026-10-27）
 
 ### 做了什么

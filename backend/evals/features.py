@@ -109,6 +109,15 @@ def _import_columns(user: User, params: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _message_triage(user: User, params: dict[str, Any]) -> dict[str, Any]:
+    # Triggered by the system in the app, so no user is passed (design section 9 item 1).
+    del user
+    return {
+        "contact_id": _param(params, "contact"),
+        "message_id": _param(params, "message"),
+    }
+
+
 def _dashboard_insight(user: User, params: dict[str, Any]) -> dict[str, Any]:
     return {"user": user, "output_language": _param(params, "output_language")}
 
@@ -220,6 +229,15 @@ FEATURES: dict[str, Feature] = {
             "suggest_import_columns",
             _import_columns,
             ("mappings",),
+            (),
+        ),
+        # Two enum labels only: no free text to scan.
+        Feature(
+            "message_triage",
+            "app.services.message_triage_service",
+            "classify_conversation",
+            _message_triage,
+            ("intent", "urgency"),
             (),
         ),
         Feature(
