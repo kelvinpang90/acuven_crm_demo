@@ -2326,7 +2326,7 @@ tasks:
       按 docs/reply-draft-documents.md 第三节至第五节，让收件箱起草回复（crm.reply_draft）发给模型的数据块多一块 documents（这个客户最近 5 张发票与报价单，报价单带明细），
       并改起草回复的系统提示，允许引用单据里的金额、日期与单号。只做业务规则层：不改接口、不改前端、不加表与迁移，不改会话快照、会话简报、翻译与客户摘要的行为；
       测试打桩 AI 客户端，不调真实模型、不写任何真实密钥与地址。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-023
     acceptance_criteria:
