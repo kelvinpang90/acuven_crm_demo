@@ -1,6 +1,6 @@
 # 从聊天记录生成跟进记录（`crm.followup_from_chat`）
 
-> 状态：**草稿，待 Kelvin 批准**（第八节 Q1 至 Q4）。批准后登记的任务，设计闸门引用本设计的 PR。
+> 状态：**已批准**（Kelvin 2026-10-27，原话「按建议批准，去登记吧」，第八节 Q1 至 Q4 按建议，PR kelvinpang90/acuven_crm_demo#209）。登记的任务，设计闸门引用 kelvinpang90/acuven_crm_demo#209。
 > 设计闸门的理由：要把这个客户的聊天消息（顾客写的内容，可能含姓名、电话、地址、需求与预算）连同客户名、商机与待办标题发给模型；AI 的产出经员工确认后会存成跟进记录与待办。不新增表、不加迁移，审计沿用 `ai_requests`。
 > 上位决定：`acuven_hub` 的 `DECISIONS.md` E-09（AI 在 CRM 员工界面出摘要与**任务草稿**）、E-12（发给模型的字段不设限制）、E-14、E-15、E-16、E-17、A-18。
 > 来由：[followup-ai-draft.md](followup-ai-draft.md) 第一节「不做」里留下的另一个想法（从聊天记录里生成跟进）。基础沿用该设计与 [inbox-ai-assist.md](inbox-ai-assist.md)。
