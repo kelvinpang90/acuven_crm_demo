@@ -85,6 +85,18 @@ def _followup_draft(user: User, params: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _followup_from_chat(user: User, params: dict[str, Any]) -> dict[str, Any]:
+    # today is the UTC date, so the offset is 0 (docs/followup-from-chat.md section 9 item 2).
+    return {
+        "user": user,
+        "contact_id": _param(params, "contact"),
+        "deal_id": _param(params, "deal"),
+        "today": _today(),
+        "utc_offset_minutes": 0,
+        "output_language": _param(params, "output_language"),
+    }
+
+
 def _deal_next_step(user: User, params: dict[str, Any]) -> dict[str, Any]:
     return {
         "user": user,
@@ -196,6 +208,14 @@ FEATURES: dict[str, Feature] = {
             "generate_followup_draft",
             _followup_draft,
             ("activity_type", "content", "tasks"),
+            ("content", "tasks.title"),
+        ),
+        Feature(
+            "followup_from_chat",
+            "app.services.followup_draft_service",
+            "generate_followup_from_chat",
+            _followup_from_chat,
+            ("activity_type", "content", "tasks", "since", "truncated"),
             ("content", "tasks.title"),
         ),
         Feature(

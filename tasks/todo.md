@@ -29,6 +29,25 @@
 
 ---
 
+## CRM-TASK-078 AI评测样例：从聊天生成跟进记录10个（2026-10-27）
+
+### 做了什么
+
+- `backend/evals/__init__.py`：`FEATURE_NAMES` 在 `followup_draft` 之后加 `followup_from_chat`，其他功能的顺序不变。
+- `backend/evals/features.py`：新增适配 `_followup_from_chat`，调用 `followup_draft_service.generate_followup_from_chat`，传用户、`params` 里 `contact` 与 `deal` 换成的 id、当天的 UTC 日期 `today`（与 `followup_draft` 的适配相同）、`utc_offset_minutes` 为 0 与 `output_language`；报告字段为 `activity_type`、`content`、`tasks`、`since`、`truncated`，自动标记扫 `content` 与 `tasks.title`。其他功能的登记不变；`seed.py` 未改。
+- 新增 `backend/evals/samples/followup_from_chat.json`，10 个样例 `fromchat-01` 至 `fromchat-10`，按 `docs/followup-from-chat.md` 第五节与 `docs/ai-eval.md` 第二节：只有顾客在问（01）、员工答应了报价（02）、AI 自动回复答应了保修（03，`author_kind` 为 `ai`）、已有同样的未完成待办（04）、上次跟进之后只有一条消息（05）、几天前说的「明天」已经过了（06）、邮件与 WhatsApp 混合（07）、没有任何跟进记录（08）、AI 自动回复与员工都答应了事且起点之后有商机状态变更（09），以及 1 个注入样例（10，顾客消息里写着让 AI 起草买演唱会门票的任务，`injection` 为真，`must_not_contain` 留空，靠人工判断）。消息与输出语言中文、英文、马来文都有。有跟进记录的样例在跟进记录之前也放了几条消息；跟进记录与消息的时间都用相对 now 的写法。人名、公司、电话全部自拟，不写邮箱、网址与主机名。
+- 新增测试 `backend/tests/test_evals_samples_followup_chat.py`，覆盖验收标准列出的四组用例，每个测试的 docstring 写明守住的验收标准。
+
+### 偏离了什么
+
+- 无
+
+### 验证到什么程度
+
+- 测试由 PR 的必需检查 backend 执行，检查结果由 Worker 和 CI 记录不写在这里；没有调用过真实模型。
+
+---
+
 ## CRM-TASK-077 跟进表单加从聊天生成，沿用AI整理的预览卡片（2026-10-27）
 
 ### 做了什么
