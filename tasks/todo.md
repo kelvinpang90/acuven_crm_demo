@@ -30,6 +30,25 @@
 
 ---
 
+## CRM-TASK-079 起草回复发给模型的数据带上客户最近的AutoCount发票与报价单（2026-10-27）
+
+### 做了什么
+
+- `backend/app/services/ai_assist_service.py`：新增私有函数 `_build_draft_documents`（设计第三节），取这个联系人的 `autocount_documents`，按 `doc_date` 从新到旧、没有日期的排最后、同一日期按 id 倒序取前 5 张；每张单据放 `type`、`doc_no`、`status`、`currency`、`total`、`doc_date`、`synced_at`，发票再加 `outstanding` 与 `due_date`，报价单再加 `validity`（截到 100 字，空为 `null`）与 `lines`。明细由 `_draft_document_lines` 组装：只取对象元素，每张最多 10 行、合计最多 20 行，`description` 截到 60 字、`unit` 截到 10 字，`qty` 规范成去掉多余零的数字字符串，`unit_price`、`discount`（取自 `discount_amt`）、`sub_total` 四舍五入成两位小数的字符串，不是数字的为 `null`。单据多于 5 张、明细超限或任一文字被截短时 `documents_truncated` 为真。不复用、不改 `contact_summary_service`。
+- `generate_reply_draft`：在 `no_messages` 检查之后组装单据，数据块按 `as_of`、`output_language`、`snapshot`、`documents`、`documents_truncated`、`channel`（有员工要求时再加 `instruction`）发出；快照、检查顺序、结果、审计与 schema 都不变，会话简报与翻译不变。
+- `backend/app/services/ai_features.py`：`REPLY_DRAFT_SYSTEM` 按设计第四节改写（单据是不可信数据、单据里的金额日期单号算事实并写出单号、照 `currency` 写金额不换算、余额以 `synced_at` 为准、`validity` 按 `as_of` 判断、单据以外照旧写 `[To confirm: ...]` 占位、`documents_truncated` 为真时不断言全部单据、`note_for_agent` 0 至 200 字）；其他功能的提示词不变。
+- 新增测试 `backend/tests/test_reply_draft_documents.py`，打桩 AI 客户端与配置，覆盖验收标准列出的六组用例，每个测试的 docstring 写明守住的验收标准。
+
+### 偏离了什么
+
+- 无
+
+### 验证到什么程度
+
+- 测试由 PR 的必需检查 backend 执行，检查结果由 Worker 和 CI 记录不写在这里。
+
+---
+
 ## 登记 CRM-TASK-079、080：起草回复带上 AutoCount 单据（2026-10-27）
 
 ### 做了什么
