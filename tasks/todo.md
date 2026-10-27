@@ -14,6 +14,8 @@
 <!-- openclaw:planning-v1:begin -->
 ### 当前计划
 
+1. `CRM-TASK-079` 起草回复发给模型的数据带上客户最近的AutoCount发票与报价单
+2. `CRM-TASK-080` AI评测样例：起草回复加6个带AutoCount单据的样例
 
 ### 已阻塞
 
@@ -2935,7 +2937,7 @@ PRECHECK_RESULT: READY
 | 5 | 联系人 | 从聊天里提取客户资料作为建议填入；表格导入时识别列名；疑似重复客户提示（不自动合并，B-05） | 三份设计 2026-10-21 已批准（PR kelvinpang90/acuven_crm_demo#135，均按建议）：`docs/contact-ai-extract.md`、`docs/contact-import-columns.md`、`docs/contact-duplicate-hints.md`（查重建议第一版不用 AI） |
 | 5 | 收件箱 | 意图和紧急度标签、按紧急度排序（每条入站消息都要调一次 AI，成本另议） | 设计 `docs/inbox-ai-triage.md` 2026-10-21 已批准（PR kelvinpang90/acuven_crm_demo#135，均按建议；自动调用加开关，缺省关） |
 | 5 | 跟进记录 | 从聊天记录生成跟进记录与任务草稿（跟进整理设计第一节留下的想法） | 设计 `docs/followup-from-chat.md` 2026-10-27 已批准（PR kelvinpang90/acuven_crm_demo#209，Q1 至 Q4 按建议），登记为 CRM-TASK-075 至 078 |
-| 5 | 收件箱 | 起草回复时带上这个客户的 AutoCount 报价单与发票，能直接回答价格、欠款类问题 | 设计 `docs/reply-draft-documents.md` 待批准 |
+| 5 | 收件箱 | 起草回复时带上这个客户的 AutoCount 报价单与发票，能直接回答价格、欠款类问题 | 设计 `docs/reply-draft-documents.md` 2026-10-27 已批准（PR kelvinpang90/acuven_crm_demo#218，Q1 至 Q4 按建议），登记为 CRM-TASK-079、080 |
 | 6 | 分配规则、屋顶项目、AutoCount | 建议分配给谁；根据勘察和完工照片起草报告；汇总客户的单据 | 想法 |
 
 - [x] Kelvin 批准 `docs/inbox-ai-assist.md`（2026-10-13，第三节 Q1 至 Q6 均按建议）

@@ -1,6 +1,6 @@
 # 起草回复带上 AutoCount 单据（`crm.reply_draft`）
 
-> 状态：**待批准**（第八节 Q1 至 Q4 待 Kelvin 拍板）。
+> 状态：**已批准**（Kelvin 2026-10-27，原话「按建议批准，去登记吧」，第八节 Q1 至 Q4 按建议，PR kelvinpang90/acuven_crm_demo#218）。登记的任务，设计闸门引用 kelvinpang90/acuven_crm_demo#218。
 > 设计闸门的理由：要把这个客户的 AutoCount 发票与报价单（单号、金额、未付余额、到期日、报价明细的品名与单价）发给模型。起草出的回复草稿会引用这些金额与日期，员工确认后才会发给顾客。不新增表，不加迁移，审计沿用 `ai_requests`。
 > 上位决定：`acuven_hub` 的 `DECISIONS.md` E-01（AI 不直接回复顾客）、E-12（发给模型的字段不设限制）、E-14、E-15、E-16、E-17、A-18（CRM 是 demo）。
 > 来由：收件箱「起草回复」现在只看聊天快照，所以顾客问价格、问欠款时，草稿只能写「[待确认：…]」占位。客户摘要（[contact-ai-summary.md](contact-ai-summary.md)）已经在快照里放了单据摘要，起草回复目前还没有。
@@ -122,8 +122,10 @@
    - 马来文问报价单里没有的产品：照旧写占位
    - 注入样例：报价明细的品名里写着指令
 
+   6 个里 3 个 WhatsApp、3 个邮件。
+
    样例里的单据要写 `synced_at_minutes_ago` 与 `line_items`，用评测种子已有的写法，`seed.py` 不改（要是做不到，停下说明）。
-   路径：`backend/evals/samples/reply_draft.json`、`backend/tests/test_evals_samples_inbox.py`（起草回复的样例数由 10 改为 16，注入样例由 1 个改为 2 个，其余两个功能不变）、`docs/ai-eval.md`（样例表中起草回复的一行）、`tasks/todo.md`；依赖 1
+   路径：`backend/evals/samples/reply_draft.json`、`backend/tests/test_evals_samples_inbox.py`（起草回复的样例数由 10 改为 16，渠道由各 5 个改为各 8 个，注入样例由 1 个改为 2 个，其余两个功能不变）、`docs/ai-eval.md`（样例表中起草回复的一行）、`tasks/todo.md`；依赖 1
 
 两个任务都有设计闸门（引用本设计的 PR），登记前跑设计预审。不改表结构、不加迁移，不改接口和前端。
 
