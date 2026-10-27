@@ -2355,7 +2355,7 @@ tasks:
     purpose: >-
       按 docs/reply-draft-documents.md 第七节与 docs/ai-eval.md 第二节，给评测脚本的起草回复（reply_draft）加 6 个带 AutoCount 发票与报价单的自拟样例，并更新样例测试与评测文档的样例表。
       只改样例、样例测试与文档：不改 app 下任何文件、不改 evals 的代码与 seed.py；样例里的人名、公司、电话、邮箱、单号全部自拟。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-079
     acceptance_criteria:
