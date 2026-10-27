@@ -31,6 +31,24 @@
 
 ---
 
+## CRM-TASK-076 从聊天生成跟进记录的接口（2026-10-27）
+
+### 做了什么
+
+- `backend/app/schemas/ai.py`：新增 `FollowupFromChatRequest`：`deal_id` 为非空字符串，`today` 为匹配 `YYYY-MM-DD` 形状的字符串，`utc_offset_minutes` 为必填的严格整数、-720 至 840，`output_language` 可选，只能是 `zh-CN`、`en`、`ms`。
+- `backend/app/routers/ai.py`：按 `docs/followup-from-chat.md` 4.4 节新增 `POST /api/ai/contacts/{contact_id}/followup-from-chat`，要求登录；沿用 `_may_use_ai_for_contact`，不过返回 403 `NOT_ASSIGNED`；调用 `followup_draft_service.generate_followup_from_chat`，传当前用户、`contact_id`、`deal_id`、`today`（原样）、`utc_offset_minutes` 与 `output_language`（缺省按界面语言，与跟进整理接口相同）；结果走共用的 `_result_response`，成功 200 返回 `request_id`、`activity_type`、`content`、`tasks`、`since`、`truncated`，`no_messages` 沿用已有映射为 400 `NO_MESSAGES`，其余类别与跟进整理接口相同。其他 AI 接口与 status 接口未动。
+- 新增测试 `backend/tests/test_ai_followup_from_chat_api.py`，打桩业务函数，覆盖验收标准列出的五组用例，每个测试的 docstring 写明守住的验收标准。
+
+### 偏离了什么
+
+- 无
+
+### 验证到什么程度
+
+- 测试由 PR 的必需检查 backend 执行，检查结果由 Worker 和 CI 记录不写在这里。
+
+---
+
 ## CRM-TASK-075 从聊天生成跟进记录的消息范围、提示词、输出校验与业务函数（2026-10-27）
 
 ### 做了什么
