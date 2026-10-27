@@ -30,6 +30,35 @@
 
 ---
 
+## 登记 CRM-TASK-079、080：起草回复带上 AutoCount 单据（2026-10-27）
+
+### 做了什么
+
+- 新设计 `docs/reply-draft-documents.md`：收件箱起草回复发给模型的数据块加 `documents`（这个客户最近 5 张发票与报价单，报价单带明细，每张 10 行、合计 20 行），提示词允许引用单据里的金额、日期与单号；不改接口、前端、会话简报与表结构。
+- `.platform/tasks.yaml` 登记两项，都是 `ready`：079 业务（单据块、数据块、提示词）、080 评测样例（起草回复加 6 个带单据的样例，依赖 079）。planning-v1「当前计划」为 079、080。
+- 任务八表格加一行。两项合并部署后重评起草回复的全部 16 个样例（设计第七节）。
+
+### 设计闸门与预审
+
+- 设计闸门：Kelvin 2026-10-27 在本 PR 上批准设计，原话「按建议批准，去登记吧」（第八节 Q1 至 Q4 按建议）。两项都引用本 PR（kelvinpang90/acuven_crm_demo#218）。
+- `contract_check`：ready to register，两项都没有拆分 WARN；planning-v1 `ok, next: CRM-TASK-079`。WARN 只有原有的四条，与本次无关。
+- 预审（设计文件 `docs/reply-draft-documents.md`，对登记分支的干净检出）：第 1 轮两项都 READY，无发现。预审调模型、不是确定性的，READY 不保证没有缺陷。
+
+```text
+第 1 轮 CRM-TASK-079:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 30.7 万 token（其中缓存读取 26.9 万），折合 API 价约 $0.43；周额度读数 37%。
+退出码 0
+第 1 轮 CRM-TASK-080:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 15.2 万 token（其中缓存读取 12.6 万），折合 API 价约 $0.26；周额度读数 37%。
+退出码 0
+```
+
 ## AI 质量评测第四轮（2026-10-27）
 
 ### 做了什么
