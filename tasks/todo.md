@@ -14,7 +14,6 @@
 <!-- openclaw:planning-v1:begin -->
 ### 当前计划
 
-1. `CRM-TASK-080` AI评测样例：起草回复加6个带AutoCount单据的样例
 
 ### 已阻塞
 
