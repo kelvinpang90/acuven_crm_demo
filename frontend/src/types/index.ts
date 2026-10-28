@@ -341,6 +341,15 @@ export interface AiReplyDraft {
   note_for_agent: string;
 }
 
+export type AiProjectReportType = 'inspection' | 'completion';
+
+export interface AiProjectReport {
+  request_id: string | null;
+  title: string;
+  body: string;
+  note_for_agent: string;
+}
+
 export interface AiTranslation {
   request_id: string | null;
   translation: string;
