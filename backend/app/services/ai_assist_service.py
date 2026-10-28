@@ -60,6 +60,8 @@ NO_DATA = "no_data"
 NOTHING_TO_FILL = "nothing_to_fill"
 SKIPPED = "skipped"
 SUPERSEDED = "superseded"
+NOT_FOUND = "not_found"
+STEP_NOT_REACHED = "step_not_reached"
 
 
 @dataclass(frozen=True)
@@ -94,6 +96,8 @@ class AiAssistResult:
     intent: str | None = None
     urgency: str | None = None
     since: str | None = None
+    title: str | None = None
+    body: str | None = None
 
 
 def _truncate(value: str | None, limit: int) -> tuple[str | None, bool]:
