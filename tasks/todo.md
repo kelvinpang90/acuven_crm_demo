@@ -32,6 +32,25 @@
 
 ---
 
+## CRM-TASK-082 屋顶项目起草报告的步骤取法、提示词、输出校验与业务函数（2026-10-28）
+
+### 做了什么
+
+- `backend/app/services/ai_features.py`：按 `docs/project-ai-report.md` 第五节加 `PROJECT_REPORT_FEATURE`（`crm.project_report`）、`PROJECT_REPORT_SYSTEM`（不可信数据、只用给的事实、`[To confirm ...]` 占位写在句子里、勘察发现只来自 `inspection_done` 的备注与 `site_notes`、两处都没有时写待补充并提醒员工、完工日期取 `completion_photos`、到 `warranty_active` 才写保修已生效、日期照 `steps`、不描述照片、称呼与落款、不加公司名、`output_language`、各字段上限）、`PROJECT_REPORT_SCHEMA` 与 `validate_project_report`（恰好三个字符串键，去空白后按码点 title 1–100、body 1–3000、note_for_agent 0–300，不合返回 None）。
+- `backend/app/services/ai_assist_service.py`：`AiAssistResult` 加可空字段 `title`、`body`；加类别常量 `NOT_FOUND`、`STEP_NOT_REACHED`。其他功能不变。
+- 新文件 `backend/app/services/project_report_service.py`：步骤英文名常量元组 `STEP_KEYS`；`build_report_steps` 按第三节与第九节取 1 至 `current_step` 的步骤（按 `step_no`、`entered_at`、`id` 正序，`date` 取每步最早一条加本地偏移后的日期，`note` 取去空白后不为空的最新一条）；`generate_project_report` 按 4.2 节顺序检查（not_found、invalid_input、step_not_reached、not_configured，都不调 AI、不写审计），按 4.3 节发一条紧凑 JSON 用户消息，三类结果都写一行 `contact_id` 为 null 的审计，校验不过改判 error 并保留 `request_id`。
+- 新测试 `backend/tests/test_project_report_service.py`：打桩 AI 客户端与配置，覆盖验收标准列出的校验、取步骤、请求、检查顺序、结果与审计五组用例，每个测试的 docstring 写明守住的验收标准。已有测试不改。
+
+### 偏离了什么
+
+- 无
+
+### 验证到什么程度
+
+- 测试由 PR 的必需检查 backend 执行，检查结果由 Worker 和 CI 记录不写在这里；没有调用过真实模型。
+
+---
+
 ## CRM-TASK-081 起草回复的提示词不写没答应过的事，占位写在句子里不另写确认后回复（2026-10-28）
 
 ### 做了什么
