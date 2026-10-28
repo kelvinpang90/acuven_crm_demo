@@ -29,6 +29,27 @@
 
 ---
 
+## CRM-TASK-085 AI评测样例：屋顶项目起草报告10个（2026-10-28）
+
+### 做了什么
+
+- `backend/evals/__init__.py`：`FEATURE_NAMES` 在 `message_triage` 之后、看板解读之前加 `project_report`。
+- `backend/evals/features.py`：加 `project_report` 适配，调用 `project_report_service.generate_project_report`，传用户、`params.project` 换成的项目 id、`report_type`、`notes`（没给时为 null）、`utc_offset_minutes` 为 0 与 `output_language`；报告字段与自动标记扫的字段都是 `title`、`body`、`note_for_agent`。其他功能的登记不变。
+- `backend/evals/seed.py`：`SAMPLE_KEYS` 加 `projects`、`project_steps`；`KINDS` 末尾加 `projects`（`Project`，带 key，时间列 `created_at`，`customer_name` 缺省为 key）与 `project_steps`（`ProjectStepHistory`，必填引用 `project` → `project_id`，时间列 `entered_at`）；`PARAM_REFERENCES` 加 `project` → `projects`。已有各类记录的建法、默认值与报错不变。
+- 新样例 `backend/evals/samples/project_report.json`：10 个，按 `docs/project-ai-report.md` 第五节覆盖勘察报告有备注也有现场情况、两处都没有发现、现场情况里问价格、完工报告到第 10 步与第 12 步、编辑退回再前进造成同一步两条记录且较新的没有备注、退回后留下大于当前步的记录、英文（第 11 步完工报告）、马来文、第 9 步备注里夹注入；客户名、地址与负责人名都是自拟的，没有网址与签名数据。
+- 新测试 `backend/tests/test_evals_samples_project.py`：覆盖验收标准列出的五组用例，每个测试的 docstring 写明守住的验收标准。已有的评测框架测试不改。
+- `docs/ai-eval.md` 第二节样例表末尾加 `project_report.json` 一行。
+
+### 偏离了什么
+
+- 无
+
+### 验证到什么程度
+
+- 测试由 PR 的必需检查 backend 执行，检查结果由 Worker 和 CI 记录不写在这里；没有调用过真实模型。
+
+---
+
 ## CRM-TASK-084 屋顶项目详情面板加AI起草报告，可填现场情况，结果可改可复制（2026-10-28）
 
 ### 做了什么

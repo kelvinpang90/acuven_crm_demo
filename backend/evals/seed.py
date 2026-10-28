@@ -30,6 +30,8 @@ from app.models import (
     Contact,
     Deal,
     Message,
+    Project,
+    ProjectStepHistory,
     SalesTarget,
     Task,
     User,
@@ -51,11 +53,18 @@ SAMPLE_KEYS = {
     "tasks",
     "documents",
     "sales_targets",
+    "projects",
+    "project_steps",
     "params",
     "must_not_contain",
 }
 # Params naming a record by key; they are passed on with the key replaced by its id.
-PARAM_REFERENCES = {"contact": "contacts", "deal": "deals", "message": "messages"}
+PARAM_REFERENCES = {
+    "contact": "contacts",
+    "deal": "deals",
+    "message": "messages",
+    "project": "projects",
+}
 
 
 class SampleError(ValueError):
@@ -127,6 +136,13 @@ KINDS = (
         {"contact": ("contacts", "contact_id", False)},
     ),
     _Kind("sales_targets", SalesTarget, "created_at", {"user": ("users", "user_id", True)}),
+    _Kind("projects", Project, "created_at", {}, keyed=True),
+    _Kind(
+        "project_steps",
+        ProjectStepHistory,
+        "entered_at",
+        {"project": ("projects", "project_id", True)},
+    ),
 )
 
 
@@ -150,6 +166,8 @@ def _defaults(section: str, index: int, key: str | None) -> dict[str, Any]:
         return {"title": label}
     if section == "documents":
         return {"doc_type": "invoice", "doc_no": f"EVAL-{index + 1:04d}", "customer_code": "EVAL"}
+    if section == "projects":
+        return {"customer_name": label}
     return {}
 
 

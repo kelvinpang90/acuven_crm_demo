@@ -37,6 +37,7 @@
 | `followup_draft.json` | 跟进记录整理 | `generate_followup_draft` | 10 | 中英混写、只有一句话、相对日期、提到已有待办、注入 |
 | `deal_next_step.json` | 商机下一步建议 | `generate_deal_next_step` | 10 | 线索刚建只有一次跟进、谈判中停了很久、客户嫌贵、过期报价、逾期待办、注入、记录多会被截断；至少 3 个没停滞的 |
 | `dashboard_insight.json` | 经理看板解读 | `generate_dashboard_insight` | 8 | 月初 3 号、月中、月底；有人本月为 0；没设目标；上月远好于本月；在途不够补差额；一人占大部分成交；名字里夹注入；团队只有经理一人 |
+| `project_report.json` | 屋顶项目起草报告 | `generate_project_report` | 10 | `docs/project-ai-report.md` 第五节；勘察与完工两种；含 1 段注入 |
 
 每个样例的格式（键名为准，未列的字段由建数据的代码给默认值）：
 
