@@ -33,6 +33,23 @@
 
 ---
 
+## CRM-TASK-081 起草回复的提示词不写没答应过的事，占位写在句子里不另写确认后回复（2026-10-28）
+
+### 做了什么
+
+- `backend/app/services/ai_features.py`：按 `docs/reply-draft-documents.md` 第九节，`REPLY_DRAFT_SYSTEM` 在「write a [To confirm: ...] placeholder in the draft and explain it in note_for_agent」一句之后紧接着加两句英文：不写快照与单据里员工或 AI 回复没说过的公司能做的事（送货、有货、赶日期），否则写成占位；每个占位写在自己的句子里、只写未知的部分，不用占位代替已给出的事实，也不另加一句说会确认或回复顾客。系统提示其余文字不变；`validate_reply_draft`、`WHATSAPP_DRAFT_SCHEMA`、`EMAIL_DRAFT_SCHEMA`、数据块与其他功能的系统提示都不变。
+- `backend/tests/test_reply_draft_documents.py`：新增一个测试，把 `REPLY_DRAFT_SYSTEM` 的空白压成单个空格后，断言两句各恰好出现一次，且第一句在「explain it in note_for_agent」之后、「When documents_truncated is true」之前；docstring 写明守住的验收标准。已有测试不改。
+
+### 偏离了什么
+
+- 无
+
+### 验证到什么程度
+
+- 测试由 PR 的必需检查 backend 执行，检查结果由 Worker 和 CI 记录不写在这里；没有调用过真实模型。
+
+---
+
 ## 登记 CRM-TASK-081 至 085：起草回复改提示词、屋顶项目起草报告（2026-10-28）
 
 ### 做了什么
