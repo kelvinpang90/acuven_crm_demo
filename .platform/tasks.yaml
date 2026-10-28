@@ -2463,7 +2463,7 @@ tasks:
     purpose: >-
       按 docs/project-ai-report.md 第 4.5 节，在屋顶项目详情面板的时间线下面加 AI 起草报告：选勘察或完工报告、可填现场情况，调用 CRM-TASK-083 的接口，结果卡片可改正文、可复制。
       CRM 不存报告。AI 未配置时不显示。只改前端：不改后端、不加页面或路由，项目详情面板的现有行为不变。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-083
     acceptance_criteria:
