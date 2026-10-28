@@ -2383,7 +2383,7 @@ tasks:
     purpose: >-
       按 docs/reply-draft-documents.md 第九节：第五轮评测里 reply-05 的草稿写了员工没答应过的能送货，判为编造。在起草回复的系统提示里补两句，一句不写快照与单据里没说过的公司能做的事，一句规定占位的写法。
       只改系统提示与对应测试：不改校验、schema、数据块、其他功能、接口、前端与评测样例；测试不调真实模型。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-079
     acceptance_criteria:
