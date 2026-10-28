@@ -1,6 +1,6 @@
 # 屋顶项目起草报告（`crm.project_report`）
 
-> 状态：**待批准**（第八节 Q1 至 Q4 待 Kelvin 拍板）。
+> 状态：**已批准**（Kelvin 2026-10-28，原话「按建议批准，去登记」，第八节 Q1 至 Q4 按建议，PR kelvinpang90/acuven_crm_demo#223）。登记的任务，设计闸门引用 kelvinpang90/acuven_crm_demo#223。
 > 设计闸门的理由：要把屋顶项目的客户名、地址、负责人、各步骤的备注（员工写的自由文字）与员工当场填的现场情况发给模型。AI 的产出不存，由员工复制后自己发给客户。不新增表、不加迁移，审计沿用 `ai_requests`。
 > 上位决定：`acuven_hub` 的 `DECISIONS.md` E-12（发给模型的字段不设限制）、E-14、E-15、E-16（只生成文字，员工确认后使用，不存 AI 正文）、E-17、A-18。
 > 来由：任务八优先 6「根据勘察和完工照片起草报告」。Kelvin 2026-10-27 选定下一份设计写这一项。基础沿用 [inbox-ai-assist.md](inbox-ai-assist.md)（AI client、审计、三类结果）与 [followup-from-chat.md](followup-from-chat.md) 第九节第 2 条（本地时区）。
@@ -136,7 +136,7 @@ AI 模块已经上线；生产配了 AI 的四项变量时，合并部署后按�
    路径：`backend/app/services/project_report_service.py`（新）、`backend/app/services/ai_features.py`、`backend/app/services/ai_assist_service.py`、`backend/tests/test_project_report_service.py`（新）、`tasks/todo.md`
 2. 接口：4.4。路径：`backend/app/routers/ai.py`、`backend/app/schemas/ai.py`、`backend/tests/test_ai_project_report_api.py`（新）、`tasks/todo.md`；依赖 1
 3. 前端：4.5。路径：`frontend/src/pages/Projects/ProjectAiReport.tsx`（新）、`frontend/src/pages/Projects/ProjectDetail.tsx`、`frontend/src/services/ai.ts`、`frontend/src/types/index.ts`、`frontend/src/locales/en/projects.json`、`frontend/src/locales/zh/projects.json`、`tasks/todo.md`；依赖 2
-4. 评测样例：评测脚本加 `project_report`（排在最后），建数据的代码加 `projects` 与 `project_steps` 两类记录（`params` 里的 `project` 换成建出来的 id），10 个样例（第五节），评测文档样例表加一行。路径：`backend/evals/__init__.py`、`backend/evals/features.py`、`backend/evals/seed.py`、`backend/evals/samples/project_report.json`（新）、`backend/tests/test_evals_samples_project.py`（新）、`docs/ai-eval.md`、`tasks/todo.md`；依赖 1
+4. 评测样例：评测脚本加 `project_report`（排在 `message_triage` 之后、看板解读之前；看板解读按现有的写法一直排最后），建数据的代码加 `projects` 与 `project_steps` 两类记录（`params` 里的 `project` 换成建出来的 id），10 个样例（第五节），评测文档样例表加一行。路径：`backend/evals/__init__.py`、`backend/evals/features.py`、`backend/evals/seed.py`、`backend/evals/samples/project_report.json`（新）、`backend/tests/test_evals_samples_project.py`（新）、`docs/ai-eval.md`、`tasks/todo.md`；依赖 1
 
 四个任务都有设计闸门（引用本设计的 PR），登记前跑设计预审。不改表结构、不加迁移，不改现有的项目接口与页面行为（只在详情面板加一块）。
 

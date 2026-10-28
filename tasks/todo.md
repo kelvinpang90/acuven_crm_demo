@@ -14,6 +14,11 @@
 <!-- openclaw:planning-v1:begin -->
 ### 当前计划
 
+1. `CRM-TASK-081` 起草回复的提示词不写没答应过的事，占位写在句子里不另写确认后回复
+2. `CRM-TASK-082` 屋顶项目起草报告的步骤取法、提示词、输出校验与业务函数
+3. `CRM-TASK-083` 屋顶项目起草报告的接口
+4. `CRM-TASK-084` 屋顶项目详情面板加AI起草报告，可填现场情况，结果可改可复制
+5. `CRM-TASK-085` AI评测样例：屋顶项目起草报告10个
 
 ### 已阻塞
 
@@ -3003,7 +3008,7 @@ PRECHECK_RESULT: READY
 | 5 | 收件箱 | 意图和紧急度标签、按紧急度排序（每条入站消息都要调一次 AI，成本另议） | 设计 `docs/inbox-ai-triage.md` 2026-10-21 已批准（PR kelvinpang90/acuven_crm_demo#135，均按建议；自动调用加开关，缺省关） |
 | 5 | 跟进记录 | 从聊天记录生成跟进记录与任务草稿（跟进整理设计第一节留下的想法） | 设计 `docs/followup-from-chat.md` 2026-10-27 已批准（PR kelvinpang90/acuven_crm_demo#209，Q1 至 Q4 按建议），登记为 CRM-TASK-075 至 078 |
 | 5 | 收件箱 | 起草回复时带上这个客户的 AutoCount 报价单与发票，能直接回答价格、欠款类问题 | 设计 `docs/reply-draft-documents.md` 2026-10-27 已批准（PR kelvinpang90/acuven_crm_demo#218，Q1 至 Q4 按建议），登记为 CRM-TASK-079、080 |
-| 6 | 屋顶项目 | 根据项目资料、步骤备注与员工填的现场情况起草勘察报告与完工报告（这一版不看照片：现在只存了文件名） | 设计 `docs/project-ai-report.md` 待批准 |
+| 6 | 屋顶项目 | 根据项目资料、步骤备注与员工填的现场情况起草勘察报告与完工报告（这一版不看照片：现在只存了文件名） | 设计 `docs/project-ai-report.md` 2026-10-28 已批准（PR kelvinpang90/acuven_crm_demo#223，Q1 至 Q4 按建议），登记为 CRM-TASK-082 至 085 |
 | 6 | 分配规则、AutoCount | 建议分配给谁；汇总客户的单据（客户摘要已带 AutoCount 单据，基本已覆盖） | 想法 |
 
 - [x] Kelvin 批准 `docs/inbox-ai-assist.md`（2026-10-13，第三节 Q1 至 Q6 均按建议）
