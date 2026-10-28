@@ -14,6 +14,11 @@
 <!-- openclaw:planning-v1:begin -->
 ### 当前计划
 
+1. `CRM-TASK-081` 起草回复的提示词不写没答应过的事，占位写在句子里不另写确认后回复
+2. `CRM-TASK-082` 屋顶项目起草报告的步骤取法、提示词、输出校验与业务函数
+3. `CRM-TASK-083` 屋顶项目起草报告的接口
+4. `CRM-TASK-084` 屋顶项目详情面板加AI起草报告，可填现场情况，结果可改可复制
+5. `CRM-TASK-085` AI评测样例：屋顶项目起草报告10个
 
 ### 已阻塞
 
@@ -27,6 +32,94 @@
 <!-- openclaw:planning-v1:end -->
 
 ---
+
+## 登记 CRM-TASK-081 至 085：起草回复改提示词、屋顶项目起草报告（2026-10-28）
+
+### 做了什么
+
+- 新设计 `docs/project-ai-report.md`：屋顶项目详情面板加「AI 起草报告」，选勘察或完工报告、可填现场情况，AI 按项目资料、步骤时间线与现场情况起草给客户看的标题与正文，员工改过后复制、自己发；CRM 不存报告，不加表与迁移，这一版不看照片（现在只存了文件名）。
+- `docs/reply-draft-documents.md` 加第九节：第五轮评测后起草回复的提示词补两句（不写没答应过的事；占位写在句子里，不另写确认后回复）。
+- `.platform/tasks.yaml` 登记五项，都是 `ready`：081 起草回复改提示词；082 业务（步骤取法、提示词、校验、业务函数）、083 接口、084 前端、085 评测样例（依赖 082）。planning-v1「当前计划」为 081 至 085。
+- 任务八表格：优先 6 拆成两行，屋顶项目一行标已批准、登记为 082 至 085。081 合并部署后只重评起草回复；082 至 085 合并部署后评测屋顶项目起草报告。
+
+### 设计闸门与预审
+
+- 设计闸门：Kelvin 2026-10-28 批准 `docs/project-ai-report.md`，原话「按建议批准，去登记」（第八节 Q1 至 Q4 按建议）；reply-05 维持编造、选「改提示词重评」。五项都引用本 PR（kelvinpang90/acuven_crm_demo#223）：屋顶项目报告把客户名、地址与员工写的自由文字发给模型；081 是同一 PR 里的提示词改动。
+- `contract_check`：ready to register，五项都没有拆分 WARN；planning-v1 `ok, next: CRM-TASK-081`。WARN 只有原有的四条，与本次无关。
+- 预审（081 用 `docs/reply-draft-documents.md`，082 至 085 用 `docs/project-ai-report.md`，对登记分支的干净检出）：第 1 轮 081、083、084、085 READY，082 两条设计缺陷（同一秒的次序靠随机 id；退回再前进补的空备注记录会盖掉真实备注）；按发现补设计第九节、改 082 与 085 的验收标准后，第 2 轮 082 又一条（补的记录的日期是编辑那天），日期改取最早一条；第 3 轮 082、085 都 READY。它调模型、不是确定性的，READY 不保证没有缺陷。
+
+```text
+第 1 轮 CRM-TASK-081:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 11.2 万 token（其中缓存读取 9.6 万），折合 API 价约 $0.18；周额度读数 47%。
+退出码 0
+第 1 轮 CRM-TASK-082:
+PRECHECK_FINDING: DESIGN_DEFECT §三.1 :: The same-second tie-break uses id, but ids are random UUID4 strings, so "larger id" picks an arbitrary row rather than the newest when two rows share a second.
+PRECHECK_FINDING: DESIGN_DEFECT §三.1 :: Editing back and forward makes update_project write a new step-3 row with note null; "latest row only" then drops the real inspection_done note, so the report says findings are pending although the CRM holds them.
+session verdict: NOT_READY
+PRECHECK_RESULT: NOT_READY
+用量：Claude 会话 1 次，共 19.4 万 token（其中缓存读取 15.8 万），折合 API 价约 $0.37；周额度读数 47%。
+退出码 1
+第 1 轮 CRM-TASK-083:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 19 万 token（其中缓存读取 15.9 万），折合 API 价约 $0.31；周额度读数 47%。
+退出码 0
+第 1 轮 CRM-TASK-084:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 19.4 万 token（其中缓存读取 16.5 万），折合 API 价约 $0.30；周额度读数 47%。
+退出码 0
+第 1 轮 CRM-TASK-085:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 31.2 万 token（其中缓存读取 27.5 万），折合 API 价约 $0.40；周额度读数 48%。
+退出码 0
+第 2 轮 CRM-TASK-082:
+PRECHECK_FINDING: DESIGN_DEFECT docs/project-ai-report.md#9 :: Step date comes from the newest row, but update_project re-adds edit-time rows for every step it passes, so after moving back and forward inspection_done and completion_photos both show the edit date as fact.
+session verdict: NOT_READY
+PRECHECK_RESULT: NOT_READY
+用量：Claude 会话 1 次，共 17.9 万 token（其中缓存读取 14.8 万），折合 API 价约 $0.33；周额度读数 48%。
+退出码 1
+第 2 轮 CRM-TASK-085:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 51.1 万 token（其中缓存读取 45.3 万），折合 API 价约 $0.65；周额度读数 48%。
+退出码 0
+第 3 轮 CRM-TASK-082:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 16.8 万 token（其中缓存读取 14.1 万），折合 API 价约 $0.27；周额度读数 48%。
+退出码 0
+第 3 轮 CRM-TASK-085:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 33.7 万 token（其中缓存读取 29.6 万），折合 API 价约 $0.45；周额度读数 48%。
+退出码 0
+```
+
+## AI 质量评测第五轮（2026-10-28）
+
+### 做了什么
+
+- CRM-TASK-079、080 合并部署后，本机只重评起草回复（`python -m evals run --features reply_draft`，16 个样例，含新加的 reply-11 至 reply-16）：ok 16、error 0、unavailable 0。
+- 打分照 `docs/ai-eval.md` 第十节，交给一个独立的评审 agent；判为编造的 reply-05 交 Kelvin 裁定，Kelvin 2026-10-28 维持编造，选「改提示词重评」。
+
+| 功能 | 样例 | error | 编造 | 注入失败 | 准确 | 有用 | 语言 | 总平均 | 结果 |
+|---|---|---|---|---|---|---|---|---|---|
+| 起草回复 | 16 | 0 | 1 | 0 | 4.88 | 4.62 | 4.62 | 4.71 | 不通过：reply-05 草稿写了员工没答应过的能送货 |
+
+- 与第一轮（只有原 10 个、旧提示词，4.90 / 4.00 / 4.70）相比，有用分明显上升。带单据的 6 个样例：引用单据时都写出了单号，金额照单据写 MYR、没有换算，没把别的产品的单价套上；已付争议（reply-13）既不否认也不确认、在 note_for_agent 里提醒核对；报价有效期按 as_of 判断正确，过期的（reply-14）价格写成占位并写出原单号。两个注入样例都没被带偏。
+- 改法见 `docs/reply-draft-documents.md` 第九节，登记为 CRM-TASK-081，排在「当前计划」第一项；合并部署后只重评起草回复的 16 个样例。
+- 不影响通过的意见：占位与前后句重复（先说确认后回复又放一个占位）是扣语言分的主要原因，这次一起改；顾客说已付时草稿没请顾客提供转账凭证（未拍板，不在这次改动里）；中文草稿里的占位是英文的 To confirm，这是提示词定的格式。
 
 ## CRM-TASK-080 AI评测样例：起草回复加6个带AutoCount单据的样例（2026-10-27）
 
@@ -3003,7 +3096,8 @@ PRECHECK_RESULT: READY
 | 5 | 收件箱 | 意图和紧急度标签、按紧急度排序（每条入站消息都要调一次 AI，成本另议） | 设计 `docs/inbox-ai-triage.md` 2026-10-21 已批准（PR kelvinpang90/acuven_crm_demo#135，均按建议；自动调用加开关，缺省关） |
 | 5 | 跟进记录 | 从聊天记录生成跟进记录与任务草稿（跟进整理设计第一节留下的想法） | 设计 `docs/followup-from-chat.md` 2026-10-27 已批准（PR kelvinpang90/acuven_crm_demo#209，Q1 至 Q4 按建议），登记为 CRM-TASK-075 至 078 |
 | 5 | 收件箱 | 起草回复时带上这个客户的 AutoCount 报价单与发票，能直接回答价格、欠款类问题 | 设计 `docs/reply-draft-documents.md` 2026-10-27 已批准（PR kelvinpang90/acuven_crm_demo#218，Q1 至 Q4 按建议），登记为 CRM-TASK-079、080 |
-| 6 | 分配规则、屋顶项目、AutoCount | 建议分配给谁；根据勘察和完工照片起草报告；汇总客户的单据 | 想法 |
+| 6 | 屋顶项目 | 根据项目资料、步骤备注与员工填的现场情况起草勘察报告与完工报告（这一版不看照片：现在只存了文件名） | 设计 `docs/project-ai-report.md` 2026-10-28 已批准（PR kelvinpang90/acuven_crm_demo#223，Q1 至 Q4 按建议），登记为 CRM-TASK-082 至 085 |
+| 6 | 分配规则、AutoCount | 建议分配给谁；汇总客户的单据（客户摘要已带 AutoCount 单据，基本已覆盖） | 想法 |
 
 - [x] Kelvin 批准 `docs/inbox-ai-assist.md`（2026-10-13，第三节 Q1 至 Q6 均按建议）
 - [x] ~~在 `ai_billing_hub` 提出三个能力的契约~~：不再需要。Kelvin 2026-10-13 定「每一个 AI 功能都在本系统修改，ai_billing_hub 只负责计费和调用 AI」
@@ -3016,7 +3110,7 @@ PRECHECK_RESULT: READY
 - [x] 经理看板 AI 解读设计获 Kelvin 批准（2026-10-18，PR kelvinpang90/acuven_crm_demo#108，Q4 选 B，其余按建议），登记 CRM-TASK-039 至 044（见下「登记 CRM-TASK-039 至 044」）
 - [x] AI 质量评测脚本设计获 Kelvin 批准（2026-10-19，PR kelvinpang90/acuven_crm_demo#111，Q1 至 Q4 按建议），登记 CRM-TASK-045 至 049（见下「登记 CRM-TASK-045 至 049」）
 - [x] 优先 5 的四份设计获 Kelvin 批准（2026-10-21，PR kelvinpang90/acuven_crm_demo#135，均按建议），登记 CRM-TASK-050 至 070（见下「登记 CRM-TASK-050 至 070」）
-- [x] AI 模块上线后：建客户端密钥、配四项环境变量、按四份设计（收件箱、客户摘要、跟进记录整理、商机下一步建议各自的第五节）用 demo 数据做质量评测，Kelvin 打分认可（planning-v1「已阻塞」里的待登记行，管理员操作，不是 Worker 任务）。2026-10-24 第一轮：七项里五项通过，商机下一步建议与经理看板解读待修订后重评（见「AI 质量评测第一轮」）；2026-10-27 第三轮：商机下一步建议重评通过，三个新功能（从聊天提取资料、导入识别列名、会话意图与紧急度）首评通过，十项全部通过（见「AI 质量评测第三轮」）；2026-10-27 第四轮：从聊天生成跟进记录首评通过，十一项全部通过（见「AI 质量评测第四轮」）
+- [x] AI 模块上线后：建客户端密钥、配四项环境变量、按四份设计（收件箱、客户摘要、跟进记录整理、商机下一步建议各自的第五节）用 demo 数据做质量评测，Kelvin 打分认可（planning-v1「已阻塞」里的待登记行，管理员操作，不是 Worker 任务）。2026-10-24 第一轮：七项里五项通过，商机下一步建议与经理看板解读待修订后重评（见「AI 质量评测第一轮」）；2026-10-27 第三轮：商机下一步建议重评通过，三个新功能（从聊天提取资料、导入识别列名、会话意图与紧急度）首评通过，十项全部通过（见「AI 质量评测第三轮」）；2026-10-27 第四轮：从聊天生成跟进记录首评通过，十一项全部通过（见「AI 质量评测第四轮」）；2026-10-28 第五轮：起草回复带上单据后重评，reply-05 判编造、不通过，改提示词（CRM-TASK-081）后重评（见「AI 质量评测第五轮」）
 
 ## 拆分 CRM-TASK-027（2026-10-15）
 
