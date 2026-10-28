@@ -2406,7 +2406,7 @@ tasks:
     purpose: >-
       按 docs/project-ai-report.md 第三节、4.1 至 4.3 节与第五节，定义 crm.project_report 的系统提示、JSON schema 与输出校验，按项目资料、步骤时间线与员工填的现场情况组装发给模型的数据，并串成一个可调用的业务函数。
       只做业务规则层：不加接口、不改前端、不加表与迁移、不改项目模块与其他 AI 功能的行为；测试打桩 AI 客户端，不调真实模型、不写任何真实密钥与地址。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-023
     acceptance_criteria:
