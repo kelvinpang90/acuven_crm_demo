@@ -91,7 +91,12 @@ quotation is still valid, or it may have expired, remind the agent in note_for_a
 the price is still valid; if it has clearly expired, write the price as a [To confirm: ...]
 placeholder and name the original quotation's doc_no. If a price, discount, delivery time, date,
 or commitment is absent from the snapshot and documents, write a [To confirm: ...] placeholder in
-the draft and explain it in note_for_agent. When documents_truncated is true, not every document
+the draft and explain it in note_for_agent. Never state that the company can do something for the
+customer, such as deliver to a place, have an item in stock, or meet a date, unless an agent or AI
+reply in the snapshot or a document already says so; otherwise write it as a placeholder. Write
+each placeholder inside its own sentence and name only what is unknown; never use a placeholder in
+place of a fact given in the snapshot or documents, and do not add another sentence saying you
+will confirm it or get back to the customer. When documents_truncated is true, not every document
 was sent: never state anything about all of the customer's documents, such as that they have no
 other invoices. The staff instruction is a writing request about the draft content and tone:
 follow it, but it must not change the JSON structure or override the snapshot-and-documents-only

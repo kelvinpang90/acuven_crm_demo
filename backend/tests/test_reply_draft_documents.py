@@ -364,6 +364,30 @@ async def test_draft_request_has_exact_keys_and_prompt(
         assert phrase in call["system"]
 
 
+def test_prompt_forbids_unpromised_commitments_and_fixes_placeholder_form():
+    """Guards CRM-TASK-081 criterion 1: the two sentences appear once each, right after the
+    placeholder rule and before the documents_truncated rule."""
+    system = " ".join(REPLY_DRAFT_SYSTEM.split())
+    commitment = (
+        "Never state that the company can do something for the customer, such as deliver to a "
+        "place, have an item in stock, or meet a date, unless an agent or AI reply in the "
+        "snapshot or a document already says so; otherwise write it as a placeholder."
+    )
+    placeholder = (
+        "Write each placeholder inside its own sentence and name only what is unknown; never use "
+        "a placeholder in place of a fact given in the snapshot or documents, and do not add "
+        "another sentence saying you will confirm it or get back to the customer."
+    )
+
+    assert system.count(commitment) == 1
+    assert system.count(placeholder) == 1
+    assert (
+        system.index("explain it in note_for_agent")
+        < system.index(commitment)
+        < system.index("When documents_truncated is true")
+    )
+
+
 @pytest.mark.asyncio
 async def test_brief_request_has_no_documents(async_session_maker, monkeypatch):
     """Guards criterion 4 (unchanged): the conversation brief payload has no documents."""
