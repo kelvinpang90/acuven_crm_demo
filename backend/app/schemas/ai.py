@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field, field_validator
 
 Language = Literal["zh-CN", "en", "ms"]
 Channel = Literal["whatsapp", "email"]
+ReportType = Literal["inspection", "completion"]
 
 
 class ConversationBriefRequest(BaseModel):
@@ -43,6 +44,14 @@ class FollowupDraftRequest(BaseModel):
 class FollowupFromChatRequest(BaseModel):
     deal_id: str = Field(min_length=1)
     today: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
+    utc_offset_minutes: int = Field(strict=True, ge=-720, le=840)
+    output_language: Language | None = None
+
+
+class ProjectReportRequest(BaseModel):
+    report_type: ReportType
+    # The length of notes is checked by the business function (docs/project-ai-report.md 4.2).
+    notes: str | None = None
     utc_offset_minutes: int = Field(strict=True, ge=-720, le=840)
     output_language: Language | None = None
 
