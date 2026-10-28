@@ -130,6 +130,18 @@ def _message_triage(user: User, params: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _project_report(user: User, params: dict[str, Any]) -> dict[str, Any]:
+    # Dates are sent as UTC dates (docs/project-ai-report.md section 6, time zone).
+    return {
+        "user": user,
+        "project_id": _param(params, "project"),
+        "report_type": _param(params, "report_type"),
+        "notes": params.get("notes"),
+        "utc_offset_minutes": 0,
+        "output_language": _param(params, "output_language"),
+    }
+
+
 def _dashboard_insight(user: User, params: dict[str, Any]) -> dict[str, Any]:
     return {"user": user, "output_language": _param(params, "output_language")}
 
@@ -259,6 +271,14 @@ FEATURES: dict[str, Feature] = {
             _message_triage,
             ("intent", "urgency"),
             (),
+        ),
+        Feature(
+            "project_report",
+            "app.services.project_report_service",
+            "generate_project_report",
+            _project_report,
+            ("title", "body", "note_for_agent"),
+            ("title", "body", "note_for_agent"),
         ),
         Feature(
             "dashboard_insight",

@@ -20,5 +20,6 @@ FEATURE_NAMES = (
     "contact_extract",
     "import_columns",
     "message_triage",
+    "project_report",
     DASHBOARD_FEATURE,
 )
