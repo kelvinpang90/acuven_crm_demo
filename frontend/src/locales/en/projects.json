@@ -83,6 +83,32 @@
     "feedback_label": "Customer feedback",
     "signature_label": "Customer signature"
   },
+  "ai_report": {
+    "title": "AI report draft",
+    "type_label": "Report type",
+    "types": {
+      "inspection": "Inspection report",
+      "completion": "Completion report"
+    },
+    "available_after": "Available from step {{step}}",
+    "none_available": "Reports are available once the project reaches step 3",
+    "notes_label": "Site notes (optional)",
+    "notes_placeholder": "What you found or did on site…",
+    "generate": "Draft",
+    "loading": "Drafting…",
+    "unverified": "AI-generated, not verified",
+    "note_for_agent": "Note for you",
+    "copy": "Copy",
+    "copied": "Copied",
+    "copy_failed": "Copy failed, please select the text and copy it manually",
+    "errors": {
+      "not_found": "Project not found or deleted",
+      "step_not_reached": "The project hasn't reached this step yet",
+      "not_enabled": "AI is not enabled",
+      "unavailable": "AI is temporarily unavailable",
+      "failed": "AI request failed"
+    }
+  },
   "steps": {
     "enquiry": "Enquiry",
     "inspection_scheduled": "Inspection scheduled",

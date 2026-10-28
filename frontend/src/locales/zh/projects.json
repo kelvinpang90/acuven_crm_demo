@@ -83,6 +83,32 @@
     "feedback_label": "顾客意见",
     "signature_label": "顾客签名"
   },
+  "ai_report": {
+    "title": "AI 起草报告",
+    "type_label": "报告类型",
+    "types": {
+      "inspection": "勘察报告",
+      "completion": "完工报告"
+    },
+    "available_after": "第 {{step}} 步之后可用",
+    "none_available": "项目到第 3 步之后才能起草报告",
+    "notes_label": "现场情况（可选）",
+    "notes_placeholder": "现场看到的情况或做了什么…",
+    "generate": "起草",
+    "loading": "起草中…",
+    "unverified": "AI 生成，未核实",
+    "note_for_agent": "给你的提醒",
+    "copy": "复制",
+    "copied": "已复制",
+    "copy_failed": "复制失败，请手动选中文字复制",
+    "errors": {
+      "not_found": "项目不存在或已删除",
+      "step_not_reached": "项目还没到这一步",
+      "not_enabled": "AI 未启用",
+      "unavailable": "AI 暂时不可用",
+      "failed": "AI 请求失败"
+    }
+  },
   "steps": {
     "enquiry": "询盘",
     "inspection_scheduled": "现场勘查排期",

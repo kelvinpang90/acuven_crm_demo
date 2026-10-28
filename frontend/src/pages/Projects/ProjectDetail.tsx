@@ -4,6 +4,7 @@ import dayjs from 'dayjs';
 import { projectsApi } from '@/services/projects';
 import { PROJECT_STEPS, TOTAL_STEPS, stepName, getAlertLevel } from './steps';
 import WarrantyConfirmModal from './WarrantyConfirmModal';
+import ProjectAiReport from './ProjectAiReport';
 import type { Project, ProjectAlertLevel, ProjectStepHistory } from '@/types';
 
 const BADGE: Record<ProjectAlertLevel, string> = {
@@ -214,6 +215,8 @@ export default function ProjectDetail({ project, onClose, onChanged, onEdit, onD
                 );
               })}
             </ol>
+
+            <ProjectAiReport projectId={project.id} currentStep={project.current_step} />
           </div>
         </div>
       </div>

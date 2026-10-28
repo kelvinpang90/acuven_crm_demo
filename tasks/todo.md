@@ -30,6 +30,27 @@
 
 ---
 
+## CRM-TASK-084 屋顶项目详情面板加AI起草报告，可填现场情况，结果可改可复制（2026-10-28）
+
+### 做了什么
+
+- 新组件 `frontend/src/pages/Projects/ProjectAiReport.tsx`：按 `docs/project-ai-report.md` 4.5 节，挂载时读一次 AI 状态，未启用或读取失败时整块不显示；报告类型两个单选项，勘察报告要 `current_step` ≥ 3、完工报告要 ≥ 10，不够的置灰并写「第 3 步之后可用」「第 10 步之后可用」，缺省选能选的里面靠后的那个，项目或 `current_step` 变了时重新定缺省；两个都不能选时只显示一行提示；「现场情况（可选）」文本框用 `maxLength` 限 2000；「起草」请求中置灰并显示起草中；结果卡片标「AI 生成，未核实」，标题一行、正文是可以改的文本框、`note_for_agent` 去空白后不为空时单独一行「给你的提醒」；「复制」把标题、空一行、（改过的）正文写进剪贴板，成功提示「已复制」、失败提示「复制失败，请手动选中文字复制」；再点起草替换整张卡片；按 `projectId` 变化与卸载（关闭面板）清空卡片与现场情况，并用请求版本号丢弃还没回来的结果；错误码按验收标准映射，超时与网络错误为「AI 暂时不可用」。
+- `frontend/src/pages/Projects/ProjectDetail.tsx`：在时间线列表下面、同一个滚动区里放 `ProjectAiReport`，其余不变。
+- `frontend/src/services/ai.ts`：加 `createProjectReport`，`POST /ai/projects/{id}/report`，58 秒超时，请求带 `report_type`、`notes`（去首尾空白后为空时为 null）、`utc_offset_minutes`（`0 - new Date().getTimezoneOffset()`）与按界面语言映射的 `output_language`（映射不到时不带，与其他 AI 组件相同）。
+- `frontend/src/types/index.ts`：加 `AiProjectReportType` 与 `AiProjectReport`（`request_id`、`title`、`body`、`note_for_agent`，与 4.4 节的返回字段一致）。
+- `frontend/src/locales/en/projects.json`、`frontend/src/locales/zh/projects.json`：加 `ai_report` 文案。
+
+### 偏离了什么
+
+- 现场情况用文本框的 `maxLength` 限长，浏览器按 UTF-16 码元计数，含表情等补充平面字符时能输入的字数会比后端按码点算的 2000 少。
+- 项目退回到第 3 步之前、两个类型都不能选时，已有的结果卡片也一起隐藏，只留一行提示。
+
+### 验证到什么程度
+
+- 前端类型检查与构建由 PR 的必需检查 frontend 执行，检查结果由 Worker 和 CI 记录不写在这里；没有在浏览器里实际操作过。
+
+---
+
 ## CRM-TASK-083 屋顶项目起草报告的接口（2026-10-28）
 
 ### 做了什么

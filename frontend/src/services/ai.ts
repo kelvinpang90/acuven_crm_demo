@@ -1,5 +1,5 @@
 import api from './api';
-import type { AiContactExtract, AiContactSummary,AiConversationBrief, AiDashboardInsight, AiDealNextStep, AiFollowUpDraft, AiFollowUpFromChat, AiImportColumn, AiImportColumns, AiLanguage, AiReplyDraft, AiStatus, AiTranslation, ApiResponse } from '@/types';
+import type { AiContactExtract, AiContactSummary,AiConversationBrief, AiDashboardInsight, AiDealNextStep, AiFollowUpDraft, AiFollowUpFromChat, AiImportColumn, AiImportColumns, AiLanguage, AiProjectReport, AiProjectReportType, AiReplyDraft, AiStatus, AiTranslation, ApiResponse } from '@/types';
 
 let aiStatusPromise: Promise<AiStatus> | null = null;
 
@@ -59,7 +59,12 @@ export const aiApi = {
   createReplyDraft: (contactId: string, channel: 'whatsapp' | 'email', instruction: string | undefined, outputLanguage: AiLanguage) =>
     api.post<ApiResponse<AiReplyDraft>>(`/ai/conversations/${contactId}/reply-draft`, { channel, ...(instruction ? { instruction } : {}), output_language: outputLanguage }, { timeout: 58000 }),
 
-  suggestImportColumns: (columns: AiImportColumn[], outputLanguage?: 'zh-CN' | 'en') =>
+  createProjectReport: (
+    projectId: string,
+    data: { report_type: AiProjectReportType; notes: string | null; utc_offset_minutes: number; output_language?: 'zh-CN' | 'en' },
+  ) => api.post<ApiResponse<AiProjectReport>>(`/ai/projects/${projectId}/report`, data, { timeout: 58000 }),
+
+  suggestImportColumns:(columns: AiImportColumn[], outputLanguage?: 'zh-CN' | 'en') =>
     api.post<ApiResponse<AiImportColumns>>(
       '/ai/import/columns',
       { columns, ...(outputLanguage ? { output_language: outputLanguage } : {}) },
