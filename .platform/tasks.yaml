@@ -2436,7 +2436,7 @@ tasks:
     purpose: >-
       按 docs/project-ai-report.md 第 4.4 节，把 CRM-TASK-082 的业务函数接成 POST /api/ai/projects/{project_id}/report，供 CRM-TASK-084 的项目详情面板使用。
       只做接口层：加在已有的 AI 路由里，不改 main.py、不改业务规则、不改表结构、不改前端、不改项目接口。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-082
     acceptance_criteria:
