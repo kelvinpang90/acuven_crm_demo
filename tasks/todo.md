@@ -14,7 +14,6 @@
 <!-- openclaw:planning-v1:begin -->
 ### 当前计划
 
-1. `CRM-TASK-085` AI评测样例：屋顶项目起草报告10个
 
 ### 已阻塞
 

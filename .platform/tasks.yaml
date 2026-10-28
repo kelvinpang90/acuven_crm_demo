@@ -2494,7 +2494,7 @@ tasks:
     purpose: >-
       按 docs/project-ai-report.md 第五节与第七节第 4 项、docs/ai-eval.md 第二节，在评测脚本里加 project_report 功能，让建数据的代码能建屋顶项目与步骤记录，并写 10 个自拟样例。
       只改评测脚本、样例、样例测试与评测文档：不改 app 下任何文件；样例里的人名、地址全部自拟。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-082
     acceptance_criteria:
