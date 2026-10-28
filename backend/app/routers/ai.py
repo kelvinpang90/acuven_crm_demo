@@ -18,6 +18,7 @@ from app.schemas.ai import (
     FollowupDraftRequest,
     FollowupFromChatRequest,
     ImportColumnsRequest,
+    ProjectReportRequest,
     ReplyDraftRequest,
     TranslateRequest,
 )
@@ -31,6 +32,7 @@ from app.services import (
     deal_next_step_service,
     followup_draft_service,
     import_columns_service,
+    project_report_service,
 )
 from app.utils.response import fail, ok
 
@@ -286,6 +288,29 @@ async def create_import_columns(
         output_language=body.output_language or _default_output_language(current_user),
     )
     return _result_response(result, ("request_id", "mappings"))
+
+
+@router.post("/projects/{project_id}/report")
+async def create_project_report(
+    project_id: str,
+    body: ProjectReportRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    result = await project_report_service.generate_project_report(
+        db,
+        user=current_user,
+        project_id=project_id,
+        report_type=body.report_type,
+        notes=body.notes,
+        utc_offset_minutes=body.utc_offset_minutes,
+        output_language=body.output_language or _default_output_language(current_user),
+    )
+    if result.category == ai_assist_service.NOT_FOUND:
+        return fail("Project not found.", code="NOT_FOUND", status_code=404)
+    if result.category == ai_assist_service.STEP_NOT_REACHED:
+        return fail("Project has not reached this step.", code="STEP_NOT_REACHED", status_code=400)
+    return _result_response(result, ("request_id", "title", "body", "note_for_agent"))
 
 
 @router.post("/translate")

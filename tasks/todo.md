@@ -31,6 +31,24 @@
 
 ---
 
+## CRM-TASK-083 屋顶项目起草报告的接口（2026-10-28）
+
+### 做了什么
+
+- `backend/app/schemas/ai.py`：加 `ProjectReportRequest`：`report_type` 只能是 `inspection`、`completion`；`notes` 可选、字符串或 null，不限长（长度由业务函数判断）；`utc_offset_minutes` 必填、严格整数、-720 至 840（与 `FollowupFromChatRequest` 相同写法）；`output_language` 可选、`zh-CN`、`en`、`ms`。
+- `backend/app/routers/ai.py`：按 `docs/project-ai-report.md` 4.4 节加 `POST /api/ai/projects/{project_id}/report`，只要登录、不分角色与负责人；把当前用户、`project_id`、`report_type`、`notes`、`utc_offset_minutes` 与 `output_language`（缺省按界面语言）传给 `project_report_service.generate_project_report`；`not_found` 返回 404 `NOT_FOUND`、`step_not_reached` 返回 400 `STEP_NOT_REACHED`，其余沿用 `_result_response`，成功返回 `request_id`、`title`、`body`、`note_for_agent`。其他 AI 接口与 status 接口不变。
+- 新测试 `backend/tests/test_ai_project_report_api.py`：打桩业务函数，覆盖验收标准的校验、默认语言、登录、传参、映射五组用例，每个测试的 docstring 写明守住的验收标准。已有测试不改。
+
+### 偏离了什么
+
+- 「没登录返回 401」用无效的 Bearer 令牌验证；完全不带 Authorization 头时，FastAPI 0.111 的 `HTTPBearer` 返回 403（与项目接口及其他 AI 接口相同，`dependencies.py` 不在本任务范围）。
+
+### 验证到什么程度
+
+- 测试由 PR 的必需检查 backend 执行，检查结果由 Worker 和 CI 记录不写在这里；没有调用过真实模型。
+
+---
+
 ## CRM-TASK-082 屋顶项目起草报告的步骤取法、提示词、输出校验与业务函数（2026-10-28）
 
 ### 做了什么
