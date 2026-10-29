@@ -2553,7 +2553,7 @@ tasks:
     purpose: >-
       按 docs/contact-assign-suggest.md 第一、四、九节，加负责人建议的业务函数，供 CRM-TASK-088 的接口使用：用表单字段把现有分配规则试算一遍，并给出负责人下拉里每个人的名下联系人、进行中商机、近 90 天赢率与同行业数字。
       只做业务层：不调 AI、不加表、不加迁移、不改接口路径、不改前端；分配规则的实际结果不变。users 路由只把候选人查询换成共用函数，返回不变。
-    status: ready
+    status: done
     depends_on: []
     acceptance_criteria:
       - access_service 新增 assignable_users(db, user)，返回在职的 User 列表并按 name 排序；管理员为全部在职的人，经理为自己与 manager_id 为自己的在职的人，其他角色只有自己（在职时）；routers/users.py 的 list_users 改为调它，返回内容、字段与顺序都不变；其他用户接口不变
