@@ -117,6 +117,14 @@ class DuplicateCheckRequest(BaseModel):
     phone: Optional[str] = Field(None, max_length=30)
 
 
+class AssignSuggestionRequest(BaseModel):
+    # The contact form's current values (docs/contact-assign-suggest.md section 9, item 2).
+    name: Optional[str] = Field(None, max_length=100)
+    company: Optional[str] = Field(None, max_length=200)
+    industry: Optional[str] = Field(None, max_length=50)
+    address: Optional[str] = Field(None, max_length=1000)
+
+
 class DuplicateContactItem(BaseModel):
     id: str
     name: str

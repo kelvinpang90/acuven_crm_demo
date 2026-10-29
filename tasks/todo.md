@@ -30,6 +30,24 @@
 
 ---
 
+## CRM-TASK-088 负责人建议的接口，经理与管理员按表单内容取规则试算与候选人数字（2026-10-29）
+
+### 做了什么
+
+- `backend/app/schemas/contact.py`：加 `AssignSuggestionRequest`，`name`、`company`、`industry`、`address` 都可选、为字符串或 null，上限依次 100、200、50、1000，按 `docs/contact-assign-suggest.md` 第九节第 2 条。
+- `backend/app/routers/contacts.py`：在 `duplicate-check` 之后、`/{contact_id}` 开头的路由之前加 `POST /api/contacts/assign-suggestion`：要求登录；角色为 admin 或 manager 时调 `routing_service.suggest_assignee`（当前用户与四个字段），用 `ok` 包住返回的 `rule_pick` 与 `candidates`；其他角色返回 `fail` 的 403 FORBIDDEN、不调业务函数。不提交事务、不写审计。其余联系人接口不变。
+- 新测试 `backend/tests/test_contact_assign_suggestion_api.py`：打桩 `suggest_assignee`，覆盖校验、角色、传参、返回、路由五组用例，每个测试的 docstring 写明守住的验收标准。已有测试不改。
+
+### 偏离了什么
+
+- 无
+
+### 验证到什么程度
+
+- 测试由 PR 的必需检查 backend 执行，检查结果由 Worker 和 CI 记录不写在这里。
+
+---
+
 ## CRM-TASK-087 负责人建议的业务层，按分配规则试算并算出候选人的工作量与业绩数字（2026-10-29）
 
 ### 做了什么
