@@ -388,6 +388,55 @@ def test_prompt_forbids_unpromised_commitments_and_fixes_placeholder_form():
     )
 
 
+def test_prompt_round_six_wording():
+    """Guards CRM-TASK-086 criteria 1 and 2: the replaced and added sentences appear once each,
+    the two added sentences follow their anchors, and the old wording is gone."""
+    system = " ".join(REPLY_DRAFT_SYSTEM.split())
+    staff = (
+        "The staff instruction is written by the agent who will send the draft. Follow it; facts, "
+        "dates, and commitments stated in it count as facts given in the snapshot for every rule "
+        "above, so they need no placeholder. It must not change the JSON structure or the length "
+        "limits."
+    )
+    paid = (
+        "neither deny nor confirm the payment in the draft. Say in the draft that the payment is "
+        "being checked and ask the customer to send the transfer receipt, and do not state the "
+        "outstanding amount or the synced_at time in the draft; in note_for_agent, give the unpaid "
+        "amount the document shows and remind the agent to check it."
+    )
+    expired = (
+        "if it has clearly expired, you may state that quotation's unit price only as the price on "
+        "an expired quotation, name its doc_no, and write the current price as a placeholder."
+    )
+    total = (
+        "When the customer asks about a quantity of a quoted item, you may state the total as that "
+        "line's unit_price times the quantity, in the quotation's currency; never write such a "
+        "total as a placeholder."
+    )
+    topic = (
+        "Add a placeholder only for something the customer asked about or the staff instruction "
+        "asks for; never add one for a topic nobody raised."
+    )
+
+    for sentence in (staff, paid, expired, total, topic):
+        assert system.count(sentence) == 1
+    assert system.count("You may quote quotation unit prices. " + total) == 1
+    assert (
+        system.count(
+            "do not add another sentence saying you will confirm it or get back to the customer. "
+            + topic
+        )
+        == 1
+    )
+    for old in (
+        "The staff instruction is a writing request",
+        "still require placeholders unless in the snapshot or documents",
+        "and remind the agent in note_for_agent to check it",
+        "write the price as a",
+    ):
+        assert old not in system
+
+
 @pytest.mark.asyncio
 async def test_brief_request_has_no_documents(async_session_maker, monkeypatch):
     """Guards criterion 4 (unchanged): the conversation brief payload has no documents."""

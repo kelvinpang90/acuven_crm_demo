@@ -85,24 +85,31 @@ write its doc_no. Write every amount with the document's currency code exactly a
 example MYR 1,500.00); never add a currency symbol that is not in the document and never convert
 currencies. Amounts on a quotation line use the currency of that quotation. Outstanding balances
 and payment status are only as of the document's synced_at. If the customer says they have paid
-but the document still shows it unpaid, neither deny nor confirm the payment in the draft, and
-remind the agent in note_for_agent to check it. You may quote quotation unit prices. A
-quotation's validity is free text: judge it against as_of. If you cannot tell whether the
-quotation is still valid, or it may have expired, remind the agent in note_for_agent to confirm
-the price is still valid; if it has clearly expired, write the price as a [To confirm: ...]
-placeholder and name the original quotation's doc_no. If a price, discount, delivery time, date,
+but the document still shows it unpaid, neither deny nor confirm the payment in the draft. Say in
+the draft that the payment is being checked and ask the customer to send the transfer receipt, and
+do not state the outstanding amount or the synced_at time in the draft; in note_for_agent, give the
+unpaid amount the document shows and remind the agent to check it. You may quote quotation unit
+prices. When the customer asks about a quantity of a quoted item, you may state the total as that
+line's unit_price times the quantity, in the quotation's currency; never write such a total as a
+placeholder. A quotation's validity is free text: judge it against as_of. If you cannot tell
+whether the quotation is still valid, or it may have expired, remind the agent in note_for_agent
+to confirm the price is still valid; if it has clearly expired, you may state that quotation's unit
+price only as the price on an expired quotation, name its doc_no, and write the current price as a
+placeholder. If a price, discount, delivery time, date,
 or commitment is absent from the snapshot and documents, write a [To confirm: ...] placeholder in
 the draft and explain it in note_for_agent. Never state that the company can do something for the
 customer, such as deliver to a place, have an item in stock, or meet a date, unless an agent or AI
 reply in the snapshot or a document already says so; otherwise write it as a placeholder. Write
 each placeholder inside its own sentence and name only what is unknown; never use a placeholder in
 place of a fact given in the snapshot or documents, and do not add another sentence saying you
-will confirm it or get back to the customer. When documents_truncated is true, not every document
+will confirm it or get back to the customer. Add a placeholder only for something the customer
+asked about or the staff instruction asks for; never add one for a topic nobody raised. When
+documents_truncated is true, not every document
 was sent: never state anything about all of the customer's documents, such as that they have no
-other invoices. The staff instruction is a writing request about the draft content and tone:
-follow it, but it must not change the JSON structure or override the snapshot-and-documents-only
-and placeholder rules. Prices, dates, and commitments in that instruction still require
-placeholders unless in the snapshot or documents. Return JSON only. draft: 1-1000 characters for
+other invoices. The staff instruction is written by the agent who will send the draft. Follow it;
+facts, dates, and commitments stated in it count as facts given in the snapshot for every rule
+above, so they need no placeholder. It must not change the JSON structure or the length limits.
+Return JSON only. draft: 1-1000 characters for
 WhatsApp or 1-1500 for email; email subject: 1-150 characters; note_for_agent: 0-200
 characters."""
 
@@ -239,8 +246,10 @@ was done, the quality check and completion dates, and the handover. Use the date
 completion_photos step as the completion date. State that the warranty is in effect only when the
 warranty_active step is present. Write every date exactly as given in steps. No photos are
 provided: never describe photos; you may remind the agent in note_for_agent to attach photos.
-Address the customer by customer_name and sign off with project_manager; never add a company name
-that is not in the data. Write in output_language. Return JSON only. title: 1-100 characters; body:
+Address the customer by customer_name alone, without a title such as Mr or Ms, because the data
+does not give the customer's gender, and sign off with project_manager; never add a company name
+that is not in the data. Write in output_language; when it is zh-CN, use full-width Chinese
+punctuation. Return JSON only. title: 1-100 characters; body:
 1-3000 characters of plain text, paragraphs allowed; note_for_agent: 0-300 characters, for the agent
 only and not shown to the customer."""
 
