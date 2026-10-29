@@ -2519,3 +2519,31 @@ tasks:
       - format.apply
     creates_branch: true
     creates_pull_request: true
+
+  - id: CRM-TASK-086
+    title: 起草回复与屋顶项目报告按第六轮评测改提示词，少放占位、称呼不猜性别
+    purpose: >-
+      按 docs/reply-draft-documents.md 第十节与 docs/project-ai-report.md 第十节：第六轮评测两个功能都通过，评审提的写法问题 Kelvin 定改。起草回复的系统提示改五处（员工要求照写、已付争议请顾客发凭证、过期报价写出原价、按单价算总价、不放没人问的占位），屋顶项目报告的系统提示改两处（称呼不加称谓、中文用全角标点）。
+      只改两个系统提示与对应测试；不改校验、schema、数据块、其他功能、接口、前端与评测样例；测试不调真实模型。
+    status: ready
+    depends_on:
+      - CRM-TASK-081
+      - CRM-TASK-082
+    acceptance_criteria:
+      - REPLY_DRAFT_SYSTEM 改三处替换。其一，删掉以 The staff instruction is a writing request 开头、到 unless in the snapshot or documents. 结尾的两句，原位置换成三句英文，原文照写（按现有写法折行即可）The staff instruction is written by the agent who will send the draft. Follow it; facts, dates, and commitments stated in it count as facts given in the snapshot for every rule above, so they need no placeholder. It must not change the JSON structure or the length limits.；其二，把 neither deny nor confirm the payment in the draft, and remind the agent in note_for_agent to check it. 换成 neither deny nor confirm the payment in the draft. Say in the draft that the payment is being checked and ask the customer to send the transfer receipt, and do not state the outstanding amount or the synced_at time in the draft; in note_for_agent, give the unpaid amount the document shows and remind the agent to check it.；其三，把以 if it has clearly expired, write the price as a 开头、到 name the original quotation's doc_no. 结尾的分句换成 if it has clearly expired, you may state that quotation's unit price only as the price on an expired quotation, name its doc_no, and write the current price as a placeholder.
+      - REPLY_DRAFT_SYSTEM 再加两句英文，原文照写。在 You may quote quotation unit prices. 之后紧接着加 When the customer asks about a quantity of a quoted item, you may state the total as that line's unit_price times the quantity, in the quotation's currency; never write such a total as a placeholder.；在 do not add another sentence saying you will confirm it or get back to the customer. 之后紧接着加 Add a placeholder only for something the customer asked about or the staff instruction asks for; never add one for a topic nobody raised.；本条与上一条之外的系统提示文字不变，CRM-TASK-081 加的两句保留原样
+      - PROJECT_REPORT_SYSTEM 改两处替换，原文照写。把 Address the customer by customer_name and sign off with project_manager; 换成 Address the customer by customer_name alone, without a title such as Mr or Ms, because the data does not give the customer's gender, and sign off with project_manager;；把 Write in output_language. 换成 Write in output_language; when it is zh-CN, use full-width Chinese punctuation.；系统提示的其余文字不变
+      - validate_reply_draft、WHATSAPP_DRAFT_SCHEMA、EMAIL_DRAFT_SCHEMA、PROJECT_REPORT_SCHEMA、两个功能的校验与数据块、其他功能的系统提示都不变
+      - test_reply_draft_documents 里加一个测试，把 REPLY_DRAFT_SYSTEM 的空白（含换行）压成单个空格后，断言前两条要求的新句子各恰好出现一次、两条新加的句子分别紧跟在各自的前一句之后，且 The staff instruction is a writing request、still require placeholders unless in the snapshot or documents、and remind the agent in note_for_agent to check it、write the price as a 四段旧文字都不再出现；test_project_report_service 里加一个测试，同样压空白后断言第三条的两段新文字各恰好出现一次、Address the customer by customer_name and sign off 不再出现；已有的测试不改、照常通过。测试只需覆盖本条列出的断言，写明守住的是哪一条验收标准；清单之外的补充覆盖只算非阻塞意见；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
+      - tasks/todo.md 新增 CRM-TASK-086 记录段（做了什么、偏离了什么、验证到什么程度）；偏离段只列两类、每条一句：与验收标准或设计文档不一致的做法，以及验收标准没有要求、但改变了现有接口或页面行为的改动；验收标准要求的改动与重构、命名、格式调整不算偏离，没有就写无；偏离段漏列只算非阻塞意见，除非漏列的改动本身违反某条验收标准（那时按那一条判）；验证段只写测试由 PR 的必需检查 backend 执行、检查结果由 Worker 和 CI 记录不写在这里、没有调用过真实模型，不写任何检查是否运行或通过；不改 planning-v1 块；复选框只允许 [ ] / [x]；改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不加表、不加迁移、不改接口与前端；allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#235），不合并、不直推
+    allowed_change_paths:
+      - backend/app/services/ai_features.py
+      - backend/tests/test_reply_draft_documents.py
+      - backend/tests/test_project_report_service.py
+      - tasks/todo.md
+    allowed_commands:
+      - lint.check
+      - format.check
+      - format.apply
+    creates_branch: true
+    creates_pull_request: true
