@@ -3210,7 +3210,8 @@ PRECHECK_RESULT: READY
 | 5 | 跟进记录 | 从聊天记录生成跟进记录与任务草稿（跟进整理设计第一节留下的想法） | 设计 `docs/followup-from-chat.md` 2026-10-27 已批准（PR kelvinpang90/acuven_crm_demo#209，Q1 至 Q4 按建议），登记为 CRM-TASK-075 至 078 |
 | 5 | 收件箱 | 起草回复时带上这个客户的 AutoCount 报价单与发票，能直接回答价格、欠款类问题 | 设计 `docs/reply-draft-documents.md` 2026-10-27 已批准（PR kelvinpang90/acuven_crm_demo#218，Q1 至 Q4 按建议），登记为 CRM-TASK-079、080 |
 | 6 | 屋顶项目 | 根据项目资料、步骤备注与员工填的现场情况起草勘察报告与完工报告（这一版不看照片：现在只存了文件名） | 设计 `docs/project-ai-report.md` 2026-10-28 已批准（PR kelvinpang90/acuven_crm_demo#223，Q1 至 Q4 按建议），登记为 CRM-TASK-082 至 085 |
-| 6 | 分配规则、AutoCount | 建议分配给谁；汇总客户的单据（客户摘要已带 AutoCount 单据，基本已覆盖） | 想法 |
+| 6 | 联系人 | 建议负责人：按分配规则试算会分给谁，列出候选人的名下联系人、进行中商机、近 90 天赢率与同行业数字（第一版建议不用 AI） | 设计草稿 `docs/contact-assign-suggest.md`（PR kelvinpang90/acuven_crm_demo#236），待 Kelvin 批准 |
+| 6 | AutoCount | 汇总客户的单据 | 客户摘要与起草回复已带 AutoCount 单据，基本已覆盖，不另做 |
 
 - [x] Kelvin 批准 `docs/inbox-ai-assist.md`（2026-10-13，第三节 Q1 至 Q6 均按建议）
 - [x] ~~在 `ai_billing_hub` 提出三个能力的契约~~：不再需要。Kelvin 2026-10-13 定「每一个 AI 功能都在本系统修改，ai_billing_hub 只负责计费和调用 AI」
