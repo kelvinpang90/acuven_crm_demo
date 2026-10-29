@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.dependencies import get_current_user, require_role
 from app.models.user import User
+from app.services.access_service import assignable_users
 from app.utils.response import fail, ok
 from app.utils.security import hash_password
 
@@ -67,16 +68,7 @@ async def list_users(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    query = select(User).where(User.is_active == True)
-
-    if current_user.role == "sales":
-        query = query.where(User.id == current_user.id)
-    elif current_user.role == "manager":
-        query = query.where((User.manager_id == current_user.id) | (User.id == current_user.id))
-    # admin sees all
-
-    result = await db.execute(query.order_by(User.name))
-    users = result.scalars().all()
+    users = await assignable_users(db, current_user)
     return ok(data=[_user_to_dict(u) for u in users])
 
 
