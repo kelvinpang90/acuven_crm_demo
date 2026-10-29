@@ -14,6 +14,7 @@
 <!-- openclaw:planning-v1:begin -->
 ### 当前计划
 
+1. `CRM-TASK-086` 起草回复与屋顶项目报告按第六轮评测改提示词，少放占位、称呼不猜性别
 
 ### 已阻塞
 
@@ -25,6 +26,36 @@
 - `CRM-TASK-019` 联系人模型取消 is_gateway 映射，列先留在库里
 - `CRM-TASK-020` 删除联系人表的 is_gateway 列
 <!-- openclaw:planning-v1:end -->
+
+---
+
+## 登记 CRM-TASK-086：第六轮评测后改两个功能的提示词（2026-10-29）
+
+### 做了什么
+
+- `docs/reply-draft-documents.md` 加第十节、`docs/project-ai-report.md` 加第十节：第六轮评测两个功能都通过，评审提的写法问题 Kelvin 2026-10-29 定改。起草回复五处：员工要求里写明的事实、日期与承诺照写不占位；已付争议写正在核对、请顾客发转账凭证，欠款金额只放 note_for_agent；过期报价写出原价并注明已过期；按报价单价算出的总价照写；只为顾客问到或员工要求的内容放占位。屋顶项目报告两处：称呼只用客户名、不加称谓；中文用全角标点。
+- `.platform/tasks.yaml` 登记 CRM-TASK-086（`ready`，依赖 081、082），只改两个系统提示与对应测试。planning-v1「当前计划」为 086。合并部署后重评起草回复 16 个、屋顶项目起草报告 10 个样例。
+
+### 设计闸门与预审
+
+- 设计闸门：本 PR（kelvinpang90/acuven_crm_demo#235）。Kelvin 2026-10-29 选「两样都做」，员工要求选「照员工要求写」，已付争议选「改成核对中并请顾客发凭证」；两份设计第十节照这些写。改的是给客户看的回复里怎么写付款与价格。
+- `contract_check`：ready to register，086 没有拆分 WARN；planning-v1 `ok, next: CRM-TASK-086`。WARN 只有原有的四条，与本次无关。
+- 预审（086 改两个功能，分别用两份设计各跑一次，对登记分支的干净检出）：两次都 READY、没有发现。它调模型、不是确定性的，READY 不保证没有缺陷。
+
+```text
+=== CRM-TASK-086（docs/reply-draft-documents.md）:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 18.6 万 token（其中缓存读取 15.1 万），折合 API 价约 $0.35；周额度读数 62%。
+退出码 0
+=== CRM-TASK-086（docs/project-ai-report.md）:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 16.2 万 token（其中缓存读取 13.4 万），折合 API 价约 $0.29；周额度读数 63%。
+退出码 0
+```
 
 ---
 
