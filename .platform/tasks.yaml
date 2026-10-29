@@ -2607,7 +2607,7 @@ tasks:
     purpose: >-
       按 docs/contact-assign-suggest.md 第一、三、四节，在联系人表单负责人下拉旁加建议负责人按钮与面板，调用 CRM-TASK-088 的接口；点选他只改下拉的值，保存仍走原来的流程。
       只改前端：不改后端、不加页面或路由，联系人表单的现有行为（含自动分配选项与查重提示）不变。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-088
     acceptance_criteria:
