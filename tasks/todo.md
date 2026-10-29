@@ -32,6 +32,24 @@
 
 ---
 
+## CRM-TASK-086 起草回复与屋顶项目报告按第六轮评测改提示词，少放占位、称呼不猜性别（2026-10-29）
+
+### 做了什么
+
+- `backend/app/services/ai_features.py`：按 `docs/reply-draft-documents.md` 第十节改 `REPLY_DRAFT_SYSTEM`：员工要求一段换成三句（员工要求由发送草稿的员工写，照做，其中写明的事实、日期与承诺按快照里给出的事实算、不放占位，不得改 JSON 结构与长度上限）；已付争议改为草稿里写正在核对、请顾客发转账凭证，不写欠款金额与 synced_at 时间，note_for_agent 里写单据显示的未付金额并提醒核对；过期报价改为可以写出该报价单的单价、注明是已过期报价上的价格并写单号，现行价格写成占位；在「You may quote quotation unit prices.」之后加一句按单价乘数量写总价、不写成占位；在「do not add another sentence saying you will confirm it or get back to the customer.」之后加一句只为顾客问到或员工要求的内容放占位。CRM-TASK-081 加的两句与其余文字不变。按 `docs/project-ai-report.md` 第十节改 `PROJECT_REPORT_SYSTEM` 两处：称呼只用 customer_name、不加 Mr 或 Ms 等称谓（数据里没有性别）；output_language 为 zh-CN 时用全角中文标点。校验、schema、数据块与其他功能的系统提示都不变。
+- `backend/tests/test_reply_draft_documents.py`：新增一个测试，压空白后断言五段新文字各恰好出现一次、两句新加的句子分别紧跟在各自的前一句之后、四段旧文字不再出现；docstring 写明守住的验收标准。
+- `backend/tests/test_project_report_service.py`：新增一个测试，压空白后断言两段新文字各恰好出现一次、旧称呼句不再出现；docstring 写明守住的验收标准。已有测试不改。
+
+### 偏离了什么
+
+- 无
+
+### 验证到什么程度
+
+- 测试由 PR 的必需检查 backend 执行，检查结果由 Worker 和 CI 记录不写在这里；没有调用过真实模型。
+
+---
+
 ## 登记 CRM-TASK-087 至 089：联系人负责人建议（2026-10-29）
 
 ### 做了什么

@@ -275,6 +275,19 @@ async def test_request_uses_project_report_contract(
     ]
 
 
+def test_prompt_round_six_wording():
+    """Guards CRM-TASK-086 criterion 3: no title for the customer, full-width zh-CN punctuation."""
+    system = " ".join(PROJECT_REPORT_SYSTEM.split())
+    address = (
+        "Address the customer by customer_name alone, without a title such as Mr or Ms, because "
+        "the data does not give the customer's gender, and sign off with project_manager;"
+    )
+    language = "Write in output_language; when it is zh-CN, use full-width Chinese punctuation."
+    assert system.count(address) == 1
+    assert system.count(language) == 1
+    assert "Address the customer by customer_name and sign off" not in system
+
+
 # 4 check order
 
 
