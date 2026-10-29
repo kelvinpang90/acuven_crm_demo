@@ -7,6 +7,8 @@ import type {
   ContactImportResult,
   DuplicateCheckRequest,
   DuplicateResult,
+  AssignSuggestionRequest,
+  AssignSuggestionResult,
 } from '@/types';
 
 export interface WhatsAppHandover {
@@ -39,6 +41,9 @@ export const contactsApi = {
 
   checkDuplicates: (data: DuplicateCheckRequest) =>
     api.post<ApiResponse<DuplicateResult>>('/contacts/duplicate-check', data),
+
+  getAssignSuggestion: (data: AssignSuggestionRequest) =>
+    api.post<ApiResponse<AssignSuggestionResult>>('/contacts/assign-suggestion', data),
 
   getDuplicates: (id: string) =>
     api.get<ApiResponse<DuplicateResult>>(`/contacts/${id}/duplicates`),

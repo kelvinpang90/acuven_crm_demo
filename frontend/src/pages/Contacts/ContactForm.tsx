@@ -4,6 +4,7 @@ import { useAuthStore } from '@/store/authStore';
 import { usersApi } from '@/services/users';
 import { contactsApi } from '@/services/contacts';
 import DuplicateHint from './DuplicateHint';
+import AssignSuggestion from './AssignSuggestion';
 import type { Contact, DuplicateResult } from '@/types';
 
 const DUPLICATE_CHECK_DELAY_MS = 300;
@@ -175,6 +176,14 @@ export default function ContactForm({ initial, onSubmit, submitting }: Props) {
               {!isEditing && <option value="">{t('autoAssign')}</option>}
               {userOptions.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
             </select>
+            <AssignSuggestion
+              name={form.name}
+              company={form.company}
+              industry={form.industry}
+              address={form.address}
+              selectedUserId={form.assigned_to}
+              onSelect={(id) => set('assigned_to', id)}
+            />
           </Field>
         )}
         <Field label={t('common:email')} error={errors.email}>
