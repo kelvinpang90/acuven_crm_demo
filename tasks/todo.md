@@ -32,6 +32,43 @@
 
 ---
 
+## 登记 CRM-TASK-087 至 089：联系人负责人建议（2026-10-29）
+
+### 做了什么
+
+- 新设计 `docs/contact-assign-suggest.md`：经理或管理员在联系人表单里选负责人时，多一个「建议负责人」面板，用表单当前的内容把现有分配规则试算一遍（不保存），列出下拉里每个人的名下联系人、进行中商机、近 90 天赢率与同行业数字；点「选他」只改下拉。第一版不用 AI，不加表与迁移，分配规则的实际结果不变。第九节写定接口字段、统计口径与返回结构。
+- `.platform/tasks.yaml` 登记三项，都是 `ready`：087 业务（候选人共用查询、规则试算、四个数字）、088 接口（依赖 087）、089 前端（依赖 088）。planning-v1「当前计划」在 086 之后接 087、088、089。
+- 任务八表格：优先 6 拆成两行，负责人建议一行标已批准、登记为 087 至 089；AutoCount 单据汇总标为已覆盖、不另做。
+
+### 设计闸门与预审
+
+- 设计闸门：Kelvin 2026-10-29 批准 `docs/contact-assign-suggest.md`，原话「按建议批准，去登记」（第八节 Q1 至 Q4 按建议，第一版不用 AI）。三项都引用本 PR（kelvinpang90/acuven_crm_demo#236）：要给经理与管理员看团队成员的业绩数字。
+- `contract_check`：ready to register，三项都没有拆分 WARN；planning-v1 `ok, next: CRM-TASK-086`。WARN 只有原有的四条，与本次无关。
+- 预审（`docs/contact-assign-suggest.md`，对登记分支的干净检出）：第 1 轮三项都 READY、没有发现。它调模型、不是确定性的，READY 不保证没有缺陷。
+
+```text
+=== 第 1 轮 CRM-TASK-087:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 14 万 token（其中缓存读取 11.4 万），折合 API 价约 $0.27；周额度读数 64%。
+退出码 0
+=== 第 1 轮 CRM-TASK-088:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 12.9 万 token（其中缓存读取 10.9 万），折合 API 价约 $0.21；周额度读数 64%。
+退出码 0
+=== 第 1 轮 CRM-TASK-089:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 9.1 万 token（其中缓存读取 6.8 万），折合 API 价约 $0.22；周额度读数 64%。
+退出码 0
+```
+
+---
+
 ## 登记 CRM-TASK-086：第六轮评测后改两个功能的提示词（2026-10-29）
 
 ### 做了什么
