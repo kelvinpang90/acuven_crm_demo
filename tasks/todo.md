@@ -31,6 +31,25 @@
 
 ---
 
+## CRM-TASK-087 负责人建议的业务层，按分配规则试算并算出候选人的工作量与业绩数字（2026-10-29）
+
+### 做了什么
+
+- `backend/app/services/access_service.py`：加 `assignable_users(db, user)`，按 `docs/contact-assign-suggest.md` 第九节第 1 条取在职的人、按 name 排：管理员全部，经理自己与 `manager_id` 为自己的人，其他角色只有自己。
+- `backend/app/routers/users.py`：`list_users` 改为调 `assignable_users`，返回内容、字段与顺序不变；其他用户接口不变。
+- `backend/app/services/routing_service.py`：按规则选人的循环拆成 `_pick_by_rules(db, contact)`，返回选中的 user_id 与命中的 `RoutingRule`（都没命中为 `(None, None)`）；兜底「最早建的在职 sales」拆成 `_fallback_sales_id`；`assign_contact` 改为先调前者、没选中再调后者，返回值不变。`assign_by_strategy`、`ASSIGN_STRATEGIES`、三种策略函数与规则的增删改不变。新加 `suggest_assignee(db, current_user, *, name, company, industry, address)`：四个字段去首尾空白、空串当 None；用不加入会话的 `Contact` 跑 `_pick_by_rules`，没命中走兜底，给出 `rule_pick`（`user_id`、`user_name`、`rule_name`、`fallback`、`selectable`）；`candidates` 由内部函数 `_candidate_stats` 算，每种数字一条按 `assigned_to` 分组的查询，口径按第一节与第九节第 3 条，行业为空时同行业两项为 None，按 `contact_count` 升序、同数按 name 排。整个函数只读，不 flush、不 commit。
+- 新测试 `backend/tests/test_assign_suggestion_service.py`：覆盖验收标准列出的候选人范围、规则试算、`assign_contact` 回归（与测试里拆分前逻辑的副本比对）、数字口径、排序、不写库六组用例，每个测试的 docstring 写明守住的验收标准。已有测试不改。
+
+### 偏离了什么
+
+- 设计第四节写的 `preview_assignment` 与 `candidate_stats` 两个公开函数没有单独加，按第九节第 1 条合成一个入口 `suggest_assignee`，候选人数字为内部函数 `_candidate_stats`。
+
+### 验证到什么程度
+
+- 测试由 PR 的必需检查 backend 执行，检查结果由 Worker 和 CI 记录不写在这里。
+
+---
+
 ## CRM-TASK-086 起草回复与屋顶项目报告按第六轮评测改提示词，少放占位、称呼不猜性别（2026-10-29）
 
 ### 做了什么

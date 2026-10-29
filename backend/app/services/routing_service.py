@@ -9,6 +9,7 @@ from app.models.contact import Contact
 from app.models.deal import Deal
 from app.models.routing_rule import RoutingRule
 from app.models.user import User
+from app.services.access_service import assignable_users
 
 # ---------------------------------------------------------------------------
 # CRUD
@@ -92,6 +93,20 @@ async def assign_contact(db: AsyncSession, contact: Contact) -> Optional[str]:
     """Determine the best sales rep to assign a contact to.
     Returns user_id or None."""
 
+    user_id, _rule = await _pick_by_rules(db, contact)
+    if user_id:
+        return user_id
+    return await _fallback_sales_id(db)
+
+
+async def _pick_by_rules(
+    db: AsyncSession, contact: Contact
+) -> tuple[Optional[str], Optional[RoutingRule]]:
+    """Try the active rules in priority order.
+
+    Returns the chosen user_id and the rule that chose them, or (None, None)
+    when no rule picks anybody.
+    """
     rules = await db.execute(
         select(RoutingRule)
         .where(RoutingRule.is_active == True)
@@ -125,9 +140,13 @@ async def assign_contact(db: AsyncSession, contact: Contact) -> Optional[str]:
             continue
 
         if user_id:
-            return user_id
+            return user_id, rule
 
-    # Fallback: first active sales
+    return None, None
+
+
+async def _fallback_sales_id(db: AsyncSession) -> Optional[str]:
+    """Fallback when no rule picks anybody: the earliest-created active sales."""
     fallback = await db.execute(
         select(User.id)
         .where(User.is_active == True, User.role == "sales")
@@ -248,6 +267,160 @@ async def _strategy_win_rate(db: AsyncSession, eligible: list[str]) -> Optional[
         return eligible[0]
 
     return best_id
+
+
+# ---------------------------------------------------------------------------
+# Assignee suggestion (docs/contact-assign-suggest.md)
+# ---------------------------------------------------------------------------
+
+
+async def suggest_assignee(
+    db: AsyncSession,
+    current_user: User,
+    *,
+    name: Optional[str],
+    company: Optional[str],
+    industry: Optional[str],
+    address: Optional[str],
+) -> dict:
+    """Dry-run the routing rules on form fields and list the pickable owners.
+
+    Read-only: the probe contact never joins the session and nothing is
+    flushed, committed or changed.
+    """
+    name, company, industry, address = (_clean(v) for v in (name, company, industry, address))
+
+    candidates = await _candidate_stats(db, current_user, industry)
+
+    probe = Contact(name=name, company=company, industry=industry, address=address)
+    user_id, rule = await _pick_by_rules(db, probe)
+    fallback = not user_id
+    if fallback:
+        user_id = await _fallback_sales_id(db)
+
+    user_name = None
+    if user_id:
+        user_name = (
+            await db.execute(select(User.name).where(User.id == user_id))
+        ).scalar_one_or_none()
+
+    return {
+        "rule_pick": {
+            "user_id": user_id,
+            "user_name": user_name,
+            "rule_name": None if fallback else rule.name,
+            "fallback": fallback,
+            "selectable": user_id is not None and any(c["user_id"] == user_id for c in candidates),
+        },
+        "candidates": candidates,
+    }
+
+
+def _clean(value: Optional[str]) -> Optional[str]:
+    if value is None:
+        return None
+    return value.strip() or None
+
+
+async def _candidate_stats(
+    db: AsyncSession, current_user: User, industry: Optional[str]
+) -> list[dict]:
+    """The assignee picker's people with their workload and results.
+
+    One grouped query per figure; people with no rows get 0.
+    """
+    users = await assignable_users(db, current_user)
+    ids = [u.id for u in users]
+
+    contact_counts: dict = {}
+    open_deal_counts: dict = {}
+    recent: dict = {}
+    industry_contacts: dict = {}
+    industry_won: dict = {}
+
+    if ids:
+        # Same basis as _strategy_workload: archived contacts count.
+        rows = await db.execute(
+            select(Contact.assigned_to, func.count(Contact.id))
+            .where(Contact.assigned_to.in_(ids), Contact.deleted_at.is_(None))
+            .group_by(Contact.assigned_to)
+        )
+        contact_counts = dict(rows.all())
+
+        rows = await db.execute(
+            select(Deal.assigned_to, func.count(Deal.id))
+            .where(
+                Deal.assigned_to.in_(ids),
+                Deal.deleted_at.is_(None),
+                Deal.status.notin_(("won", "lost")),
+            )
+            .group_by(Deal.assigned_to)
+        )
+        open_deal_counts = dict(rows.all())
+
+        # Same basis as _strategy_win_rate.
+        cutoff = datetime.utcnow() - timedelta(days=90)
+        rows = await db.execute(
+            select(
+                Deal.assigned_to,
+                func.count(case((Deal.status == "won", 1))),
+                func.count(Deal.id),
+            )
+            .where(
+                Deal.assigned_to.in_(ids),
+                Deal.deleted_at.is_(None),
+                Deal.created_at >= cutoff,
+            )
+            .group_by(Deal.assigned_to)
+        )
+        recent = {uid: (won, total) for uid, won, total in rows.all()}
+
+        if industry is not None:
+            rows = await db.execute(
+                select(Contact.assigned_to, func.count(Contact.id))
+                .where(
+                    Contact.assigned_to.in_(ids),
+                    Contact.deleted_at.is_(None),
+                    Contact.industry == industry,
+                )
+                .group_by(Contact.assigned_to)
+            )
+            industry_contacts = dict(rows.all())
+
+            rows = await db.execute(
+                select(Deal.assigned_to, func.count(Deal.id))
+                .join(Contact, Contact.id == Deal.contact_id)
+                .where(
+                    Deal.assigned_to.in_(ids),
+                    Deal.deleted_at.is_(None),
+                    Deal.status == "won",
+                    Contact.deleted_at.is_(None),
+                    Contact.industry == industry,
+                )
+                .group_by(Deal.assigned_to)
+            )
+            industry_won = dict(rows.all())
+
+    candidates = []
+    for u in users:
+        won_90d, total_90d = recent.get(u.id, (0, 0))
+        candidates.append(
+            {
+                "user_id": u.id,
+                "name": u.name,
+                "contact_count": contact_counts.get(u.id, 0),
+                "open_deal_count": open_deal_counts.get(u.id, 0),
+                "won_90d": won_90d,
+                "total_90d": total_90d,
+                "industry_contact_count": (
+                    None if industry is None else industry_contacts.get(u.id, 0)
+                ),
+                "industry_won_count": None if industry is None else industry_won.get(u.id, 0),
+            }
+        )
+
+    candidates.sort(key=lambda c: (c["contact_count"], c["name"]))
+    return candidates
 
 
 # ---------------------------------------------------------------------------

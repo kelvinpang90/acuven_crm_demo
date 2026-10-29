@@ -80,6 +80,25 @@ async def may_access_task(db: AsyncSession, user: User, task_id: str) -> bool:
     return await may_access_owner(db, user, owner)
 
 
+async def assignable_users(db: AsyncSession, user: User) -> list[User]:
+    """The active users ``user`` may pick as an owner, ordered by name.
+
+    This is the assignee picker's list (``GET /api/users``): an admin gets every
+    active user, a manager themselves and their direct reports, anyone else
+    only themselves -- and nobody inactive, themselves included.
+    """
+    query = select(User).where(User.is_active == True)
+    if user.role == "admin":
+        pass
+    elif user.role == "manager":
+        query = query.where((User.manager_id == user.id) | (User.id == user.id))
+    else:
+        query = query.where(User.id == user.id)
+
+    result = await db.execute(query.order_by(User.name))
+    return list(result.scalars().all())
+
+
 async def may_assign_to(db: AsyncSession, user: User, target_id: str) -> bool:
     """Whether `user` may hand a record to `target_id`.
 
