@@ -2525,7 +2525,7 @@ tasks:
     purpose: >-
       按 docs/reply-draft-documents.md 第十节与 docs/project-ai-report.md 第十节：第六轮评测两个功能都通过，评审提的写法问题 Kelvin 定改。起草回复的系统提示改五处（员工要求照写、已付争议请顾客发凭证、过期报价写出原价、按单价算总价、不放没人问的占位），屋顶项目报告的系统提示改两处（称呼不加称谓、中文用全角标点）。
       只改两个系统提示与对应测试；不改校验、schema、数据块、其他功能、接口、前端与评测样例；测试不调真实模型。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-081
       - CRM-TASK-082
