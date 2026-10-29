@@ -16,6 +16,7 @@ from app.models.user import User
 from app.schemas.activity import ActivityCreate
 from app.schemas.contact import (
     ArchiveRequest,
+    AssignSuggestionRequest,
     ContactCreate,
     ContactUpdate,
     DuplicateCheckRequest,
@@ -330,6 +331,30 @@ async def check_duplicates(
         phone=body.phone,
     )
     return ok(data=_duplicates_payload(result))
+
+
+# --- Assignee suggestion (docs/contact-assign-suggest.md sections 3, 4 and 9) ---
+# Also before the /{contact_id} routes. POST because the body carries the
+# customer's name and address; read-only, so nothing is committed or audited.
+
+
+@router.post("/assign-suggestion")
+async def suggest_assignee(
+    body: AssignSuggestionRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    if current_user.role not in ("admin", "manager"):
+        return fail("Permission denied", code="FORBIDDEN", status_code=403)
+    result = await routing_service.suggest_assignee(
+        db,
+        current_user,
+        name=body.name,
+        company=body.company,
+        industry=body.industry,
+        address=body.address,
+    )
+    return ok(data=result)
 
 
 @router.get("/{contact_id}/duplicates")
