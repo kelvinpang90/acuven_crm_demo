@@ -15,6 +15,9 @@
 ### 当前计划
 
 1. `CRM-TASK-086` 起草回复与屋顶项目报告按第六轮评测改提示词，少放占位、称呼不猜性别
+2. `CRM-TASK-087` 负责人建议的业务层，按分配规则试算并算出候选人的工作量与业绩数字
+3. `CRM-TASK-088` 负责人建议的接口，经理与管理员按表单内容取规则试算与候选人数字
+4. `CRM-TASK-089` 联系人表单的负责人下拉旁加建议负责人面板，看规则试算与候选人数字后一键选人
 
 ### 已阻塞
 
@@ -26,6 +29,43 @@
 - `CRM-TASK-019` 联系人模型取消 is_gateway 映射，列先留在库里
 - `CRM-TASK-020` 删除联系人表的 is_gateway 列
 <!-- openclaw:planning-v1:end -->
+
+---
+
+## 登记 CRM-TASK-087 至 089：联系人负责人建议（2026-10-29）
+
+### 做了什么
+
+- 新设计 `docs/contact-assign-suggest.md`：经理或管理员在联系人表单里选负责人时，多一个「建议负责人」面板，用表单当前的内容把现有分配规则试算一遍（不保存），列出下拉里每个人的名下联系人、进行中商机、近 90 天赢率与同行业数字；点「选他」只改下拉。第一版不用 AI，不加表与迁移，分配规则的实际结果不变。第九节写定接口字段、统计口径与返回结构。
+- `.platform/tasks.yaml` 登记三项，都是 `ready`：087 业务（候选人共用查询、规则试算、四个数字）、088 接口（依赖 087）、089 前端（依赖 088）。planning-v1「当前计划」在 086 之后接 087、088、089。
+- 任务八表格：优先 6 拆成两行，负责人建议一行标已批准、登记为 087 至 089；AutoCount 单据汇总标为已覆盖、不另做。
+
+### 设计闸门与预审
+
+- 设计闸门：Kelvin 2026-10-29 批准 `docs/contact-assign-suggest.md`，原话「按建议批准，去登记」（第八节 Q1 至 Q4 按建议，第一版不用 AI）。三项都引用本 PR（kelvinpang90/acuven_crm_demo#236）：要给经理与管理员看团队成员的业绩数字。
+- `contract_check`：ready to register，三项都没有拆分 WARN；planning-v1 `ok, next: CRM-TASK-086`。WARN 只有原有的四条，与本次无关。
+- 预审（`docs/contact-assign-suggest.md`，对登记分支的干净检出）：第 1 轮三项都 READY、没有发现。它调模型、不是确定性的，READY 不保证没有缺陷。
+
+```text
+=== 第 1 轮 CRM-TASK-087:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 14 万 token（其中缓存读取 11.4 万），折合 API 价约 $0.27；周额度读数 64%。
+退出码 0
+=== 第 1 轮 CRM-TASK-088:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 12.9 万 token（其中缓存读取 10.9 万），折合 API 价约 $0.21；周额度读数 64%。
+退出码 0
+=== 第 1 轮 CRM-TASK-089:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 9.1 万 token（其中缓存读取 6.8 万），折合 API 价约 $0.22；周额度读数 64%。
+退出码 0
+```
 
 ---
 
@@ -3241,7 +3281,8 @@ PRECHECK_RESULT: READY
 | 5 | 跟进记录 | 从聊天记录生成跟进记录与任务草稿（跟进整理设计第一节留下的想法） | 设计 `docs/followup-from-chat.md` 2026-10-27 已批准（PR kelvinpang90/acuven_crm_demo#209，Q1 至 Q4 按建议），登记为 CRM-TASK-075 至 078 |
 | 5 | 收件箱 | 起草回复时带上这个客户的 AutoCount 报价单与发票，能直接回答价格、欠款类问题 | 设计 `docs/reply-draft-documents.md` 2026-10-27 已批准（PR kelvinpang90/acuven_crm_demo#218，Q1 至 Q4 按建议），登记为 CRM-TASK-079、080 |
 | 6 | 屋顶项目 | 根据项目资料、步骤备注与员工填的现场情况起草勘察报告与完工报告（这一版不看照片：现在只存了文件名） | 设计 `docs/project-ai-report.md` 2026-10-28 已批准（PR kelvinpang90/acuven_crm_demo#223，Q1 至 Q4 按建议），登记为 CRM-TASK-082 至 085 |
-| 6 | 分配规则、AutoCount | 建议分配给谁；汇总客户的单据（客户摘要已带 AutoCount 单据，基本已覆盖） | 想法 |
+| 6 | 联系人 | 建议负责人：按分配规则试算会分给谁，列出候选人的名下联系人、进行中商机、近 90 天赢率与同行业数字（第一版建议不用 AI） | 设计 `docs/contact-assign-suggest.md` 2026-10-29 已批准（PR kelvinpang90/acuven_crm_demo#236，Q1 至 Q4 按建议，第一版不用 AI），登记为 CRM-TASK-087 至 089 |
+| 6 | AutoCount | 汇总客户的单据 | 客户摘要与起草回复已带 AutoCount 单据，基本已覆盖，不另做 |
 
 - [x] Kelvin 批准 `docs/inbox-ai-assist.md`（2026-10-13，第三节 Q1 至 Q6 均按建议）
 - [x] ~~在 `ai_billing_hub` 提出三个能力的契约~~：不再需要。Kelvin 2026-10-13 定「每一个 AI 功能都在本系统修改，ai_billing_hub 只负责计费和调用 AI」

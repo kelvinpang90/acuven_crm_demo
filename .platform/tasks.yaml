@@ -2547,3 +2547,87 @@ tasks:
       - format.apply
     creates_branch: true
     creates_pull_request: true
+
+  - id: CRM-TASK-087
+    title: 负责人建议的业务层，按分配规则试算并算出候选人的工作量与业绩数字
+    purpose: >-
+      按 docs/contact-assign-suggest.md 第一、四、九节，加负责人建议的业务函数，供 CRM-TASK-088 的接口使用：用表单字段把现有分配规则试算一遍，并给出负责人下拉里每个人的名下联系人、进行中商机、近 90 天赢率与同行业数字。
+      只做业务层：不调 AI、不加表、不加迁移、不改接口路径、不改前端；分配规则的实际结果不变。users 路由只把候选人查询换成共用函数，返回不变。
+    status: ready
+    depends_on: []
+    acceptance_criteria:
+      - access_service 新增 assignable_users(db, user)，返回在职的 User 列表并按 name 排序；管理员为全部在职的人，经理为自己与 manager_id 为自己的在职的人，其他角色只有自己（在职时）；routers/users.py 的 list_users 改为调它，返回内容、字段与顺序都不变；其他用户接口不变
+      - routing_service 把按规则选人的逻辑拆成一个内部函数，返回选中的 user_id 与命中的 RoutingRule（都没命中时两者为空）；assign_contact 改为基于它，在任何数据下返回值都与现在一致，包括兜底取最早建的在职 sales；assign_by_strategy、ASSIGN_STRATEGIES、三种策略函数与规则的增删改不变
+      - routing_service 新增 suggest_assignee(db, current_user, *, name, company, industry, address)，返回含 rule_pick 与 candidates 两个键的 dict；四个字段去首尾空白，空串当作 None；rule_pick 用这四个字段建一个不加入会话的 Contact 跑上一条的规则逻辑，命中时给 user_id、user_name、rule_name（规则的 name）与 fallback 为 false；没命中时按 assign_contact 的兜底给出那个人，rule_name 为 None、fallback 为 true；没有任何在职 sales 时 user_id、user_name、rule_name 都为 None、fallback 为 true；selectable 为 user_id 是否在 candidates 里；整个函数不写库、不 flush、不 commit、不改任何记录
+      - candidates 为 assignable_users(current_user) 的每个人一项，键为 user_id、name、contact_count、open_deal_count、won_90d、total_90d、industry_contact_count、industry_won_count；contact_count 为 assigned_to 是此人、deleted_at 为空的联系人数（含已归档，与 workload 策略同一口径）；open_deal_count 为 assigned_to 是此人、deleted_at 为空、status 不是 won 也不是 lost 的商机数；won_90d 与 total_90d 为 assigned_to 是此人、deleted_at 为空、created_at 不早于 UTC 当前时间减 90 天的商机里 status 为 won 的数与总数（与 win_rate 策略同一口径）；industry 有值时 industry_contact_count 为此人名下 deleted_at 为空且 industry 与之相等的联系人数，industry_won_count 为 assigned_to 是此人、deleted_at 为空、status 为 won，且所属联系人 deleted_at 为空、industry 与之相等的商机数；industry 为空时这两项为 None；每种数字用一条按人分组的查询算出、不按人循环查库，没有记录的人为 0；按 contact_count 升序、同数按 name 排
+      - 新测试文件 test_assign_suggestion_service 覆盖下列用例（一个用例可以是一个参数化测试）；1 候选人范围，管理员、经理、销售各自得到的人与 list_users 一致，停用的人不在内；2 规则试算，workload 规则命中、region 规则按地址关键词命中、没有规则命中走兜底、没有在职 sales，分别得到上一条所述的 rule_pick；规则选中的人不在经理的候选人里时 selectable 为 false；3 assign_contact 回归，同样的数据下拆分前后返回相同的人（含兜底）；4 数字口径，已删除的联系人与商机不计、已归档的联系人计入 contact_count、won 与 lost 不计入 open_deal_count、91 天前建的商机不计入近 90 天、别的行业不计入同行业、industry 为空时两项为 None、没有记录的人为 0；5 排序，按 contact_count 升序、同数按 name；6 不写库，调用前后联系人、商机与规则的行数与内容不变，会话里没有新对象。测试只需覆盖这些用例，每个测试写明守住的是哪一条验收标准；清单之外的补充覆盖只算非阻塞意见；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
+      - tasks/todo.md 新增 CRM-TASK-087 记录段（做了什么、偏离了什么、验证到什么程度）；偏离段只列两类、每条一句：与验收标准或设计文档不一致的做法，以及验收标准没有要求、但改变了现有接口或页面行为的改动；验收标准要求的改动与重构、命名、格式调整不算偏离，没有就写无；偏离段漏列只算非阻塞意见，除非漏列的改动本身违反某条验收标准（那时按那一条判）；验证段只写测试由 PR 的必需检查 backend 执行、检查结果由 Worker 和 CI 记录不写在这里，不写任何检查是否运行或通过；不改 planning-v1 块；复选框只允许 [ ] / [x]
+      - 改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不加表、不加迁移、不改前端；allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#236），不合并、不直推
+    allowed_change_paths:
+      - backend/app/services/access_service.py
+      - backend/app/services/routing_service.py
+      - backend/app/routers/users.py
+      - backend/tests/test_assign_suggestion_service.py
+      - tasks/todo.md
+    allowed_commands:
+      - lint.check
+      - format.check
+      - format.apply
+    creates_branch: true
+    creates_pull_request: true
+
+  - id: CRM-TASK-088
+    title: 负责人建议的接口，经理与管理员按表单内容取规则试算与候选人数字
+    purpose: >-
+      按 docs/contact-assign-suggest.md 第三、四、九节，把 CRM-TASK-087 的业务函数接成 POST /api/contacts/assign-suggestion，供 CRM-TASK-089 的联系人表单使用。
+      只做接口层：加在已有的联系人路由里，不改 main.py、不改业务规则、不改表结构、不改前端、不改其他联系人接口。
+    status: ready
+    depends_on:
+      - CRM-TASK-087
+    acceptance_criteria:
+      - 新增 POST /api/contacts/assign-suggestion，请求模型 AssignSuggestionRequest 放在 schemas/contact.py，name、company、industry、address 四个字段都可选、为字符串或 null，上限依次为 100、200、50、1000 个字符，超出或类型不对返回 422；其余联系人接口与 duplicate-check 的路径与行为不变，不与 /{contact_id} 开头的路由冲突
+      - 要求登录；当前用户角色为 admin 或 manager 时调用 routing_service.suggest_assignee，传当前用户对象与请求里的四个字段，返回 200 与照现有 ok 外壳包住的 rule_pick 与 candidates（字段照业务函数，见设计第九节第 4 条）；其他角色返回 403 FORBIDDEN（照现有 fail 外壳）且不调用业务函数；接口不提交事务、不写审计
+      - 新测试文件 test_contact_assign_suggestion_api 打桩业务函数，覆盖下列用例（一个用例可以是一个参数化测试）；1 校验，四个字段分别超上限、类型为数字时返回 422 且业务函数没被调用；全部不给或都为 null 时照常调用、四个参数为 None；2 角色，没登录 401；销售 403 FORBIDDEN 且业务函数没被调用；经理与管理员 200；3 传参，业务函数收到的用户与四个字段与请求一致；4 返回，200 的 data 原样含业务函数给的 rule_pick 与 candidates；5 路由，POST 这个路径不会落到 /{contact_id} 开头的路由。测试只需覆盖这些用例，每个测试写明守住的是哪一条验收标准；清单之外的补充覆盖只算非阻塞意见；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
+      - tasks/todo.md 新增 CRM-TASK-088 记录段（做了什么、偏离了什么、验证到什么程度）；偏离段只列两类、每条一句：与验收标准或设计文档不一致的做法，以及验收标准没有要求、但改变了现有接口或页面行为的改动；验收标准要求的改动与重构、命名、格式调整不算偏离，没有就写无；偏离段漏列只算非阻塞意见，除非漏列的改动本身违反某条验收标准（那时按那一条判）；验证段只写测试由 PR 的必需检查 backend 执行、检查结果由 Worker 和 CI 记录不写在这里，不写任何检查是否运行或通过；不改 planning-v1 块；复选框只允许 [ ] / [x]
+      - 改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置、nginx；不装依赖；不加表、不加迁移、不改前端；allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#236），不合并、不直推
+    allowed_change_paths:
+      - backend/app/routers/contacts.py
+      - backend/app/schemas/contact.py
+      - backend/tests/test_contact_assign_suggestion_api.py
+      - tasks/todo.md
+    allowed_commands:
+      - lint.check
+      - format.check
+      - format.apply
+    creates_branch: true
+    creates_pull_request: true
+
+  - id: CRM-TASK-089
+    title: 联系人表单的负责人下拉旁加建议负责人面板，看规则试算与候选人数字后一键选人
+    purpose: >-
+      按 docs/contact-assign-suggest.md 第一、三、四节，在联系人表单负责人下拉旁加建议负责人按钮与面板，调用 CRM-TASK-088 的接口；点选他只改下拉的值，保存仍走原来的流程。
+      只改前端：不改后端、不加页面或路由，联系人表单的现有行为（含自动分配选项与查重提示）不变。
+    status: ready
+    depends_on:
+      - CRM-TASK-088
+    acceptance_criteria:
+      - 新组件 AssignSuggestion 放在 ContactForm 的负责人下拉旁，只在能选负责人时（canSelectUser，经理与管理员）显示，新建与编辑都有；services/contacts.ts 新增调用 POST /contacts/assign-suggestion 的函数，请求带表单当前的 name、company、industry、address（去首尾空白后为空的传 null）；类型定义放 types/index.ts，与接口字段一致
+      - 点建议负责人按钮发请求，进行中按钮置灰并显示加载中；面板顶部写明按当前填的内容试算；规则试算一行按 rule_pick 显示三种情况之一，命中写会分给某人与规则名，fallback 为 true 且有人时写没有规则命中、会分给某人，user_id 为空时写现在没有在职的销售可以分配；selectable 为 true 时这一行有选他按钮，为 false 时标不在你能选的范围里、不给按钮
+      - 候选人表格每人一行，列为姓名、名下联系人、进行中商机、近 90 天赢率（写成赢单数/总数并附四舍五入到整数的百分比，total_90d 为 0 时写无）、同行业（名下同行业联系人数与同行业赢单数；industry_contact_count 为 null 时整列不显示）；每行有选他按钮，点了把表单的负责人改成这个人，当前已选的人那一行标出来
+      - 表单里 name、company、industry、address 任一个改了就清掉面板里的结果，要重新点；请求失败（任何错误码、超时与网络错误）时面板显示读取建议失败；新文案同时加在 en 与 zh 的 contacts 命名空间，不写硬编码文字；保存、自动分配选项与查重提示的现有行为不变；前端类型检查与构建由 PR 的必需 CI 检查 frontend 执行并通过（Worker 沙箱不跑 npm）
+      - tasks/todo.md 新增 CRM-TASK-089 记录段（做了什么、偏离了什么、验证到什么程度）；偏离段只列两类、每条一句：与验收标准或设计文档不一致的做法，以及验收标准没有要求、但改变了现有接口或页面行为的改动；验收标准要求的改动与重构、命名、格式调整不算偏离，没有就写无；偏离段漏列只算非阻塞意见，除非漏列的改动本身违反某条验收标准（那时按那一条判）；验证段只写前端类型检查与构建由 PR 的必需检查 frontend 执行、检查结果由 Worker 和 CI 记录不写在这里、没有在浏览器里实际操作过，不写任何检查是否运行或通过；不改 planning-v1 块；复选框只允许 [ ] / [x]
+      - 改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不改后端；allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#236），不合并、不直推
+    allowed_change_paths:
+      - frontend/src/pages/Contacts/AssignSuggestion.tsx
+      - frontend/src/pages/Contacts/ContactForm.tsx
+      - frontend/src/services/contacts.ts
+      - frontend/src/types/index.ts
+      - frontend/src/locales/en/contacts.json
+      - frontend/src/locales/zh/contacts.json
+      - tasks/todo.md
+    allowed_commands:
+      - lint.check
+      - format.check
+      - format.apply
+    creates_branch: true
+    creates_pull_request: true
