@@ -2581,7 +2581,7 @@ tasks:
     purpose: >-
       按 docs/contact-assign-suggest.md 第三、四、九节，把 CRM-TASK-087 的业务函数接成 POST /api/contacts/assign-suggestion，供 CRM-TASK-089 的联系人表单使用。
       只做接口层：加在已有的联系人路由里，不改 main.py、不改业务规则、不改表结构、不改前端、不改其他联系人接口。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-087
     acceptance_criteria:
