@@ -15,6 +15,9 @@
 ### 当前计划
 
 1. `CRM-TASK-086` 起草回复与屋顶项目报告按第六轮评测改提示词，少放占位、称呼不猜性别
+2. `CRM-TASK-087` 负责人建议的业务层，按分配规则试算并算出候选人的工作量与业绩数字
+3. `CRM-TASK-088` 负责人建议的接口，经理与管理员按表单内容取规则试算与候选人数字
+4. `CRM-TASK-089` 联系人表单的负责人下拉旁加建议负责人面板，看规则试算与候选人数字后一键选人
 
 ### 已阻塞
 
@@ -3241,7 +3244,7 @@ PRECHECK_RESULT: READY
 | 5 | 跟进记录 | 从聊天记录生成跟进记录与任务草稿（跟进整理设计第一节留下的想法） | 设计 `docs/followup-from-chat.md` 2026-10-27 已批准（PR kelvinpang90/acuven_crm_demo#209，Q1 至 Q4 按建议），登记为 CRM-TASK-075 至 078 |
 | 5 | 收件箱 | 起草回复时带上这个客户的 AutoCount 报价单与发票，能直接回答价格、欠款类问题 | 设计 `docs/reply-draft-documents.md` 2026-10-27 已批准（PR kelvinpang90/acuven_crm_demo#218，Q1 至 Q4 按建议），登记为 CRM-TASK-079、080 |
 | 6 | 屋顶项目 | 根据项目资料、步骤备注与员工填的现场情况起草勘察报告与完工报告（这一版不看照片：现在只存了文件名） | 设计 `docs/project-ai-report.md` 2026-10-28 已批准（PR kelvinpang90/acuven_crm_demo#223，Q1 至 Q4 按建议），登记为 CRM-TASK-082 至 085 |
-| 6 | 联系人 | 建议负责人：按分配规则试算会分给谁，列出候选人的名下联系人、进行中商机、近 90 天赢率与同行业数字（第一版建议不用 AI） | 设计草稿 `docs/contact-assign-suggest.md`（PR kelvinpang90/acuven_crm_demo#236），待 Kelvin 批准 |
+| 6 | 联系人 | 建议负责人：按分配规则试算会分给谁，列出候选人的名下联系人、进行中商机、近 90 天赢率与同行业数字（第一版建议不用 AI） | 设计 `docs/contact-assign-suggest.md` 2026-10-29 已批准（PR kelvinpang90/acuven_crm_demo#236，Q1 至 Q4 按建议，第一版不用 AI），登记为 CRM-TASK-087 至 089 |
 | 6 | AutoCount | 汇总客户的单据 | 客户摘要与起草回复已带 AutoCount 单据，基本已覆盖，不另做 |
 
 - [x] Kelvin 批准 `docs/inbox-ai-assist.md`（2026-10-13，第三节 Q1 至 Q6 均按建议）
