@@ -29,6 +29,26 @@
 
 ---
 
+## CRM-TASK-089 联系人表单的负责人下拉旁加建议负责人面板，看规则试算与候选人数字后一键选人（2026-10-29）
+
+### 做了什么
+
+- 新组件 `frontend/src/pages/Contacts/AssignSuggestion.tsx`：按 `docs/contact-assign-suggest.md` 第一、三、四节，一个「建议负责人」按钮，点了以表单当前的 `name`、`company`、`industry`、`address`（去首尾空白后为空传 null）请求建议，进行中按钮置灰并显示加载中；面板顶部写「按当前填的内容试算」；规则试算一行按 `rule_pick` 写命中（人与规则名）、兜底（没有规则命中、会分给某人）或 `user_id` 为空（现在没有在职的销售可以分配），`selectable` 为 true 时给「选他」、为 false 时标「不在你能选的范围里」；候选人表格列为姓名、名下联系人、进行中商机、近 90 天赢率（赢单数/总数与四舍五入的百分比，`total_90d` 为 0 写「无」）、同行业（同行业联系人数与赢单数，`industry_contact_count` 为 null 时整列不显示），每行「选他」，当前已选的人那一行高亮并标「已选」；四个字段任一个变了就清掉结果，并用请求版本号丢弃还没回来的结果；请求失败（任何错误码、超时与网络错误）显示「读取建议失败」。
+- `frontend/src/pages/Contacts/ContactForm.tsx`：在 `canSelectUser` 时的负责人下拉下方放 `AssignSuggestion`，新建与编辑都有；「选他」只调原来的 `set('assigned_to', id)` 改下拉的值；保存、自动分配选项与查重提示不变。
+- `frontend/src/services/contacts.ts`：加 `getAssignSuggestion`，`POST /contacts/assign-suggestion`。
+- `frontend/src/types/index.ts`：加 `AssignSuggestionRequest`、`AssignRulePick`、`AssignCandidate`、`AssignSuggestionResult`，字段与第九节第 4 条一致。
+- `frontend/src/locales/en/contacts.json`、`frontend/src/locales/zh/contacts.json`：加 `assignSuggest*` 文案。
+
+### 偏离了什么
+
+- 无
+
+### 验证到什么程度
+
+- 前端类型检查与构建由 PR 的必需检查 frontend 执行，检查结果由 Worker 和 CI 记录不写在这里；没有在浏览器里实际操作过。
+
+---
+
 ## CRM-TASK-088 负责人建议的接口，经理与管理员按表单内容取规则试算与候选人数字（2026-10-29）
 
 ### 做了什么

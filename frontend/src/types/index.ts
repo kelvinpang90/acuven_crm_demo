@@ -422,6 +422,38 @@ export interface DuplicateCheckRequest {
   phone?: string | null;
 }
 
+// Assignee suggestion (docs/contact-assign-suggest.md section 9, items 2 and 4).
+export interface AssignSuggestionRequest {
+  name: string | null;
+  company: string | null;
+  industry: string | null;
+  address: string | null;
+}
+
+export interface AssignRulePick {
+  user_id: string | null;
+  user_name: string | null;
+  rule_name: string | null;
+  fallback: boolean;
+  selectable: boolean;
+}
+
+export interface AssignCandidate {
+  user_id: string;
+  name: string;
+  contact_count: number;
+  open_deal_count: number;
+  won_90d: number;
+  total_90d: number;
+  industry_contact_count: number | null;
+  industry_won_count: number | null;
+}
+
+export interface AssignSuggestionResult {
+  rule_pick: AssignRulePick;
+  candidates: AssignCandidate[];
+}
+
 export interface AiImportColumn {
   header: string;
   samples: string[];
