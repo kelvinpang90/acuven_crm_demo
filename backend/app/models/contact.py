@@ -49,6 +49,10 @@ class Contact(Base):
     )
     wa_handover_expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     wa_handover_updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Conversation claim: who is replying right now and until when (naive UTC).
+    # A claim is valid only while reply_claimed_until is in the future.
+    reply_claimed_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    reply_claimed_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
