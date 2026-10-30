@@ -51,7 +51,7 @@
 
 ### 设计闸门与预审
 
-- 设计闸门：`docs/chatbot-phase3.md`（kelvinpang90/acuven_crm_demo#249，Kelvin 2026-10-30 批准）；第十五节改了已批准的写法，**要 Kelvin 在本登记 PR 上批准**。
+- 设计闸门：`docs/chatbot-phase3.md`（kelvinpang90/acuven_crm_demo#249，Kelvin 2026-10-30 批准）；第十五节改了已批准的写法，Kelvin 2026-10-31 在本登记 PR 上批准（原话「批准，合并」）。
   096（改表结构）、097（Meta 按条计费、发送状态规则）、098（收发个人数据的接口）适用；099 只展示与调用已有接口，不适用，仍引用同一 PR。
 - `contract_check`：ready to register，四项都没有拆分 WARN；planning-v1 `ok, next: CRM-TASK-091`。WARN 只有原有的四条，与本次无关。
 - 预审（`docs/chatbot-phase3.md`，对登记分支的干净检出）：096 至 098 第 1 轮都 READY，没有 `DESIGN_DEFECT` 与 `SCOPE_GAP`；097 报的两条 `UNDECIDED` 按设计第十五节第 10 条写死，
