@@ -33,6 +33,67 @@
 
 ---
 
+## 登记 CRM-TASK-091 至 095：会话认领与转派、推送补联系人变化（2026-10-30）
+
+### 做了什么
+
+- 新设计 `docs/chatbot-phase3.md`（demo 号多客服第 3 阶段「补齐」：实时刷新补缺口、会话认领与转派、窗口外模板消息、媒体），本次只登记只涉及 CRM 的第一批。
+  第十四节是登记时的补充：编号按依赖重排、迁移号、发送时什么时候抢认领、释放别人的认领要带接手、批量更新的推送判断、093 与 094 之间的过渡、认领字段的输出，以及第 1 轮预审后写死的细节。
+- `.platform/tasks.yaml` 登记五项，都是 `ready`：091 数据库（迁移 019，认领两列）、092 推送钩子（依赖 091）、093 认领规则并接进发送与重试（依赖 091）、094 接口（依赖 093）、095 前端（依赖 094、092）。
+- CRM-TASK-020（删 `is_gateway` 列）的迁移号再顺延为 020，`down_revision` 改为 019，依赖由 065 改为 091；验收标准里的文件名与编号随之改，范围不变。
+- planning-v1「当前计划」接上 091 至 095。
+- 模板（096 至 099）与媒体（100 至 105）这次不登记：模板等 chatbot 侧 C5 与 Meta 审核，媒体排在模板之后。
+
+### 设计闸门与预审
+
+- 设计闸门：Kelvin 2026-10-30 批准 `docs/chatbot-phase3.md`，原话「都按照你建议执行」（第十节 Q1 至 Q14 按建议）；第 3 项模板同日确认保留（原话「保留」）。
+  091、093、094 引用本设计的 PR（kelvinpang90/acuven_crm_demo#249）：改表结构、认领状态规则、收发认领状态的接口。092（信号不带数据）与 095（只展示与调用已有接口）不适用，仍引用同一 PR 以便追溯。
+- `contract_check`：ready to register，五项都没有拆分 WARN；planning-v1 `ok, next: CRM-TASK-091`。WARN 只有原有的四条，与本次无关。
+- 预审（`docs/chatbot-phase3.md`，对登记分支的干净检出）：第 1 轮五项都 READY，没有 `DESIGN_DEFECT` 与 `SCOPE_GAP`；093 至 095 报了 8 条 `UNDECIDED`，
+  按设计第十四节第 8 条全部写死，并改了 093、094、095 的验收标准（重试以请求人认领、释放用条件更新、接手自己时被接手的人为空、批量查询只管新字段、转派后 403 或 404 都算无权、列表小标同一个 30 秒重算）。
+  只补细节、没有改规则，周额度读数已到 94%，没有再跑第 2 轮。它调模型、不是确定性的，READY 不保证没有缺陷。
+
+```text
+=== 第 1 轮 CRM-TASK-091:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 20.5 万 token（其中缓存读取 16.6 万），折合 API 价约 $0.38；周额度读数 94%。
+退出码 0
+=== 第 1 轮 CRM-TASK-092:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 13.4 万 token（其中缓存读取 9.5 万），折合 API 价约 $0.39；周额度读数 94%。
+退出码 0
+=== 第 1 轮 CRM-TASK-093:
+PRECHECK_FINDING: UNDECIDED backend/app/services/chatbot_send_service.py :: retry_agent_reply gets no current user, so "someone else's claim" could mean other than message.sent_by or other than a new caller parameter; these differ when a manager retries a salesperson's message.
+PRECHECK_FINDING: UNDECIDED 5.2 :: Release reads the valid claim and then clears both columns with no condition, so a claim taken between the read and the clear is wiped; it is not said whether the clear must be a conditional update like the claim.
+PRECHECK_FINDING: UNDECIDED 5.2 :: When the current valid claimer takes over their own claim, it is not said whether "the person taken over" is that user or empty.
+session verdict: NOT_READY
+judged from the findings, not the session's verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 25.7 万 token（其中缓存读取 21.3 万），折合 API 价约 $0.46；周额度读数 94%。
+退出码 0
+=== 第 1 轮 CRM-TASK-094:
+PRECHECK_FINDING: UNDECIDED 5.2 :: Retry service takes no user id, and design does not say whether the claim is checked and renewed for the requester or the message's sent_by when a manager retries someone else's message.
+PRECHECK_FINDING: UNDECIDED 5.2 :: Claim with takeover=true when the valid claim is already the caller's own: undecided whether taken_over_from returns the caller's id or null.
+PRECHECK_FINDING: UNDECIDED backend/app/services/contact_service.py :: Unclear whether the one-batch-query rule also requires batching the existing per-row assigned_to_name lookup, or only the new claim name lookup.
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 63.8 万 token（其中缓存读取 56.7 万），折合 API 价约 $0.77；周额度读数 94%。
+退出码 0
+=== 第 1 轮 CRM-TASK-095:
+PRECHECK_FINDING: UNDECIDED backend/app/routers/contacts.py :: After reassigning, the contact read returns 404 NOT_FOUND and only the messages read returns 403, so the implementer must pick which read means no access and whether 404 counts.
+PRECHECK_FINDING: UNDECIDED 5.2 :: It is not stated whether the list badge is also rechecked every 30 seconds after expiry, or only the conversation header.
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 78 万 token（其中缓存读取 71.5 万），折合 API 价约 $0.76；周额度读数 94%。
+退出码 0
+```
+
+---
+
 ## CRM-TASK-090 收发邮件的阻塞调用放进线程并设超时，邮件服务器卡住时后端不跟着停（2026-10-30）
 
 ### 做了什么

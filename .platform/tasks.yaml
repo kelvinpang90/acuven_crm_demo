@@ -2732,9 +2732,9 @@ tasks:
       - CRM-TASK-091
     acceptance_criteria:
       - 新增 claim_service：常量 CLAIM_DURATION 为 15 分钟；有效认领指 reply_claimed_by 非空且当前 UTC 时间早于 reply_claimed_until（恰好到期算无效）；提供只读判断函数（给定联系人与当前时间，返回有效认领人与到期时间或无）
-      - 认领函数（参数为联系人 id、当前用户、是否接手）：联系人不存在或已软删除返回 NOT_FOUND；不接手时用一条条件更新写入认领人为当前用户、到期为现在加 15 分钟，条件是联系人未删除且（没有认领人，或认领人就是当前用户，或到期时间不晚于现在），影响 0 行即读出当前认领人与到期时间返回 CLAIMED；接手时无条件覆盖为当前用户并返回被接手的人（原有效认领人，没有则为空）；成功返回认领人与到期时间；释放函数（参数同上）：联系人不存在或已软删除返回 NOT_FOUND；没有有效认领或有效认领人是当前用户时清空两列；有效认领是别人的且不接手时返回 CLAIMED 并带认领人与到期时间、不改；接手时清空；归属是否可访问由接口层判断，服务不查
+      - 认领函数（参数为联系人 id、当前用户、是否接手）：联系人不存在或已软删除返回 NOT_FOUND；不接手时用一条条件更新写入认领人为当前用户、到期为现在加 15 分钟，条件是联系人未删除且（没有认领人，或认领人就是当前用户，或到期时间不晚于现在），影响 0 行即读出当前认领人与到期时间返回 CLAIMED；接手时无条件覆盖为当前用户并返回被接手的人（原有效认领人是别人时为那个人；没有有效认领、或有效认领人就是当前用户时为空）；成功返回认领人与到期时间；释放函数（参数同上）：联系人不存在或已软删除返回 NOT_FOUND；不接手时用一条条件更新清空两列，条件与认领函数相同（没有认领人，或认领人就是当前用户，或到期时间不晚于现在），影响 0 行即读出当前认领人与到期时间返回 CLAIMED、不改；接手时无条件清空；归属是否可访问由接口层判断，服务不查
       - WhatsApp 回复的发送（chatbot_send_service 现有的发送函数）：在联系人存在的检查之后、号码检查之前，只读判断有效认领，是别人的返回新的结果类别 CLAIMED（带认领人与到期时间），不存消息、不调用 chatbot；全部校验通过后、存消息之前，用与认领函数相同的条件更新抢或续认领（到期为现在加 15 分钟），影响 0 行同样返回 CLAIMED、不存消息、不调用；抢认领与存消息在同一次提交里；被号码、窗口、配置等校验拒掉的发送不改认领
-      - 重试（现有的重试函数）：现有的已确认直接返回、IN_PROGRESS、RETRY_EXPIRED 与 NOT_FOUND 的先后不变；之后按上一条同样判断认领，再查窗口与配置；全部通过、调用 chatbot 之前按上一条抢或续认领；别人有有效认领时返回 CLAIMED、不调用 chatbot、这条消息保留不变
+      - 重试（现有的重试函数）：新增当前用户参数（由接口层传入请求人），认领的判断与抢、续都以请求人为准，发给 chatbot 的 agent 仍为原发送人 sent_by（第 2 阶段规则不变）；现有的已确认直接返回、IN_PROGRESS、RETRY_EXPIRED 与 NOT_FOUND 的先后不变；之后按上一条同样判断认领，再查窗口与配置；全部通过、调用 chatbot 之前按上一条抢或续认领；别人有有效认领时返回 CLAIMED、不调用 chatbot、这条消息保留不变
       - contact_service 修改负责人且负责人确实改变时（与现有消息随行同一个条件），同一次写入里清空 reply_claimed_by 与 reply_claimed_until；负责人不变时不动认领
       - 新增测试：claim_service 覆盖无认领时认领成功、自己续期、别人有效认领时返回 CLAIMED 且不改、别人认领已过期（含恰好到期）时可认领、接手返回被接手的人、释放的三种情况、联系人已删除返回 NOT_FOUND；发送与重试打桩 chatbot，覆盖别人有效认领时 CLAIMED 且不存消息不调用、成功发送后认领人为发送人且到期为现在加 15 分钟、窗口关闭被拒时认领不变、只读判断之后被别人抢先（在条件更新前把认领改成别人）时返回 CLAIMED 且不存消息、重试遇到别人认领返回 CLAIMED 且消息不变；改负责人清空认领、负责人不变不动；对应设计第十二节例 1 至例 6；每条测试写明守住的是哪一条验收标准；现有发送、重试与转派的测试继续通过；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
       - tasks/todo.md 新增 CRM-TASK-093 记录段（做了什么、偏离了什么、验证到什么程度）；偏离段只列两类、每条一句：与验收标准不一致的做法，以及验收标准没有要求、但改变了现有接口或页面行为的改动（例如 094 部署前发送遇到别人认领时接口返回 403，设计第十四节第 6 条）；没有就写无；验证段只写测试由 PR 的必需检查 backend 执行、检查结果由 Worker 和 CI 记录不写在这里，不写任何检查是否运行或通过；不改 planning-v1 块；复选框只允许 [ ] / [x]
@@ -2763,10 +2763,10 @@ tasks:
     depends_on:
       - CRM-TASK-093
     acceptance_criteria:
-      - 新增 POST /api/contacts/{contact_id}/claim，请求体可选 takeover（布尔，默认 false，其他类型 422）；归属用 may_access_contact，无权、联系人不存在或已删除（含管理员请求时）一律返回同一个 403 NOT_ASSIGNED；成功 200，data 为 reply_claimed_by、reply_claimed_by_name、reply_claimed_until 与 taken_over_from（被接手的人的 id，没有为空）、taken_over_from_name；别人有有效认领且不接手时 409 CLAIMED
+      - 新增 POST /api/contacts/{contact_id}/claim，请求体可选 takeover（布尔，默认 false，其他类型 422）；归属用 may_access_contact，无权、联系人不存在或已删除（含管理员请求时）一律返回同一个 403 NOT_ASSIGNED；成功 200，data 为 reply_claimed_by、reply_claimed_by_name、reply_claimed_until 与 taken_over_from（被接手的人的 id；没有有效认领或有效认领人就是请求人时为空）、taken_over_from_name；别人有有效认领且不接手时 409 CLAIMED
       - 新增 DELETE /api/contacts/{contact_id}/claim，查询参数可选 takeover（默认 false）；归属与 403 同上；成功 200，data 为清空后的三项（都为空）；别人有有效认领且不接手时 409 CLAIMED
-      - 409 CLAIMED 一律用现有 fail 外壳，fields 里带 claimed_by、claimed_by_name（用户已不存在为空）与 claimed_until；POST /api/messages/whatsapp/send 与 POST /api/messages/{message_id}/whatsapp/retry 遇到服务返回 CLAIMED 时同样返回这个 409；两个接口的其他映射与先后不变（CLAIMED 落在 403 之后、NO_PHONE 之前，与设计第八节一致）
-      - 联系人详情与联系人列表每项多 reply_claimed_by、reply_claimed_by_name、reply_claimed_until；GET /api/messages/conversations 每项多同样三项（取该会话联系人的认领；没有联系人的会话三项为空）；认领已过期或没有认领时三项都为空；时间带 UTC 标记输出，写法与 wa_reply_window_until 相同；列表一页内对联系人与用户名各一次批量查询，不逐条查库
+      - 409 CLAIMED 一律用现有 fail 外壳，fields 里带 claimed_by、claimed_by_name（用户已不存在为空）与 claimed_until；POST /api/messages/whatsapp/send 与 POST /api/messages/{message_id}/whatsapp/retry 遇到服务返回 CLAIMED 时同样返回这个 409，重试接口把请求人传给重试服务；两个接口的其他映射与先后不变（CLAIMED 落在 403 之后、NO_PHONE 之前，与设计第八节一致）
+      - 联系人详情与联系人列表每项多 reply_claimed_by、reply_claimed_by_name、reply_claimed_until；GET /api/messages/conversations 每项多同样三项（取该会话联系人的认领；没有联系人的会话三项为空）；认领已过期或没有认领时三项都为空；时间带 UTC 标记输出，写法与 wa_reply_window_until 相同；新加的认领字段在列表一页内对联系人与认领人名字各一次批量查询，不逐条查库；已有字段（例如 assigned_to_name）的查法不改
       - 新增测试逐条覆盖：认领成功与续期、409 CLAIMED 的 fields、接手返回被接手的人、释放的三种情况、takeover 类型不对 422、无权与联系人已删除返回同一个 403、发送与重试遇到别人认领返回 409 且不存消息不调用 chatbot、三个列表与详情接口的认领字段（有效、过期、没有）；现有接口测试继续通过；每条测试写明守住的是哪一条验收标准；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
       - tasks/todo.md 新增 CRM-TASK-094 记录段（做了什么、偏离了什么、验证到什么程度）；偏离段只列两类、每条一句：与验收标准不一致的做法，以及验收标准没有要求、但改变了现有接口或页面行为的改动；没有就写无；验证段只写测试由 PR 的必需检查 backend 执行、检查结果由 Worker 和 CI 记录不写在这里，不写任何检查是否运行或通过；不改 planning-v1 块；复选框只允许 [ ] / [x]
       - 改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置、nginx；不装依赖；不加表、不加迁移、不改前端；allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#249），不合并、不直推
@@ -2796,10 +2796,10 @@ tasks:
       - CRM-TASK-092
     acceptance_criteria:
       - WhatsApp 会话头部显示认领状态：有认领时显示认领人与到期时间（本地时间，时分），是自己时显示自己正在处理；没有时显示无人认领；按钮：没有有效认领时显示认领，自己认领时显示释放，别人认领时显示接手（确认后调用认领接口并带 takeover）；成功后用返回的认领状态刷新头部；失败按错误码提示原因；邮件会话不显示这些
-      - 认领显示以 reply_claimed_until 为准：前端每 30 秒按当前时间重算一次，过了到期时间就按无人认领显示，不额外请求
+      - 认领显示以 reply_claimed_until 为准：会话头部与会话列表的小标都每 30 秒按当前时间重算一次，过了到期时间就按无人认领显示，不额外请求
       - 会话列表每行在别人有有效认领时显示认领人正在处理的小标，自己认领的不显示；数据取会话列表返回的三项
       - 回复框发送或重试返回 409 CLAIMED 时保留输入框内容，提示谁正在处理、到几点（取 fields），并给接手并发送：先调用认领接口带 takeover，成功后用同一段文字再发送一次（发送结果的处理与现有一致）；接手失败只提示原因、不发送；重试遇到 CLAIMED 只提示，不碰回复框
-      - 会话头部加转派：只对角色为经理或管理员的用户显示，候选人取现有的用户接口；选人确认后调用现有的修改联系人接口只改负责人；成功后重新读取联系人与会话列表；转派后当前用户已无权查看（读取返回 403）时关闭当前会话并刷新列表；失败提示原因
+      - 会话头部加转派：只对角色为经理或管理员的用户显示，候选人取现有的用户接口；选人确认后调用现有的修改联系人接口只改负责人；成功后重新读取联系人与会话列表；转派后重新读取联系人或会话消息时，任一返回 403 或 404 即视为当前用户已无权查看，关闭当前会话并刷新列表；失败提示原因
       - 新文案同时加在 en 与 zh 的 inbox 命名空间，不写硬编码文字；类型定义与接口字段一致（联系人与会话列表项的三项认领字段、认领接口的返回）；前端类型检查与构建由 PR 的必需 CI 检查 frontend 执行并通过（Worker 沙箱不跑 npm）
       - tasks/todo.md 新增 CRM-TASK-095 记录段（做了什么、偏离了什么、验证到什么程度）；偏离段只列两类、每条一句：与验收标准不一致的做法，以及验收标准没有要求、但改变了现有接口或页面行为的改动；没有就写无；验证段只写前端类型检查与构建由 PR 的必需检查 frontend 执行、检查结果由 Worker 和 CI 记录不写在这里、没有在浏览器里实际操作过，不写任何检查是否运行或通过；不改 planning-v1 块；复选框只允许 [ ] / [x]
       - 改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不改后端；allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：不适用，只展示与调用已有接口；设计见 kelvinpang90/acuven_crm_demo#249），不合并、不直推
