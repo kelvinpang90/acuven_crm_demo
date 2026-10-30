@@ -29,6 +29,15 @@
 
 ---
 
+## CRM-TASK-090 第一次 run 失败后改契约（2026-10-30）
+
+- 现象：run 6a4dcd71 以 `design_defect` 停下，没改文件。验收标准第 3 条要 `smtplib.SMTP` 传 `timeout`，第 5 条又要「原有用例全部不改并继续通过」；而 `test_email_send.py` 的 `test_send_success_is_saved` 用 `assert_called_once_with(host, port)` 断言 SMTP 的调用参数，加了 `timeout` 这一条必然失败，两条不能同时成立。核对属实，其他原有用例（未配置、连接与登录与发送出错、联系人没有邮箱）不受影响。
+- 改动：`.platform/tasks.yaml` 只改 CRM-TASK-090 第 5 条最后一句，允许把那一行断言改为同时期望 `timeout` 等于 `MAIL_TIMEOUT_SECONDS`，其余原有用例仍不改。目的、其他验收标准、`allowed_change_paths`（已含 `test_email_send.py`）与 planning-v1 不变。
+- 设计闸门：不适用，理由同登记时。预审：不适用，理由同登记时。
+- 教训见 `tasks/lessons.md` L8。
+
+---
+
 ## 登记 CRM-TASK-090：收发邮件不卡后端（2026-10-29）
 
 - 来由：计划清空后对照早先的缺口清单逐条看代码，导入走路由、转派带走消息、送达状态、未分派筛选、关闭公开注册都已修好；剩下的「IMAP 同步调用阻塞事件循环」还在，发邮件的 SMTP 也一样，而且两边都没设超时。Kelvin 2026-10-29 选登记这一项（另两项候选：再收一次起草回复与屋顶报告的提示词、会话认领与转派，这次不做）。
