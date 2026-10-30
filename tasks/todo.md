@@ -37,6 +37,25 @@
 
 ---
 
+## CRM-TASK-091 联系人加会话认领两列，记录谁正在回复与认领到期时间（2026-10-31）
+
+### 做了什么
+
+- 新迁移 `backend/alembic/versions/019_add_contact_reply_claim.py`（`down_revision` 为 018）：upgrade 给 `contacts` 加 `reply_claimed_by`（字符串 36，可空）与 `reply_claimed_until`（DateTime，可空，存 UTC 的 naive 时间），不加外键与索引、不改存量数据；downgrade 删掉这两列回到 018 的形状。
+- `backend/app/models/contact.py`：只加这两个字段，注释说明谁在回复、到期时间，以到期时间为准判断认领是否有效；不加行为。
+- 新测试 `backend/tests/test_migration_019.py`：在内存 SQLite 只含 id 的最小 `contacts` 表上执行 019 的 upgrade 再 downgrade（两列的类型、可空、没有外键与索引，存量行为空，降级后消失且行保留）；模型与迁移一致；按模型建表后插入不带两列的联系人成功且两列为空。每条测试写明守住的验收标准。
+- 没有改服务、路由、schema、前端。
+
+### 偏离了什么
+
+- 无
+
+### 验证到什么程度
+
+- 测试由 PR 的必需检查 backend 执行，检查结果由 Worker 和 CI 记录不写在这里。
+
+---
+
 ## 登记 CRM-TASK-096 至 099：窗口外模板消息的 CRM 一侧（2026-10-31）
 
 ### 做了什么
