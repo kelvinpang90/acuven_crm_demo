@@ -2670,7 +2670,7 @@ tasks:
     purpose: >-
       按 docs/chatbot-phase3.md 第九节与第十四节第 2 条，给 contacts 加 reply_claimed_by 与 reply_claimed_until，供会话认领使用。
       一次 Alembic 迁移加列，模型同步。只做表结构：不改服务、接口、前端，不改存量数据。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-065
     acceptance_criteria:
