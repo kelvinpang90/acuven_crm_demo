@@ -1,7 +1,8 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/store/authStore';
+import api from '@/services/api';
 
 const DEMO_ACCOUNTS = [
   { key: 'admin', label: 'Admin', email: 'admin@crm.com', password: 'Admin123' },
@@ -19,6 +20,22 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [localErrors, setLocalErrors] = useState<{ email?: string; password?: string }>({});
+  const [gitSha, setGitSha] = useState<string | null>(null);
+
+  // Show the deployed version; hide it if health fails or the sha is unknown
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .get<{ git_sha?: string }>('/health')
+      .then((res) => {
+        const sha = res.data?.git_sha;
+        if (!cancelled && sha && sha !== 'unknown') setGitSha(sha.slice(0, 7));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const validate = () => {
     const errors: { email?: string; password?: string } = {};
@@ -196,6 +213,9 @@ export default function LoginPage() {
         <p className="text-center text-text-muted text-xs mt-4">
           CRM Pro v1.0 &copy; 2026
         </p>
+        {gitSha && (
+          <p className="text-center text-text-muted text-xs mt-1">版本 {gitSha}</p>
+        )}
       </div>
     </div>
   );
