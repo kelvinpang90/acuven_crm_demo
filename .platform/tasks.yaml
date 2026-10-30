@@ -641,21 +641,21 @@ tasks:
       迁移编号原为 015，登记 CRM-TASK-021 时 015 给了 ai_requests 建表，顺延为 016（docs/inbox-ai-assist.md 第八节第 4 条）；
       登记 CRM-TASK-039 时 016 给了审计表 contact_id 改可空，顺延为 017（docs/dashboard-ai-insight.md 第七节）；
       登记 CRM-TASK-065 时 017 给了会话标签表，再顺延为 018（docs/inbox-ai-triage.md 第三节）；
-      017 后来被商机来源占用、065 改为 018，再顺延为 019；登记 CRM-TASK-091 时 019 给了联系人认领两列，再顺延为 020（docs/chatbot-phase3.md 第十四节第 2 条）。
+      017 后来被商机来源占用、065 改为 018，再顺延为 019；登记 CRM-TASK-091 时 019 给了联系人认领两列，再顺延为 020（docs/chatbot-phase3.md 第十四节第 2 条）；登记 CRM-TASK-096 时 020 给了消息的模板三列，再顺延为 021（同一设计第十五节第 2 条）。
     status: ready
     depends_on:
       - CRM-TASK-019
-      - CRM-TASK-091
+      - CRM-TASK-096
     acceptance_criteria:
-      - 新增迁移 020，down_revision 为 019（CRM-TASK-091 的联系人认领两列）：upgrade 删掉 contacts 的 is_gateway 列与 idx_contacts_is_gateway 索引；downgrade 重建该列（布尔，非空，带数据库默认值 false）与索引，不还原原来为真的值，在迁移的 docstring 写明
+      - 新增迁移 021，down_revision 为 020（CRM-TASK-096 的消息模板三列）：upgrade 删掉 contacts 的 is_gateway 列与 idx_contacts_is_gateway 索引；downgrade 重建该列（布尔，非空，带数据库默认值 false）与索引，不还原原来为真的值，在迁移的 docstring 写明
       - 不改模型（CRM-TASK-019 已取消映射）、服务、接口与前端
-      - 新增测试：用 Alembic 的 Operations 在内存 SQLite 上对含 id 与 is_gateway 的最小 contacts 表执行 020 的 upgrade 再 downgrade，断言列与索引先消失后回来、回来后全部为 false；每条测试写明守住的是哪一条验收标准；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
+      - 新增测试：用 Alembic 的 Operations 在内存 SQLite 上对含 id 与 is_gateway 的最小 contacts 表执行 021 的 upgrade 再 downgrade，断言列与索引先消失后回来、回来后全部为 false；每条测试写明守住的是哪一条验收标准；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
       - tasks/todo.md 新增 CRM-TASK-020 记录段（做了什么、偏离了什么、验证到什么程度）；不改 planning-v1 块；复选框只允许 [ ] / [x]
       - 改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖
       - allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#28），不合并、不直推
     allowed_change_paths:
-      - backend/alembic/versions/020_drop_contact_is_gateway.py
-      - backend/tests/test_migration_020.py
+      - backend/alembic/versions/021_drop_contact_is_gateway.py
+      - backend/tests/test_migration_021.py
       - tasks/todo.md
     allowed_commands:
       - lint.check
@@ -2809,6 +2809,134 @@ tasks:
       - frontend/src/pages/Inbox/ReplyBox.tsx
       - frontend/src/pages/Inbox/index.tsx
       - frontend/src/services/contacts.ts
+      - frontend/src/types/index.ts
+      - frontend/src/locales/en/inbox.json
+      - frontend/src/locales/zh/inbox.json
+      - tasks/todo.md
+    allowed_commands:
+      - lint.check
+      - format.check
+      - format.apply
+    creates_branch: true
+    creates_pull_request: true
+
+  # 以下四个是 demo 号多客服第 3 阶段的第二批：窗口外模板消息，CRM 一侧。设计见 docs/chatbot-phase3.md 第 5.3 节、第七节
+  # （Kelvin 2026-10-30 批准，设计闸门引用 kelvinpang90/acuven_crm_demo#249）；登记时的补充见设计第十五节（存三列、模板重试、频率、先读白名单、错误顺序）。
+  # chatbot 一侧的 C5（白名单与 send-template 接口）由 ai_chatbot_demo 的人工会话做；本批不等 C5 部署即可合并部署，真机验收要等 C5 与 Meta 模板获批。
+  # 设计闸门：096 改表结构，097 碰钱（Meta 按条计费）且是发送状态规则，098 收发个人数据的接口，适用；099 只展示与调用已有接口，不适用，仍引用同一 PR。
+  # 迁移号：096 取 020，CRM-TASK-020 的删列迁移顺延为 021（设计第十五节第 2 条）。设计预审的完整输出在 tasks/todo.md「登记 CRM-TASK-096 至 099」。
+  - id: CRM-TASK-096
+    title: 消息表加模板名、语言与参数三列，供发送与重试模板消息
+    purpose: >-
+      按 docs/chatbot-phase3.md 第十五节第 2、3 条，给 messages 加 template_name、template_language、template_params，记客服发出的 WhatsApp 模板消息用的是哪个模板与参数，
+      重试时原样重发。一次 Alembic 迁移加列，模型同步。只做表结构：不改服务、接口、前端，不改存量数据。
+    status: ready
+    depends_on:
+      - CRM-TASK-091
+    acceptance_criteria:
+      - messages 新增 template_name（字符串 100，可空）、template_language（字符串 20，可空）与 template_params（JSON，可空，存字符串列表）；都不加外键、不加索引；存量行三列为空
+      - 新增迁移 020，down_revision 为 019：upgrade 只加这三列、不改存量数据；downgrade 删掉它们回到 019 的形状；模型与迁移一致，模型只加三个字段，注释一句说明只有客服发的模板消息才写，不加行为
+      - 不改任何服务、路由、schema、前端
+      - 新增测试：用 Alembic 的 Operations 在内存 SQLite 上对只含 id 的最小 messages 表执行 020 的 upgrade 再 downgrade，断言三列先出现（类型、可空、没有外键与索引）后消失、存量行为空；按模型建表后插入不带这三列的消息成功且三列为空，插入带字符串列表参数的消息后读回相同的列表；每条测试写明守住的是哪一条验收标准；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
+      - tasks/todo.md 新增 CRM-TASK-096 记录段（做了什么、偏离了什么、验证到什么程度）；偏离段只列两类、每条一句：与验收标准不一致的做法，以及验收标准没有要求、但改变了现有接口或页面行为的改动；没有就写无；验证段只写测试由 PR 的必需检查 backend 执行、检查结果由 Worker 和 CI 记录不写在这里，不写任何检查是否运行或通过；不改 planning-v1 块；复选框只允许 [ ] / [x]
+      - 改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖
+      - allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#249），不合并、不直推
+    allowed_change_paths:
+      - backend/alembic/versions/020_add_message_template_fields.py
+      - backend/app/models/message.py
+      - backend/tests/test_migration_020.py
+      - tasks/todo.md
+    allowed_commands:
+      - lint.check
+      - format.check
+      - format.apply
+    creates_branch: true
+    creates_pull_request: true
+
+  - id: CRM-TASK-097
+    title: 经 chatbot 读模板白名单与发模板消息的规则，含资格、频率、重试
+    purpose: >-
+      按 docs/chatbot-phase3.md 第 5.3 节、第七节与第十五节第 3 至 8 条，新建模板服务：经 chatbot 读给 CRM 用的模板白名单；客服在窗口外给曾来过消息的访客发一条模板，
+      校验资格、频率、白名单与参数，先存未确认的出站消息再签名调用 chatbot 的 send-template，结果分类与文字发送相同；模板消息的重试改调 send-template、不查窗口。
+      只做业务规则层，由 CRM-TASK-098 的接口调用：不加接口、不改归属校验与请求模型校验（接口层）、不改表结构、不改前端，文字发送与交还 AI 的行为不变。
+    status: ready
+    depends_on:
+      - CRM-TASK-096
+      - CRM-TASK-093
+    acceptance_criteria:
+      - 读白名单：用现有的签名请求向 chatbot 的 /internal/crm/templates 发空对象请求体（总时限 30 秒）；未配置为 NOT_CONFIGURED；200 且 templates 为列表时返回其中合规的项（name、language、body 为非空字符串，params 为列表、每项 label 为字符串且 max_len 为正整数），不合规的项丢弃并打 WARNING；其他任何结果（非 200、超时、传输失败、体不合规）为 CHATBOT_FAILED
+      - 发模板（参数为联系人 id、模板名、语言、参数列表、客服 id 与名字、可选的当前时间）按设计第十五节第 8 条的顺序校验，任一不过就返回对应结果、不存消息、不调用 send-template：联系人不存在或已软删除 NOT_FOUND；别人有有效认领 CLAIMED（CRM-TASK-093 的只读判断）；号码不能规范化 NO_PHONE；该联系人从没有渠道为 whatsapp 的入站消息 NO_OPT_IN；该联系人最后一条 whatsapp 入站消息之后已有模板消息（template_name 非空的客服消息，不论是否已确认）TEMPLATE_PENDING；未配置 NOT_CONFIGURED；读白名单失败 CHATBOT_FAILED；名字加语言不在白名单 TEMPLATE_UNKNOWN；参数个数与白名单不同，或某个参数去掉首尾空白后为空或超过该项 max_len，TEMPLATE_PARAMS
+      - 校验都过后，按 CRM-TASK-093 文字发送的同一写法抢或续认领（影响 0 行返回 CLAIMED、不存不调），与存消息同一次提交：新 UUID 作 id 与 request_id，渠道 whatsapp、出站、author_kind 为 agent、sent_by 为当前客服、负责人取联系人当前负责人、发件人 ai_chatbot_demo、收件人为规范化号码、已读、external_id 与 delivery_status 为空；template_name、template_language 与 template_params（去掉首尾空白后的参数）照请求写；body 为白名单正文把每个双花括号加序号的占位换成对应参数后的文字
+      - 提交后签名调用 chatbot 的 /internal/crm/send-template，请求体为 request_id、visitor 的 phone 与 bsuid、template 的 name、language 与 params、agent 的 id 与 name；结果分类、已发出时的条件更新与接管写入、明确没发出时删掉这条消息、结果不明时保留，全部与文字发送相同（复用现有的判断函数，不另写一套）；chatbot 响应里的 body 不覆盖已存的正文
+      - 重试（现有的重试函数）遇到 template_name 非空的消息：已确认直接返回、IN_PROGRESS、RETRY_EXPIRED、NOT_FOUND、认领与配置的检查不变，但不查 24 小时窗口、不查资格与频率、不读白名单；用同一个 request_id、存下的名字、语言与参数、发给这条消息存的收件人、agent 为原发送人，调用 send-template；之后的处理与文字消息的重试相同；文字消息的重试行为不变
+      - 新增测试，打桩 HTTP 客户端充当 chatbot，测试里独立重算签名并核对请求路径与请求体，以下面列出的用例为准：读白名单的合规、丢弃不合规项、各类失败；发模板的每一个校验结果各一例且断言没有存消息、没有调用 send-template；TEMPLATE_PENDING 在最后一条入站之后已有一条未确认模板时也成立、在访客再来消息之后不再成立；成功时三列与渲染后的正文、认领、external_id 与 sent；明确没发出删行、结果不明留行；模板消息的重试在窗口已关时照样调用 send-template 且请求体参数与存下的相同；文字消息的重试仍调用文字发送；对应设计第十二节例 8、例 9；每条测试写明守住的是哪一条验收标准；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
+      - tasks/todo.md 新增 CRM-TASK-097 记录段（做了什么、偏离了什么、验证到什么程度）；偏离段只列两类、每条一句：与验收标准不一致的做法，以及验收标准没有要求、但改变了现有接口或页面行为的改动；没有就写无；验证段只写测试由 PR 的必需检查 backend 执行、检查结果由 Worker 和 CI 记录不写在这里，不写任何检查是否运行或通过；不改 planning-v1 块；复选框只允许 [ ] / [x]
+      - 改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不加表、不加迁移、不改接口与前端；allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#249），不合并、不直推
+    allowed_change_paths:
+      - backend/app/services/chatbot_template_service.py
+      - backend/app/services/chatbot_send_service.py
+      - backend/tests/test_chatbot_template_service.py
+      - tasks/todo.md
+    allowed_commands:
+      - lint.check
+      - format.check
+      - format.apply
+    creates_branch: true
+    creates_pull_request: true
+
+  - id: CRM-TASK-098
+    title: 模板列表与发模板接口，消息返回模板名，重试接口支持模板消息
+    purpose: >-
+      按 docs/chatbot-phase3.md 第 5.3 节与第十五节第 6、8 条，在 CRM-TASK-097 的服务之上加读模板列表与发模板两个接口，把各结果映射成响应，
+      消息接口返回模板名，供 CRM-TASK-099 使用；重试接口不改路径，模板消息由服务自行改调 send-template。
+      只做接口层：不改业务规则、不改表结构、不改前端，不改会话事件接口。
+    status: ready
+    depends_on:
+      - CRM-TASK-097
+      - CRM-TASK-094
+    acceptance_criteria:
+      - 新增 GET /api/messages/whatsapp/templates，登录即可调用；成功 200，data 为模板列表（每项 name、language、category 有则带、params 的 label 与 max_len、body）；NOT_CONFIGURED 503；CHATBOT_FAILED 502
+      - 新增 POST /api/messages/whatsapp/send-template，请求模型：contact_id；template_name 去掉首尾空白后 1 至 100 字符；language 1 至 20 字符；params 为 0 至 10 个字符串的列表，每个去掉首尾空白后 1 至 1024 字符，且不含换行、制表符、连续 4 个以上空格；不合规 422（先于处理函数）
+      - 归属校验同文字发送（may_access_contact，无权、联系人不存在或已删除含管理员请求时一律 403 NOT_ASSIGNED）；之后交给 CRM-TASK-097，按设计第十五节第 8 条映射：CLAIMED 409（fields 同 CRM-TASK-094）、NO_PHONE 400、NO_OPT_IN 409、TEMPLATE_PENDING 409、NOT_CONFIGURED 503、CHATBOT_FAILED 502、TEMPLATE_UNKNOWN 422、TEMPLATE_PARAMS 422、已发出 200 返回消息、明确没发出 502 SEND_FAILED（fields 带 error_code 与 error_title）、结果不明 202（ok 外壳，message 为 UNCONFIRMED）；错误用现有 fail 外壳，code 即上面的名字
+      - 现有重试接口不改路径与权限，模板消息的重试结果按同一套映射返回；消息列表、联系人消息、会话列表与发送、重试返回的消息每条多 template_name（文字消息为空）
+      - 新增测试逐条覆盖两个接口的成功、每个错误码、请求模型的 422（含参数里有换行、连续 5 个空格、超过 10 个参数）、权限、模板消息的重试经接口返回 200 与 202、消息的 template_name；现有接口测试继续通过；每条测试写明守住的是哪一条验收标准；由 PR 的必需 CI 检查 backend 执行并全部通过（Worker 沙箱不跑 pytest）
+      - tasks/todo.md 新增 CRM-TASK-098 记录段（做了什么、偏离了什么、验证到什么程度）；偏离段只列两类、每条一句：与验收标准不一致的做法，以及验收标准没有要求、但改变了现有接口或页面行为的改动；没有就写无；验证段只写测试由 PR 的必需检查 backend 执行、检查结果由 Worker 和 CI 记录不写在这里，不写任何检查是否运行或通过；不改 planning-v1 块；复选框只允许 [ ] / [x]
+      - 改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置、nginx；不装依赖；不加表、不加迁移、不改前端；allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：kelvinpang90/acuven_crm_demo#249），不合并、不直推
+    allowed_change_paths:
+      - backend/app/routers/messages.py
+      - backend/app/schemas/message.py
+      - backend/tests/test_template_api.py
+      - tasks/todo.md
+    allowed_commands:
+      - lint.check
+      - format.check
+      - format.apply
+    creates_branch: true
+    creates_pull_request: true
+
+  - id: CRM-TASK-099
+    title: 收件箱窗口关闭时可选模板填参数发送，消息上显示模板名
+    purpose: >-
+      在 CRM-TASK-098 的接口之上，按 docs/chatbot-phase3.md 第 5.3 节「前端」与第十节 Q8，WhatsApp 回复窗口关闭时给客服一个发模板的弹窗：
+      选模板、填参数、看预览、发送；发出的模板消息在会话里标明模板名。只改前端：不改后端、不加页面或路由，不做媒体。
+    status: ready
+    depends_on:
+      - CRM-TASK-098
+      - CRM-TASK-095
+    acceptance_criteria:
+      - WhatsApp 会话的回复窗口关闭（现有判断）且联系人有号码时，在窗口已关闭的提示旁显示发模板按钮；窗口开着或邮件会话不显示
+      - 点开弹窗时调用模板列表接口；读取中、失败（按错误码提示，未配置与读取失败分开）、列表为空（提示没有可用模板）各有提示；列表显示模板名、语言与类别
+      - 选中模板后按它的 params 逐个显示输入框（标签取 label，最大长度取 max_len），第一个输入框预填联系人名字（可改）；下方实时预览，把正文里每个双花括号加序号的占位换成对应输入；有空参数时禁用发送
+      - 发送调用发模板接口，超时与文字发送一样设为 45 秒；200 关闭弹窗并刷新会话；202 关闭弹窗、刷新并提示未确认送出（之后用现有的重试）；收不到响应时保留弹窗内容、刷新会话并提示先看有没有未确认送出的消息；其他错误保留弹窗内容并按错误码显示原因（NO_OPT_IN、TEMPLATE_PENDING、CLAIMED 带认领人与时间、TEMPLATE_UNKNOWN、TEMPLATE_PARAMS、SEND_FAILED 带 Meta 的错误码与标题、CHATBOT_FAILED、NOT_CONFIGURED、无权）
+      - 会话里 template_name 非空的客服消息，在现有的客服加名字之后再显示模板名；未确认送出、发送中与重试的显示沿用现有逻辑
+      - 新文案同时加在 en 与 zh 的 inbox 命名空间，不写硬编码文字；类型定义与接口字段一致（模板列表项、消息的 template_name）；前端类型检查与构建由 PR 的必需 CI 检查 frontend 执行并通过（Worker 沙箱不跑 npm）
+      - tasks/todo.md 新增 CRM-TASK-099 记录段（做了什么、偏离了什么、验证到什么程度）；偏离段只列两类、每条一句：与验收标准不一致的做法，以及验收标准没有要求、但改变了现有接口或页面行为的改动；没有就写无；验证段只写前端类型检查与构建由 PR 的必需检查 frontend 执行、检查结果由 Worker 和 CI 记录不写在这里、没有在浏览器里实际操作过，不写任何检查是否运行或通过；不改 planning-v1 块；复选框只允许 [ ] / [x]
+      - 改动只落在 allowed_change_paths；不改 .platform/、CI、部署配置；不装依赖；不改后端；allowed_commands 里的检查全部零退出，skipped 如实报告且不算 passed；以 Draft PR 交付（设计闸门：不适用，只展示与调用已有接口；设计见 kelvinpang90/acuven_crm_demo#249），不合并、不直推
+    allowed_change_paths:
+      - frontend/src/pages/Inbox/TemplateDialog.tsx
+      - frontend/src/pages/Inbox/ReplyBox.tsx
+      - frontend/src/pages/Inbox/ConversationView.tsx
+      - frontend/src/services/messages.ts
       - frontend/src/types/index.ts
       - frontend/src/locales/en/inbox.json
       - frontend/src/locales/zh/inbox.json
