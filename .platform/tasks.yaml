@@ -2637,7 +2637,7 @@ tasks:
     purpose: >-
       现在收邮件（IMAP）与发邮件（SMTP）都是同步调用、没设超时，直接跑在异步后端的事件循环里；邮件服务器一慢或卡住，整个后端的请求都会跟着停。
       改为每次阻塞调用都放进线程执行，并给连接设超时。只改 backend/app/services/email_service.py 与测试；接口、返回内容、配置项、轮询间隔与出错时的行为都不变。
-    status: ready
+    status: done
     depends_on: []
     acceptance_criteria:
       - email_service 新增模块常量 MAIL_TIMEOUT_SECONDS，值为 30；不新增配置项
