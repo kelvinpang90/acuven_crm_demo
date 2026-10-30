@@ -211,7 +211,7 @@ export default function LoginPage() {
 
         {/* Footer hint */}
         <p className="text-center text-text-muted text-xs mt-4">
-          CRM Pro v1.0 &copy; 2026
+          CRM Pro &copy; 2026
         </p>
         {gitSha && (
           <p className="text-center text-text-muted text-xs mt-1">版本 {gitSha}</p>
