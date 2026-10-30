@@ -37,6 +37,52 @@
 
 ---
 
+## 登记 CRM-TASK-096 至 099：窗口外模板消息的 CRM 一侧（2026-10-31）
+
+### 做了什么
+
+- `.platform/tasks.yaml` 登记四项，都是 `ready`：096 数据库（迁移 020，消息加模板名、语言、参数三列）、097 业务规则（读白名单、发模板的资格与频率、模板消息的重试，依赖 096、093）、
+  098 接口（模板列表与发模板，依赖 097、094）、099 前端（发模板弹窗，依赖 098、095）。
+- CRM-TASK-020（删 `is_gateway` 列）的迁移号再顺延为 021，`down_revision` 改为 020，依赖由 091 改为 096；范围不变。
+- `docs/chatbot-phase3.md` 加第十五节：本批的范围与迁移号；改了第九节与第 5.3 节的三处写法（存三列而不只存模板名、模板消息的重试不查窗口、频率按「最后一条入站之后最多 1 条」）；
+  发之前先读白名单、错误顺序、事件不改、上线不等 C5；以及预审后写死的两处细节。
+- planning-v1「当前计划」在 095 之后接 096 至 099。
+- 媒体（第十一节暂定 100 至 105）这次不登记：等 chatbot 侧 C6、C7 有了计划再登记。chatbot 侧 C5 已在 `ai_chatbot_demo` 另开人工会话。
+
+### 设计闸门与预审
+
+- 设计闸门：`docs/chatbot-phase3.md`（kelvinpang90/acuven_crm_demo#249，Kelvin 2026-10-30 批准）；第十五节改了已批准的写法，**要 Kelvin 在本登记 PR 上批准**。
+  096（改表结构）、097（Meta 按条计费、发送状态规则）、098（收发个人数据的接口）适用；099 只展示与调用已有接口，不适用，仍引用同一 PR。
+- `contract_check`：ready to register，四项都没有拆分 WARN；planning-v1 `ok, next: CRM-TASK-091`。WARN 只有原有的四条，与本次无关。
+- 预审（`docs/chatbot-phase3.md`，对登记分支的干净检出）：096 至 098 第 1 轮都 READY，没有 `DESIGN_DEFECT` 与 `SCOPE_GAP`；097 报的两条 `UNDECIDED` 按设计第十五节第 10 条写死，
+  并改了 097 的验收标准（访客回复按严格晚于判断、白名单项的占位序号要与参数个数一致）。只补细节，没有再跑第 2 轮。它调模型、不是确定性的，READY 不保证没有缺陷。
+- 099 预审：不适用。纯前端，没有设计闸门，8 个路径，没有拆分 WARN。
+
+```text
+=== 第 1 轮 CRM-TASK-096:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 35.4 万 token（其中缓存读取 30.9 万），折合 API 价约 $0.48；周额度读数 96%。
+退出码 0
+=== 第 1 轮 CRM-TASK-097:
+PRECHECK_FINDING: UNDECIDED 15.5 :: TEMPLATE_PENDING compares CRM-clock template created_at with chatbot occurred_at for inbound; same-second ties and future-dated inbound rows let a second billable template through, and no tolerance or tie-break is specified.
+PRECHECK_FINDING: UNDECIDED 15.6 :: Param count is checked against the whitelist params list, not the body placeholders; whether an item whose body has a {{n}} beyond that count is dropped or rendered with the placeholder left in is not decided.
+session verdict: NOT_READY
+judged from the findings, not the session's verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 36 万 token（其中缓存读取 30 万），折合 API 价约 $0.63；周额度读数 96%。
+退出码 0
+=== 第 1 轮 CRM-TASK-098:
+(no findings)
+session verdict: READY
+PRECHECK_RESULT: READY
+用量：Claude 会话 1 次，共 29 万 token（其中缓存读取 24.7 万），折合 API 价约 $0.46；周额度读数 96%。
+退出码 0
+```
+
+---
+
 ## 登记 CRM-TASK-091 至 095：会话认领与转派、推送补联系人变化（2026-10-30）
 
 ### 做了什么
