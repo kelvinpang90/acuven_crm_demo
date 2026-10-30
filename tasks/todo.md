@@ -29,6 +29,24 @@
 
 ---
 
+## CRM-TASK-090 收发邮件的阻塞调用放进线程并设超时，邮件服务器卡住时后端不跟着停（2026-10-30）
+
+### 做了什么
+
+- `backend/app/services/email_service.py`：加模块常量 `MAIL_TIMEOUT_SECONDS = 30`。`poll_emails` 建 `IMAP4_SSL` 时传 `timeout=MAIL_TIMEOUT_SECONDS`，建连接与 `login`、`select`、`search`、`fetch`、`store`、`logout` 都经 `asyncio.to_thread` 执行；`_process_email` 仍在事件循环里 await，处理后才标记已读；IMAP 未配置仍直接返回 0；出错（含超时）仍记日志并返回已处理的数，连接已建时经 `asyncio.to_thread` 调 `shutdown` 关掉，关时出错忽略。`send_email` 把建 SMTP 连接、`starttls`、`login`、`send_message` 放进同步的 `_smtp_send`，经 `asyncio.to_thread` 执行，`smtplib.SMTP` 传 `timeout=MAIL_TIMEOUT_SECONDS`；出错仍记日志、抛 `api_error` 的 `EmailSendError`、不存消息，成功时存的消息与返回内容不变。
+- 新测试 `backend/tests/test_email_poll.py`：用假的 `IMAP4_SSL` 覆盖不卡事件循环、超时参数、只标记处理成功的邮件、fetch 超时时返回已处理数并记 ERROR 日志与调 `shutdown`、IMAP 未配置不建连接五个用例。
+- `backend/tests/test_email_send.py`：`test_send_success_is_saved` 断言 `smtplib.SMTP` 调用参数的那一行改为同时期望 `timeout=MAIL_TIMEOUT_SECONDS`；补发送不卡事件循环（并断言超时参数）与 `send_message` 抛 `TimeoutError` 时回 502 API_ERROR、不存消息两个用例。其余原有用例不改。
+
+### 偏离了什么
+
+- 无
+
+### 验证到什么程度
+
+- 测试由 PR 的必需检查 backend 执行，检查结果由 Worker 和 CI 记录不写在这里。
+
+---
+
 ## CRM-TASK-090 第一次 run 失败后改契约（2026-10-30）
 
 - 现象：run 6a4dcd71 以 `design_defect` 停下，没改文件。验收标准第 3 条要 `smtplib.SMTP` 传 `timeout`，第 5 条又要「原有用例全部不改并继续通过」；而 `test_email_send.py` 的 `test_send_success_is_saved` 用 `assert_called_once_with(host, port)` 断言 SMTP 的调用参数，加了 `timeout` 这一条必然失败，两条不能同时成立。核对属实，其他原有用例（未配置、连接与登录与发送出错、联系人没有邮箱）不受影响。
