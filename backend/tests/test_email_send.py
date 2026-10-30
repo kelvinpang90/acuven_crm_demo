@@ -5,8 +5,10 @@ configured or not, and whether the send raised or not, so the inbox showed
 emails as sent that the customer never got.
 """
 
+import asyncio
 import logging
 import smtplib
+import time
 from unittest.mock import patch
 
 import pytest
@@ -18,6 +20,7 @@ from app.main import app
 from app.models.contact import Contact
 from app.models.message import Message
 from app.models.user import User
+from app.services.email_service import MAIL_TIMEOUT_SECONDS
 
 ADMIN = User(id="u-admin", name="Admin", email="admin@example.com", password_hash="x", role="admin")
 
@@ -123,7 +126,9 @@ async def test_send_success_is_saved(client, async_session_maker, smtp_configure
     data = resp.json()["data"]
     assert data["direction"] == "outbound"
     assert data["recipient_id"] == "customer@example.com"
-    smtp_cls.assert_called_once_with("smtp.example.com", settings.smtp_port)
+    smtp_cls.assert_called_once_with(
+        "smtp.example.com", settings.smtp_port, timeout=MAIL_TIMEOUT_SECONDS
+    )
     server.login.assert_called_once_with("crm@example.com", "pw")
     server.send_message.assert_called_once()
     assert await _outbound_count(async_session_maker) == 1
@@ -140,4 +145,54 @@ async def test_contact_without_email_is_unchanged(client, async_session_maker, s
     assert resp.status_code == 400
     assert resp.json()["error"]["message"] == "Contact not found or has no email"
     smtp_cls.assert_not_called()
+    assert await _outbound_count(async_session_maker) == 0
+
+
+async def _ticks_during(coro):
+    """Await `coro` while a coroutine counts every 0.05s; return (result, ticks)."""
+    ticks = 0
+
+    async def ticker():
+        nonlocal ticks
+        while True:
+            await asyncio.sleep(0.05)
+            ticks += 1
+
+    task = asyncio.create_task(ticker())
+    try:
+        result = await coro
+        counted = ticks
+    finally:
+        task.cancel()
+    return result, counted
+
+
+async def test_send_does_not_block_event_loop(client, async_session_maker, smtp_configured):
+    """Guards AC3: the SMTP calls run via asyncio.to_thread with
+    timeout=MAIL_TIMEOUT_SECONDS, so a 0.3s blocking send_message leaves the
+    event loop free to run other coroutines."""
+    contact_id = await _make_contact(async_session_maker)
+
+    with patch("app.services.email_service.smtplib.SMTP") as smtp_cls:
+        server = smtp_cls.return_value.__enter__.return_value
+        server.send_message.side_effect = lambda msg: time.sleep(0.3)
+        resp, ticks = await _ticks_during(_post_send(client, contact_id))
+
+    assert resp.status_code == 200
+    assert ticks >= 3
+    assert smtp_cls.call_args.kwargs["timeout"] == MAIL_TIMEOUT_SECONDS
+
+
+async def test_send_timeout_is_502_and_not_saved(client, async_session_maker, smtp_configured):
+    """Guards AC3: a TimeoutError from send_message answers 502 API_ERROR and
+    persists no outbound message."""
+    contact_id = await _make_contact(async_session_maker)
+
+    with patch("app.services.email_service.smtplib.SMTP") as smtp_cls:
+        server = smtp_cls.return_value.__enter__.return_value
+        server.send_message.side_effect = TimeoutError("timed out")
+        resp = await _post_send(client, contact_id)
+
+    assert resp.status_code == 502
+    assert resp.json()["error"]["code"] == "API_ERROR"
     assert await _outbound_count(async_session_maker) == 0

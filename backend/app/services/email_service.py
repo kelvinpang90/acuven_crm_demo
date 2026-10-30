@@ -5,6 +5,7 @@ Polling is skipped when IMAP is not configured; sending without SMTP, or a
 failed send, raises EmailSendError and persists nothing.
 """
 
+import asyncio
 import email
 import logging
 import smtplib
@@ -26,6 +27,9 @@ from app.services import routing_service
 
 logger = logging.getLogger(__name__)
 
+# Socket timeout for IMAP and SMTP connections, in seconds.
+MAIL_TIMEOUT_SECONDS = 30
+
 
 class EmailSendError(Exception):
     """Raised when sending an outbound email fails.
@@ -45,27 +49,35 @@ async def poll_emails(db: AsyncSession) -> int:
         return 0
 
     count = 0
+    mail = None
     try:
-        mail = IMAP4_SSL(settings.imap_host, settings.imap_port)
-        mail.login(settings.imap_user, settings.imap_password)
-        mail.select("INBOX")
+        mail = await asyncio.to_thread(
+            IMAP4_SSL, settings.imap_host, settings.imap_port, timeout=MAIL_TIMEOUT_SECONDS
+        )
+        await asyncio.to_thread(mail.login, settings.imap_user, settings.imap_password)
+        await asyncio.to_thread(mail.select, "INBOX")
 
-        _, data = mail.search(None, "UNSEEN")
+        _, data = await asyncio.to_thread(mail.search, None, "UNSEEN")
         ids = data[0].split()
 
         for eid in ids:
-            _, msg_data = mail.fetch(eid, "(RFC822)")
+            _, msg_data = await asyncio.to_thread(mail.fetch, eid, "(RFC822)")
             raw = msg_data[0][1]
             msg = email.message_from_bytes(raw)
 
             processed = await _process_email(db, msg)
             if processed:
-                mail.store(eid, "+FLAGS", "\\Seen")
+                await asyncio.to_thread(mail.store, eid, "+FLAGS", "\\Seen")
                 count += 1
 
-        mail.logout()
+        await asyncio.to_thread(mail.logout)
     except Exception:
         logger.exception("Error polling emails")
+        if mail is not None:
+            try:
+                await asyncio.to_thread(mail.shutdown)
+            except Exception:
+                pass
 
     return count
 
@@ -174,10 +186,7 @@ async def send_email(db: AsyncSession, contact_id: str, subject: str, body: str)
         msg["Subject"] = subject
         msg.attach(MIMEText(body, "plain", "utf-8"))
 
-        with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as server:
-            server.starttls()
-            server.login(settings.smtp_user, settings.smtp_password)
-            server.send_message(msg)
+        await asyncio.to_thread(_smtp_send, msg)
     except Exception as exc:
         logger.exception("Failed to send email")
         raise EmailSendError("api_error", str(exc)) from exc
@@ -212,6 +221,16 @@ async def send_email(db: AsyncSession, contact_id: str, subject: str, body: str)
         "assigned_to": message.assigned_to,
         "created_at": message.created_at.isoformat() if message.created_at else None,
     }
+
+
+def _smtp_send(msg: MIMEMultipart) -> None:
+    """Blocking SMTP send; run it in a thread so a stuck server can't stall the event loop."""
+    with smtplib.SMTP(
+        settings.smtp_host, settings.smtp_port, timeout=MAIL_TIMEOUT_SECONDS
+    ) as server:
+        server.starttls()
+        server.login(settings.smtp_user, settings.smtp_password)
+        server.send_message(msg)
 
 
 def _decode_str(s: str) -> str:
