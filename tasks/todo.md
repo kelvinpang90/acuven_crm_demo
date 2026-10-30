@@ -36,6 +36,23 @@
 
 ---
 
+## CRM-TASK-092 联系人的接管、负责人与认领变化也推送给打开的收件箱（2026-10-31）
+
+### 做了什么
+
+- `backend/app/services/inbox_events.py`：flush 钩子在没有消息改动时，再看本次 flush 前 `session.dirty` 里的联系人，按 SQLAlchemy 属性历史判断 `wa_handover_active`、`wa_handover_expires_at`、`wa_handover_updated_at`、`assigned_to`、`reply_claimed_by`、`reply_claimed_until` 有无改动，有就置标记；新建联系人不看。`do_orm_execute` 钩子对批量 `update(Contact)` 取 SET 的列（`values` / `ordered_values` 与按主键批量执行的参数），含六列之一就置标记；批量 update、delete 消息的行为不变。广播仍由现有的提交后钩子做，一次提交只广播一次；信号名、内容、推送接口与前端不变。模块文档字符串补了一句联系人变化也会推送。
+- `backend/tests/test_inbox_events.py`：新增 8 条测试，每条写明守住的验收标准：改接管列、改 `assigned_to` 各广播一次且只在提交后；直接设 `reply_claimed_by` 提交后广播一次；同一次提交里写消息与改接管只广播一次；只改名字不广播；新建联系人不广播；调用 `chatbot_event_service.write_response_handover`（同步响应的批量 update 写法）广播一次；批量 update 只清 `whatsapp_bsuid` 不广播。
+
+### 偏离了什么
+
+- 无
+
+### 验证到什么程度
+
+- 测试由 PR 的必需检查 backend 执行，检查结果由 Worker 和 CI 记录不写在这里。
+
+---
+
 ## CRM-TASK-091 联系人加会话认领两列，记录谁正在回复与认领到期时间（2026-10-31）
 
 ### 做了什么
