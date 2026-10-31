@@ -2699,7 +2699,7 @@ tasks:
       按 docs/chatbot-phase3.md 第 5.1 节与第十四节第 5 条，收件箱推送目前只在写 messages 时发信号，只改联系人的变化（chatbot 推来的接管变化、
       认领）不会让打开的页面刷新。让联系人的接管三列、负责人与认领两列的改动在提交后同样广播现有的 messages_changed 信号。
       只改后端的推送钩子：信号名、信号内容、推送接口与前端都不变，不改表结构。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-091
     acceptance_criteria:
