@@ -2727,7 +2727,7 @@ tasks:
       按 docs/chatbot-phase3.md 第 5.2 节、第八节与第十四节第 3、4、6 条，新建会话认领服务（认领、接手、释放，15 分钟滑动，以到期时间为准），
       把认领接进 WhatsApp 回复的发送与重试：别人有有效认领时不发，否则发送即认领或续期；改负责人时清空认领。
       只做业务规则层，由 CRM-TASK-094 的接口调用：不加接口、不改归属校验（接口层）、不改表结构、不改前端，不动交还 AI。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-091
     acceptance_criteria:
