@@ -35,6 +35,26 @@
 
 ---
 
+## CRM-TASK-093 会话认领接手与释放的规则，客服回复前校验认领，转派时清空认领（2026-11-01）
+
+### 做了什么
+
+- 新增 `backend/app/services/claim_service.py`：`CLAIM_DURATION` 为 15 分钟；`active_claim(contact, now)` 只读判断，`reply_claimed_by` 非空且 `now` 早于 `reply_claimed_until` 才返回（认领人, 到期时间），恰好到期算无效；`try_claim` 用一条条件更新（未删除且没有认领人、认领人是自己或到期不晚于现在）写入认领人与现在加 15 分钟；`claim` 与 `release` 的参数为联系人 id、用户 id、`takeover`：联系人不存在或已软删除返回 `NOT_FOUND`，不接手时走同一个条件，影响 0 行即读出当前认领人与到期时间返回 `CLAIMED`；接手时无条件覆盖或清空，`claim` 只在原有效认领人是别人时返回 `taken_over_from`。服务只执行更新不提交，由调用方提交；不查归属。
+- `backend/app/services/chatbot_send_service.py`：新结果类别 `CLAIMED`，`SendReplyResult` 加 `claimed_by`、`claimed_until`。发送在联系人存在之后、号码之前只读判断，别人有效认领即返回 `CLAIMED`；全部校验通过、存消息之前用 `try_claim` 抢或续认领，影响 0 行同样返回 `CLAIMED`，抢认领与存消息在同一次提交里。重试新增 `requester_id` 参数，已确认、`IN_PROGRESS`、`RETRY_EXPIRED`、`NOT_FOUND` 的先后不变，之后按请求人判断认领，再查窗口与配置，调用前抢或续认领（随调用前已有的那次提交写入）；发给 chatbot 的 `agent` 仍是 `sent_by`。
+- `backend/app/services/contact_service.py`：`update_contact` 在负责人确实改变时（与消息随行同一个条件）在同一个联系人对象上清空认领两列，随同一次 flush 写入；负责人不变不动。
+- 新测试 `backend/tests/test_claim_service.py`、`backend/tests/test_chatbot_send_claim.py`：覆盖验收标准列的认领、续期、拒绝、过期（含恰好到期）、接手、释放三种情况与接手释放、NOT_FOUND；发送与重试打桩 chatbot 的 HTTP 客户端，覆盖别人认领时 `CLAIMED`、成功发送后的认领、窗口关闭不改认领、只读判断之后被别人抢先、重试遇到别人认领、重试按请求人认领；改负责人清空与不变不动。对应设计第十二节例 1 至例 6，每条写明守住的验收标准。
+
+### 偏离了什么
+
+- 重试的 `requester_id` 是可选参数，094 接口层传入之前未传时以原发送人 `sent_by` 作为认领人，而不是请求人。
+- 094 部署前，发送或重试遇到别人的有效认领时，现有接口把 `CLAIMED` 映射成 403 `NOT_ASSIGNED`（设计第十四节第 6 条）。
+
+### 验证到什么程度
+
+- 测试由 PR 的必需检查 backend 执行，检查结果由 Worker 和 CI 记录不写在这里。
+
+---
+
 ## CRM-TASK-092 联系人的接管、负责人与认领变化也推送给打开的收件箱（2026-10-31）
 
 ### 做了什么
