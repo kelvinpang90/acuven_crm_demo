@@ -229,6 +229,10 @@ async def update_contact(
     contact.updated_at = datetime.utcnow()
 
     if reassigned:
+        # A claim says who is replying for the previous owner; it means nothing
+        # after the handover (docs/chatbot-phase3.md 5.2).
+        contact.reply_claimed_by = None
+        contact.reply_claimed_until = None
         # Message.assigned_to is a copy of the owner taken when the message was
         # stored, and the inbox filters on it. Without this the new owner would
         # inherit the customer but see none of the conversation, while the

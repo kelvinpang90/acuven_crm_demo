@@ -23,7 +23,7 @@ from app.config import settings
 from app.models.contact import Contact
 from app.models.message import Message
 from app.models.user import User
-from app.services import chatbot_event_service
+from app.services import chatbot_event_service, claim_service
 from app.utils.phone import normalize_phone
 
 CHATBOT_PARTY = "ai_chatbot_demo"
@@ -44,6 +44,7 @@ CHATBOT_FAILED = "chatbot_failed"
 HANDOFF_FAILED = CHATBOT_FAILED
 ENDED = "ended"
 NOT_ACTIVE = "not_active"
+CLAIMED = claim_service.CLAIMED
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +58,8 @@ class SendReplyResult:
     window_until: Optional[datetime] = None
     error_code: Optional[Any] = None
     error_title: Optional[str] = None
+    claimed_by: Optional[str] = None
+    claimed_until: Optional[datetime] = None
 
 
 @dataclass
@@ -99,6 +102,38 @@ async def _live_contact(db: AsyncSession, contact_id: str) -> Optional[Contact]:
         .execution_options(populate_existing=True)
     )
     return result.scalar_one_or_none()
+
+
+def _claimed_by_other(
+    contact: Contact, user_id: Optional[str], now: datetime, message: Optional[Message] = None
+) -> Optional[SendReplyResult]:
+    """Read-only claim step of the check order (design section 14 item 3)."""
+    held = claim_service.active_claim(contact, now)
+    if held is None or held[0] == user_id:
+        return None
+    return SendReplyResult(CLAIMED, message=message, claimed_by=held[0], claimed_until=held[1])
+
+
+async def _take_claim(
+    db: AsyncSession,
+    contact: Contact,
+    user_id: str,
+    now: datetime,
+    message: Optional[Message] = None,
+) -> Optional[SendReplyResult]:
+    """Take or extend the claim once every check passed; a result means someone
+    else claimed the contact after the read-only step and nothing may be sent."""
+    if await claim_service.try_claim(db, contact_id=contact.id, user_id=user_id, now=now):
+        return None
+    current = await _live_contact(db, contact.id)
+    if current is None:
+        return SendReplyResult(NOT_FOUND)
+    return SendReplyResult(
+        CLAIMED,
+        message=message,
+        claimed_by=current.reply_claimed_by,
+        claimed_until=current.reply_claimed_until,
+    )
 
 
 async def _post_chatbot(path: str, payload: dict[str, Any]):
@@ -217,18 +252,28 @@ async def send_agent_reply(
     if contact is None:
         return SendReplyResult(NOT_FOUND)
 
+    current = chatbot_event_service.to_naive_utc(now) if now else datetime.utcnow()
+    claimed = _claimed_by_other(contact, agent_id, current)
+    if claimed is not None:
+        return claimed
+
     phone = normalize_phone(contact.phone)
     if phone is None:
         return SendReplyResult(NO_PHONE)
 
     latest_inbound = await _last_inbound(db, contact.id)
     window_until = latest_inbound + REPLY_WINDOW if latest_inbound else None
-    current = chatbot_event_service.to_naive_utc(now) if now else datetime.utcnow()
     if window_until is None or current >= window_until:
         return SendReplyResult(WINDOW_CLOSED, window_until=window_until)
 
     if not (settings.chatbot_send_url and settings.chatbot_send_secret):
         return SendReplyResult(NOT_CONFIGURED)
+
+    # Only a send that passed every check claims, so a rejected one leaves no
+    # claim behind; the claim is committed together with the message below.
+    claimed = await _take_claim(db, contact, agent_id, current)
+    if claimed is not None:
+        return claimed
 
     message = Message(
         id=str(uuid.uuid4()),
@@ -276,9 +321,18 @@ async def send_agent_reply(
 
 
 async def retry_agent_reply(
-    db: AsyncSession, *, message_id: str, now: Optional[datetime] = None
+    db: AsyncSession,
+    *,
+    message_id: str,
+    requester_id: Optional[str] = None,
+    now: Optional[datetime] = None,
 ) -> SendReplyResult:
-    """Retry one unconfirmed agent reply without ever deleting its durable row."""
+    """Retry one unconfirmed agent reply without ever deleting its durable row.
+
+    The claim is checked and taken for ``requester_id``, the user asking for the
+    retry; chatbot still gets the original ``sent_by`` as the agent. Until the
+    API layer passes the requester (CRM-TASK-094) the original sender stands in.
+    """
     result = await db.execute(select(Message).where(Message.id == message_id))
     message = result.scalar_one_or_none()
     if message is None or message.author_kind != "agent":
@@ -295,12 +349,21 @@ async def retry_agent_reply(
     contact = await _live_contact(db, message.contact_id)
     if contact is None:
         return SendReplyResult(NOT_FOUND)
+    claimant = requester_id if requester_id is not None else message.sent_by
+    claimed = _claimed_by_other(contact, claimant, current, message)
+    if claimed is not None:
+        return claimed
     latest_inbound = await _last_inbound(db, contact.id)
     window_until = latest_inbound + REPLY_WINDOW if latest_inbound else None
     if window_until is None or current >= window_until:
         return SendReplyResult(WINDOW_CLOSED, message=message, window_until=window_until)
     if not (settings.chatbot_send_url and settings.chatbot_send_secret):
         return SendReplyResult(NOT_CONFIGURED, message=message)
+    # Taken before the call and committed with the commit below; another user
+    # taking over in the meantime means the old message must not go out.
+    claimed = await _take_claim(db, contact, claimant, current, message)
+    if claimed is not None:
+        return claimed
 
     agent_name = message.sent_by
     if message.sent_by:
@@ -315,8 +378,8 @@ async def retry_agent_reply(
         "text": message.body,
         "agent": {"id": message.sent_by, "name": agent_name},
     }
-    # End the read-only transaction so the slow call holds no snapshot and the
-    # re-read below sees rows an event may have changed in the meantime.
+    # Commit the claim and end the transaction so the slow call holds no snapshot
+    # and the re-read below sees rows an event may have changed in the meantime.
     await db.commit()
     response, response_payload, connection_failure = await _post_chatbot(
         "/internal/crm/send", payload
