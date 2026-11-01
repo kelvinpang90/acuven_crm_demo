@@ -34,6 +34,26 @@
 
 ---
 
+## CRM-TASK-094 认领与释放接口，发送遇到他人认领返回冲突，列表与详情返回认领状态（2026-11-01）
+
+### 做了什么
+
+- `backend/app/routers/contacts.py`：新增 `POST /api/contacts/{contact_id}/claim`（请求体可选，`takeover` 为严格布尔、默认 false）与 `DELETE /api/contacts/{contact_id}/claim`（查询参数 `takeover`、默认 false），调用 CRM-TASK-093 的 `claim_service.claim` / `release`。归属先过 `may_access_contact`，无权与服务返回 `NOT_FOUND`（联系人不存在或已删除，含管理员）都返回同一个 403 `NOT_ASSIGNED`；`CLAIMED` 返回 409，`fail` 外壳的 `fields` 带 `claimed_by`、`claimed_by_name`、`claimed_until`；成功时提交，认领返回 `reply_claimed_by`、`reply_claimed_by_name`、`reply_claimed_until`、`taken_over_from`、`taken_over_from_name`，释放返回三项空值。
+- `backend/app/routers/messages.py`：`_send_result` 在 `NO_PHONE` 之前把 `CLAIMED` 映射为同样的 409，发送与重试共用；重试接口把请求人作为 `requester_id` 传给 `retry_agent_reply`；`GET /api/messages/conversations` 每项加三项认领字段，按该页联系人一次批量读取，没有联系人的会话三项为空。
+- `backend/app/services/contact_service.py`：新增 `claims_for`（已读出的联系人，认领人名字一次批量查询）、`claims_for_contact_ids`（联系人认领一次批量查询后同上）、`claim_to_dict`、`claim_conflict_fields`、`empty_claim` 与 `CLAIMED_MESSAGE`；有效认领沿用 `claim_service.active_claim`，过期或没有认领三项都为空，到期时间以 naive UTC 交给 `ok()` 输出带 Z，写法与 `wa_reply_window_until` 相同；联系人列表与详情每项加三项，`assigned_to_name` 等已有字段查法不变。
+- `backend/app/schemas/contact.py`：新增 `ClaimRequest`；`ContactResponse` 补三项认领字段。
+- 新测试 `backend/tests/test_contact_claim_api.py`：认领成功与续期、409 `CLAIMED` 的 fields（含认领人已不存在）、接手返回被接手的人、接手已过期的认领为空、释放的三种情况、`takeover` 类型不对 422、无权与不存在与已删除（含管理员）返回同一个 403、发送与重试遇到别人认领返回 409 且不存消息不调用 chatbot、`CLAIMED` 在 403 之后与 `NO_PHONE` 之前、重试传请求人、联系人列表与详情及会话列表的认领字段（有效、过期、没有、没有联系人的会话）、每页名字一次批量查询与会话列表认领一次批量查询；每条写明守住的验收标准。
+
+### 偏离了什么
+
+- 无。
+
+### 验证到什么程度
+
+- 测试由 PR 的必需检查 backend 执行，检查结果由 Worker 和 CI 记录不写在这里。
+
+---
+
 ## CRM-TASK-093 会话认领接手与释放的规则，客服回复前校验认领，转派时清空认领（2026-11-01）
 
 ### 做了什么

@@ -12,7 +12,13 @@ from app.models.conversation_triage import ConversationTriage
 from app.models.message import Message
 from app.models.user import User
 from app.schemas.message import EmailSendRequest, WhatsAppSendRequest
-from app.services import access_service, chatbot_send_service, email_service, inbox_events
+from app.services import (
+    access_service,
+    chatbot_send_service,
+    contact_service,
+    email_service,
+    inbox_events,
+)
 from app.services.email_service import EmailSendError
 from app.utils.response import fail, ok
 
@@ -150,10 +156,13 @@ async def list_conversations(
 
     messages = [row[0] for row in rows]
     items = await _message_dicts(db, messages, include_contact_name=True)
-    triage = await _triage_by_contact(db, {m.contact_id for m in messages if m.contact_id})
+    contact_ids = {m.contact_id for m in messages if m.contact_id}
+    triage = await _triage_by_contact(db, contact_ids)
+    claims = await contact_service.claims_for_contact_ids(db, contact_ids)
     for item, row in zip(items, rows):
         item["unread_count"] = int(row[1] or 0)
         item["triage"] = triage.get(item["contact_id"])
+        item.update(claims.get(item["contact_id"]) or contact_service.empty_claim())
     return ok(data={"data": items, "total": total, "page": page, "page_size": page_size})
 
 
@@ -301,7 +310,9 @@ async def retry_whatsapp(
         or contact_is_live is None
     ):
         return fail(message=NOT_YOURS, code="NOT_ASSIGNED", status_code=403)
-    result = await chatbot_send_service.retry_agent_reply(db, message_id=message_id)
+    result = await chatbot_send_service.retry_agent_reply(
+        db, message_id=message_id, requester_id=current_user.id
+    )
     if result.category in (chatbot_send_service.NOT_FOUND, chatbot_send_service.NOT_RETRYABLE):
         return fail(message=NOT_YOURS, code="NOT_ASSIGNED", status_code=403)
     return await _send_result(db, result)
@@ -414,6 +425,16 @@ async def _send_result(db: AsyncSession, result: chatbot_send_service.SendReplyR
             data=(await _message_dicts(db, [result.message]))[0],
             message="UNCONFIRMED",
             status_code=202,
+        )
+    # After the 403 and before NO_PHONE in the check order (docs/chatbot-phase3.md section 8).
+    if category == chatbot_send_service.CLAIMED:
+        return fail(
+            contact_service.CLAIMED_MESSAGE,
+            code="CLAIMED",
+            fields=await contact_service.claim_conflict_fields(
+                db, result.claimed_by, result.claimed_until
+            ),
+            status_code=409,
         )
     if category == chatbot_send_service.NO_PHONE:
         return fail("Contact not found or has no phone number", code="NO_PHONE", status_code=400)
