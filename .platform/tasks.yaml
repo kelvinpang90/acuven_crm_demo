@@ -2759,7 +2759,7 @@ tasks:
       按 docs/chatbot-phase3.md 第 5.2 节、第八节与第十四节第 4、7 条，在 CRM-TASK-093 的服务之上加认领与释放接口，
       WhatsApp 回复的发送与重试把 CLAIMED 映射为 409，联系人详情、联系人列表与会话列表返回认领状态，供 CRM-TASK-095 使用。
       只做接口层：不改业务规则、不改表结构、不改前端，不改交还 AI 与推送接口。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-093
     acceptance_criteria:
