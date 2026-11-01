@@ -9,7 +9,7 @@ from app.models.contact import Contact
 from app.models.deal import Deal
 from app.models.message import Message
 from app.models.user import User
-from app.services import access_service, routing_service
+from app.services import access_service, claim_service, routing_service
 from app.utils.demo_scope import contact_not_demo
 from app.utils.phone import normalize_phone, phone_for_storage
 
@@ -93,6 +93,7 @@ async def list_contacts(
     deal_summary = await _bulk_deal_summary(db, contact_ids)
     conflicts = await _phone_conflicts_for(db, current_user, contacts)
     reply_windows = await _reply_windows_for(db, contact_ids)
+    claims = await claims_for(db, contacts)
 
     # Enrich with assigned_to_name
     data = []
@@ -101,6 +102,7 @@ async def list_contacts(
         d = _contact_to_dict(c)
         d["phone_conflict"] = c.phone in conflicts
         d["wa_reply_window_until"] = reply_windows.get(c.id)
+        d.update(claims[c.id])
         if c.assigned_to:
             if c.assigned_to not in user_cache:
                 u = await db.execute(select(User.name).where(User.id == c.assigned_to))
@@ -135,6 +137,7 @@ async def get_contact(
     d["deal_count"] = summary.get(contact_id, {}).get("count", 0)
     d["sources"] = summary.get(contact_id, {}).get("sources", [])
     d["wa_reply_window_until"] = (await _reply_windows_for(db, [contact_id])).get(contact_id)
+    d.update((await claims_for(db, [contact]))[contact.id])
     return d
 
 
@@ -648,6 +651,79 @@ async def _reply_windows_for(db: AsyncSession, contact_ids: list[str]) -> dict[s
         .group_by(Message.contact_id)
     )
     return {contact_id: created_at + timedelta(hours=24) for contact_id, created_at in result.all()}
+
+
+CLAIMED_MESSAGE = "Another user is replying to this customer."
+
+
+async def _user_names(db: AsyncSession, user_ids: Iterable[Optional[str]]) -> dict[str, str]:
+    ids = {user_id for user_id in user_ids if user_id}
+    if not ids:
+        return {}
+    return dict((await db.execute(select(User.id, User.name).where(User.id.in_(ids)))).all())
+
+
+def empty_claim() -> dict:
+    return {"reply_claimed_by": None, "reply_claimed_by_name": None, "reply_claimed_until": None}
+
+
+def _claim_fields(held: Optional[tuple[str, datetime]], names: dict[str, str]) -> dict:
+    if held is None:
+        return empty_claim()
+    # Naive UTC datetimes, marked with Z by ok() like wa_reply_window_until.
+    return {
+        "reply_claimed_by": held[0],
+        "reply_claimed_by_name": names.get(held[0]),
+        "reply_claimed_until": held[1],
+    }
+
+
+async def claims_for(db: AsyncSession, contacts: Iterable) -> dict[str, dict]:
+    """The valid claim of each contact as the three reply_claimed_* fields, with
+    every claimant's name in one query; an expired claim reads as none
+    (docs/chatbot-phase3.md 5.2). Anything with the contact's id and two claim
+    columns will do."""
+    now = datetime.utcnow()
+    held = {contact.id: claim_service.active_claim(contact, now) for contact in contacts}
+    names = await _user_names(db, (claim[0] for claim in held.values() if claim))
+    return {contact_id: _claim_fields(claim, names) for contact_id, claim in held.items()}
+
+
+async def claims_for_contact_ids(db: AsyncSession, contact_ids: Iterable[str]) -> dict[str, dict]:
+    """claims_for with the contacts read in one query; unknown ids are left out."""
+    ids = set(contact_ids)
+    if not ids:
+        return {}
+    rows = await db.execute(
+        select(Contact.id, Contact.reply_claimed_by, Contact.reply_claimed_until).where(
+            Contact.id.in_(ids)
+        )
+    )
+    return await claims_for(db, rows.all())
+
+
+async def claim_to_dict(db: AsyncSession, result: claim_service.ClaimResult) -> dict:
+    """A successful claim and, after a takeover, whose claim it replaced."""
+    names = await _user_names(db, (result.claimed_by, result.taken_over_from))
+    return {
+        "reply_claimed_by": result.claimed_by,
+        "reply_claimed_by_name": names.get(result.claimed_by),
+        "reply_claimed_until": result.claimed_until,
+        "taken_over_from": result.taken_over_from,
+        "taken_over_from_name": names.get(result.taken_over_from),
+    }
+
+
+async def claim_conflict_fields(
+    db: AsyncSession, claimed_by: Optional[str], claimed_until: Optional[datetime]
+) -> dict:
+    """`fields` of a 409 CLAIMED; the name is empty once the user is gone."""
+    names = await _user_names(db, (claimed_by,))
+    return {
+        "claimed_by": claimed_by,
+        "claimed_by_name": names.get(claimed_by),
+        "claimed_until": claimed_until,
+    }
 
 
 def handover_to_dict(contact: Contact) -> dict:

@@ -17,6 +17,7 @@ from app.schemas.activity import ActivityCreate
 from app.schemas.contact import (
     ArchiveRequest,
     AssignSuggestionRequest,
+    ClaimRequest,
     ContactCreate,
     ContactUpdate,
     DuplicateCheckRequest,
@@ -27,6 +28,7 @@ from app.services import (
     activity_service,
     autocount_service,
     chatbot_send_service,
+    claim_service,
     contact_service,
     duplicate_service,
     routing_service,
@@ -421,6 +423,71 @@ async def handback_whatsapp(
     if result.category == chatbot_send_service.CHATBOT_FAILED:
         return fail("Chatbot handback failed", code="CHATBOT_FAILED", status_code=502)
     return ok(data=contact_service.handover_to_dict(result.contact))
+
+
+# --- Conversation claims (docs/chatbot-phase3.md 5.2 and section 14 items 4 and 8) ---
+
+
+def _not_assigned():
+    # Missing and deleted customers too, admins included, like handback.
+    return fail("This customer is not assigned to you.", code="NOT_ASSIGNED", status_code=403)
+
+
+async def _claim_refused(db: AsyncSession, result: claim_service.ClaimResult):
+    """The response for a claim or release that changed nothing, else None."""
+    if result.category == claim_service.NOT_FOUND:
+        return _not_assigned()
+    if result.category == claim_service.CLAIMED:
+        return fail(
+            contact_service.CLAIMED_MESSAGE,
+            code="CLAIMED",
+            fields=await contact_service.claim_conflict_fields(
+                db, result.claimed_by, result.claimed_until
+            ),
+            status_code=409,
+        )
+    return None
+
+
+@router.post("/{contact_id}/claim")
+async def claim_contact(
+    contact_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+    body: Optional[ClaimRequest] = None,
+):
+    if not await access_service.may_access_contact(db, current_user, contact_id):
+        return _not_assigned()
+    result = await claim_service.claim(
+        db,
+        contact_id=contact_id,
+        user_id=current_user.id,
+        takeover=body.takeover if body is not None else False,
+    )
+    refused = await _claim_refused(db, result)
+    if refused is not None:
+        return refused
+    await db.commit()
+    return ok(data=await contact_service.claim_to_dict(db, result))
+
+
+@router.delete("/{contact_id}/claim")
+async def release_claim(
+    contact_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+    takeover: bool = Query(False),
+):
+    if not await access_service.may_access_contact(db, current_user, contact_id):
+        return _not_assigned()
+    result = await claim_service.release(
+        db, contact_id=contact_id, user_id=current_user.id, takeover=takeover
+    )
+    refused = await _claim_refused(db, result)
+    if refused is not None:
+        return refused
+    await db.commit()
+    return ok(data=contact_service.empty_claim())
 
 
 @router.post("")

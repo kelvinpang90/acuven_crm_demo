@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field, StrictBool, field_validator
 
 from app.schemas.deal import DealSource
 
@@ -77,6 +77,10 @@ class ContactResponse(BaseModel):
     wa_handover_expires_at: Optional[datetime] = None
     wa_handover_updated_at: Optional[datetime] = None
     wa_reply_window_until: Optional[datetime] = None
+    # List and detail only; all empty when the claim has expired (docs/chatbot-phase3.md 5.2).
+    reply_claimed_by: Optional[str] = None
+    reply_claimed_by_name: Optional[str] = None
+    reply_claimed_until: Optional[datetime] = None
     # List and detail only; computed for admins, always False for other roles.
     phone_conflict: bool = False
     created_at: datetime
@@ -94,6 +98,11 @@ class ArchiveRequest(BaseModel):
         if v not in (0, 1):
             raise ValueError("is_archived must be 0 or 1")
         return v
+
+
+class ClaimRequest(BaseModel):
+    # Strict: "true" or 1 is a 422, not a takeover.
+    takeover: StrictBool = False
 
 
 class PaginatedContacts(BaseModel):
