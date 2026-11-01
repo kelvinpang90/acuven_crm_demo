@@ -100,8 +100,9 @@ def _response(status, payload=None):
     return response
 
 
-def _sent():
-    return _response(200, {"result": "sent", "wa_message_id": "wamid.1"})
+def _sent(wa_message_id="wamid.1"):
+    # messages.external_id is unique, so each successful send needs its own id.
+    return _response(200, {"result": "sent", "wa_message_id": wa_message_id})
 
 
 def _stub_http(monkeypatch, post):
@@ -204,7 +205,7 @@ async def test_send_renews_own_claim_and_takes_an_expired_one(async_session_make
         _inbound(),
     )
     _configured(monkeypatch)
-    _stub_http(monkeypatch, AsyncMock(return_value=_sent()))
+    _stub_http(monkeypatch, AsyncMock(side_effect=[_sent("wamid.1"), _sent("wamid.2")]))
 
     assert (await _send(async_session_maker, S1, now=NOW + timedelta(minutes=5))).category == SENT
     assert await _stored_claim(async_session_maker) == (S1, NOW + timedelta(minutes=20))
