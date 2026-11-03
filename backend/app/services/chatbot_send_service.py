@@ -301,9 +301,16 @@ async def send_agent_reply(
         "text": text,
         "agent": {"id": agent_id, "name": agent_name},
     }
-    response, payload_response, connection_failure = await _post_chatbot(
-        "/internal/crm/send", payload
-    )
+    return await _deliver_stored(db, message, contact, "/internal/crm/send", payload)
+
+
+async def _deliver_stored(
+    db: AsyncSession, message: Message, contact: Contact, path: str, payload: dict[str, Any]
+) -> SendReplyResult:
+    """First attempt for a message already committed: call chatbot and classify.
+
+    Shared by text and template sends (design section 15 item 8)."""
+    response, payload_response, connection_failure = await _post_chatbot(path, payload)
     error_code = payload_response.get("error_code")
     title = payload_response.get("error_title")
     error_title = title if isinstance(title, str) else None
@@ -353,10 +360,13 @@ async def retry_agent_reply(
     claimed = _claimed_by_other(contact, claimant, current, message)
     if claimed is not None:
         return claimed
-    latest_inbound = await _last_inbound(db, contact.id)
-    window_until = latest_inbound + REPLY_WINDOW if latest_inbound else None
-    if window_until is None or current >= window_until:
-        return SendReplyResult(WINDOW_CLOSED, message=message, window_until=window_until)
+    # A template message is sent outside the window by design, so its retry skips
+    # the window (and eligibility, rate and whitelist) checks (design section 15 item 4).
+    if message.template_name is None:
+        latest_inbound = await _last_inbound(db, contact.id)
+        window_until = latest_inbound + REPLY_WINDOW if latest_inbound else None
+        if window_until is None or current >= window_until:
+            return SendReplyResult(WINDOW_CLOSED, message=message, window_until=window_until)
     if not (settings.chatbot_send_url and settings.chatbot_send_secret):
         return SendReplyResult(NOT_CONFIGURED, message=message)
     # Taken before the call and committed with the commit below; another user
@@ -372,18 +382,32 @@ async def retry_agent_reply(
         ).scalar_one_or_none()
         if user is not None:
             agent_name = user.name
-    payload = {
-        "request_id": message.id,
-        "visitor": {"phone": message.recipient_id, "bsuid": contact.whatsapp_bsuid},
-        "text": message.body,
-        "agent": {"id": message.sent_by, "name": agent_name},
-    }
+    visitor = {"phone": message.recipient_id, "bsuid": contact.whatsapp_bsuid}
+    agent = {"id": message.sent_by, "name": agent_name}
+    if message.template_name is None:
+        path = "/internal/crm/send"
+        payload = {
+            "request_id": message.id,
+            "visitor": visitor,
+            "text": message.body,
+            "agent": agent,
+        }
+    else:
+        path = "/internal/crm/send-template"
+        payload = {
+            "request_id": message.id,
+            "visitor": visitor,
+            "template": {
+                "name": message.template_name,
+                "language": message.template_language,
+                "params": message.template_params,
+            },
+            "agent": agent,
+        }
     # Commit the claim and end the transaction so the slow call holds no snapshot
     # and the re-read below sees rows an event may have changed in the meantime.
     await db.commit()
-    response, response_payload, connection_failure = await _post_chatbot(
-        "/internal/crm/send", payload
-    )
+    response, response_payload, connection_failure = await _post_chatbot(path, payload)
     if _sent(response, response_payload):
         return await _apply_sent_response(db, message, contact, response_payload)
     # A failed retry only says this attempt did not send; the first attempt's
