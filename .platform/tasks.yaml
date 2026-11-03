@@ -2790,7 +2790,7 @@ tasks:
       在 CRM-TASK-094 的接口之上，按 docs/chatbot-phase3.md 第 5.2 节「前端」让客服在收件箱里看到谁正在处理、认领与释放、
       遇到别人认领时接手后再发送，并在会话头部转派负责人（复用现有的修改联系人接口）。
       只改前端：不改后端、不加页面或路由，不做模板与媒体。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-094
       - CRM-TASK-092
