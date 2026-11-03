@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Enum, Index, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, Enum, Index, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -38,6 +38,10 @@ class Message(Base):
         Enum("sent", "delivered", "read", "failed", name="message_delivery_status"), nullable=True
     )
     delivery_error: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    # Only written for WhatsApp template messages sent by an agent; params is a list of strings.
+    template_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    template_language: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    template_params: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
 
     __table_args__ = (
