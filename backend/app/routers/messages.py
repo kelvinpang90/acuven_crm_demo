@@ -308,7 +308,16 @@ async def send_whatsapp_template(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    if not await access_service.may_access_contact(db, current_user, body.contact_id):
+    # may_access_contact lets an admin through for any id, so a missing or deleted
+    # contact is checked here too (docs/chatbot-phase3.md section 15 item 8).
+    contact_is_live = (
+        await db.execute(
+            select(Contact.id).where(Contact.id == body.contact_id, Contact.deleted_at.is_(None))
+        )
+    ).scalar_one_or_none()
+    if contact_is_live is None or not await access_service.may_access_contact(
+        db, current_user, body.contact_id
+    ):
         return fail(message=NOT_YOURS, code="NOT_ASSIGNED", status_code=403)
 
     result = await chatbot_template_service.send_template(
@@ -510,7 +519,7 @@ async def _send_result(db: AsyncSession, result: chatbot_send_service.SendReplyR
     if category == chatbot_send_service.NOT_CONFIGURED:
         return fail("Chatbot is not configured", code="NOT_CONFIGURED", status_code=503)
     if category == chatbot_send_service.CHATBOT_FAILED:
-        return fail("Could not read the template list", code="CHATBOT_FAILED", status_code=502)
+        return fail("Chatbot request failed", code="CHATBOT_FAILED", status_code=502)
     if category == chatbot_template_service.TEMPLATE_UNKNOWN:
         return fail("This template is not available", code="TEMPLATE_UNKNOWN", status_code=422)
     if category == chatbot_template_service.TEMPLATE_PARAMS:
