@@ -545,6 +545,7 @@ export default function ConversationView({ contactId, contactName, channel, now,
               )}
               <div className="flex flex-wrap items-center justify-end gap-x-2 text-[10px] text-text-muted mt-1">
                 {authorLabel(msg) && <span>{authorLabel(msg)}</span>}
+                {msg.author_kind === 'agent' && msg.template_name && <span>{t('templateLabel', { name: msg.template_name })}</span>}
                 {deliveryLabel(msg) && <span>{deliveryLabel(msg)}</span>}
                 <span>{dayjs(msg.created_at).format('HH:mm')}</span>
               </div>
@@ -558,7 +559,7 @@ export default function ConversationView({ contactId, contactName, channel, now,
         ))}
       </div>
 
-      <ReplyBox contactId={contactId} channel={channel} waReplyWindowUntil={contact?.wa_reply_window_until} contactPhone={contact?.phone} aiEnabled={aiEnabled} messageCount={messages.length} onSent={handleSent} onClaimChange={(next) => applyClaim(contactId, next)} />
+      <ReplyBox contactId={contactId} contactName={contact?.name || contactName} channel={channel} waReplyWindowUntil={contact?.wa_reply_window_until} contactPhone={contact?.phone} aiEnabled={aiEnabled} messageCount={messages.length} onSent={handleSent} onClaimChange={(next) => applyClaim(contactId, next)} />
     </div>
   );
 }

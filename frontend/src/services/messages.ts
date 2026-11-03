@@ -1,5 +1,5 @@
 import api from './api';
-import type { ApiResponse, PaginatedResponse, Message, Conversation } from '@/types';
+import type { ApiResponse, PaginatedResponse, Message, Conversation, WhatsAppTemplate } from '@/types';
 
 export interface MessageListParams {
   channel?: string;
@@ -41,6 +41,17 @@ export const messagesApi = {
     api.post<ApiResponse<Message>>(
       '/messages/whatsapp/send',
       { contact_id: contactId, message },
+      { timeout: 45000 },
+    ),
+
+  // Read afresh each time the template dialog opens.
+  getWhatsAppTemplates: () =>
+    api.get<ApiResponse<WhatsAppTemplate[]>>('/messages/whatsapp/templates'),
+
+  sendWhatsAppTemplate: (contactId: string, templateName: string, language: string, params: string[]) =>
+    api.post<ApiResponse<Message>>(
+      '/messages/whatsapp/send-template',
+      { contact_id: contactId, template_name: templateName, language, params },
       { timeout: 45000 },
     ),
 

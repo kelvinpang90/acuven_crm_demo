@@ -8,9 +8,11 @@ import { aiApi } from '@/services/ai';
 import { contactsApi } from '@/services/contacts';
 import { messagesApi } from '@/services/messages';
 import type { AiLanguage, ApiError, ReplyClaim } from '@/types';
+import TemplateDialog from './TemplateDialog';
 
 interface Props {
   contactId: string;
+  contactName: string;
   channel: string;
   waReplyWindowUntil: string | null | undefined;
   contactPhone: string | null | undefined;
@@ -72,7 +74,7 @@ function defaultDraftLanguage(language: string): AiLanguage {
   return language.startsWith('en') ? 'en' : 'zh-CN';
 }
 
-export default function ReplyBox({ contactId, channel, waReplyWindowUntil, contactPhone, aiEnabled, messageCount, onSent, onClaimChange }: Props) {
+export default function ReplyBox({ contactId, contactName, channel, waReplyWindowUntil, contactPhone, aiEnabled, messageCount, onSent, onClaimChange }: Props) {
   const { t, i18n } = useTranslation('inbox');
   const [message, setMessage] = useState('');
   const [subject, setSubject] = useState('');
@@ -84,6 +86,7 @@ export default function ReplyBox({ contactId, channel, waReplyWindowUntil, conta
   const [drafting, setDrafting] = useState(false);
   const [translating, setTranslating] = useState(false);
   const [now, setNow] = useState(Date.now());
+  const [templateOpen, setTemplateOpen] = useState(false);
   // A send refused because someone else is replying, with the text it carried.
   const [claimConflict, setClaimConflict] = useState<{ text: string; notice: string } | null>(null);
   const activeContactId = useRef(contactId);
@@ -98,6 +101,7 @@ export default function ReplyBox({ contactId, channel, waReplyWindowUntil, conta
   const windowOpen = !isWhatsApp || waReplyWindowUntil === undefined || (!!waReplyWindowUntil && new Date(waReplyWindowUntil).getTime() > now);
   const missingPhone = isWhatsApp && contactPhone !== undefined && !contactPhone?.trim();
   const replyDisabled = !windowOpen || missingPhone;
+  const hasPhone = !!contactPhone?.trim();
   const normalizedMessage = message.trim();
   const translationInvalid = !normalizedMessage || Array.from(normalizedMessage).length > 2000;
   // Takeover sends the same text, so the offer lasts only while it is unchanged.
@@ -122,7 +126,13 @@ export default function ReplyBox({ contactId, channel, waReplyWindowUntil, conta
     setDrafting(false);
     setTranslating(false);
     setClaimConflict(null);
+    setTemplateOpen(false);
   }, [contactId]);
+
+  // Templates are only offered while the window is closed.
+  useEffect(() => {
+    if (windowOpen || !hasPhone) setTemplateOpen(false);
+  }, [windowOpen, hasPhone]);
 
   const send = async (text: string) => {
     const requestedContactId = contactId;
@@ -225,9 +235,18 @@ export default function ReplyBox({ contactId, channel, waReplyWindowUntil, conta
   };
 
   return (
+    <>
+    {templateOpen && isWhatsApp && !windowOpen && hasPhone && (
+      <TemplateDialog key={contactId} contactId={contactId} contactName={contactName} onClose={() => setTemplateOpen(false)} onSent={onSent} />
+    )}
     <form onSubmit={handleSubmit} className="space-y-2 border-t border-dark-border p-3">
       {channel === 'email' && <input className="input text-sm" placeholder={t('subject')} value={subject} disabled={replyDisabled} onChange={(event) => setSubject(event.target.value)} />}
-      {isWhatsApp && !windowOpen && <p className="text-xs text-text-muted">{t('windowClosed')}</p>}
+      {isWhatsApp && !windowOpen && (
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-xs text-text-muted">{t('windowClosed')}</p>
+          {hasPhone && <button type="button" className="btn-secondary text-xs" onClick={() => setTemplateOpen(true)}>{t('sendTemplate')}</button>}
+        </div>
+      )}
       {missingPhone && <p className="text-xs text-text-muted">{t('replyNoPhone')}</p>}
       {visibleConflict && (
         <div className="flex flex-wrap items-center gap-2">
@@ -259,5 +278,6 @@ export default function ReplyBox({ contactId, channel, waReplyWindowUntil, conta
         <button type="submit" disabled={sending || !normalizedMessage || replyDisabled} className="btn-primary px-4 text-sm">{t('send')}</button>
       </div>
     </form>
+    </>
   );
 }

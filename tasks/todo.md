@@ -29,6 +29,29 @@
 
 ---
 
+## CRM-TASK-099 收件箱窗口关闭时可选模板填参数发送，消息上显示模板名（2026-11-03）
+
+### 做了什么
+
+- `frontend/src/types/index.ts`：`Message` 加 `template_name`；新增 `WhatsAppTemplateParam`（label、max_len）与 `WhatsAppTemplate`（name、language、可选 category、params、body），与 CRM-TASK-098 的接口字段一致。
+- `frontend/src/services/messages.ts`：新增 `getWhatsAppTemplates()`（`GET /messages/whatsapp/templates`）与 `sendWhatsAppTemplate(contactId, templateName, language, params)`（`POST /messages/whatsapp/send-template`，超时 45 秒，与文字发送相同）。
+- 新组件 `frontend/src/pages/Inbox/TemplateDialog.tsx`：打开时读取模板列表，分别提示读取中、未配置（`NOT_CONFIGURED`）、其他读取失败、没有可用模板；下拉列出「模板名 · 语言 · 类别」（没有类别时省略）；选中后按 params 逐个显示输入框（标签取 label、最大长度取 max_len），第一个预填联系人名字（按 max_len 截断，可改）；下方实时预览，把正文里的 `{{n}}` 换成第 n 个输入去掉首尾空白后的值；有空参数时禁用发送并提示。发送 200 关闭弹窗并刷新会话；202 关闭、刷新并提示未确认送出；收不到响应时保留弹窗内容、刷新会话并在弹窗里提示先查看未确认送出的消息；其他错误保留弹窗内容，在弹窗里按错误码提示（`NO_OPT_IN`、`TEMPLATE_PENDING`、`CLAIMED` 带认领人与到期时间、`TEMPLATE_UNKNOWN`、`TEMPLATE_PARAMS`、`SEND_FAILED` 带 Meta 的错误码与标题、`CHATBOT_FAILED`、`NOT_CONFIGURED`、`NOT_ASSIGNED`、`NO_PHONE`，其余通用）。发送中不能关闭弹窗。
+- `frontend/src/pages/Inbox/ReplyBox.tsx`：新增 `contactName` 属性；WhatsApp 会话回复窗口关闭（沿用现有判断）且联系人有号码时，在窗口已关闭的提示旁显示「发模板」，点开弹窗；切换会话、窗口重新打开时弹窗随之关闭。邮件会话与窗口开着时不显示。
+- `frontend/src/pages/Inbox/ConversationView.tsx`：给回复框传联系人名字（联系人详情的名字，没读到时用列表传来的名字）；`template_name` 非空的客服消息在现有的「客服 · 名字」之后显示「模板 · 模板名」；未确认送出、发送中与重试的显示不变。
+- `frontend/src/locales/en/inbox.json`、`frontend/src/locales/zh/inbox.json`：新文案同时加在两个语言的 inbox 命名空间。
+- 没有改后端、页面与路由，不涉及媒体。
+
+### 偏离了什么
+
+- 回复框里「窗口已关闭」的提示改为与「发模板」按钮放在同一个可换行的行里，排列方式随之改变。
+
+### 验证到什么程度
+
+- 前端类型检查与构建由 PR 的必需检查 frontend 执行，检查结果由 Worker 和 CI 记录不写在这里。
+- 没有在浏览器里实际操作过。
+
+---
+
 ## CRM-TASK-098 模板列表与发模板接口，消息返回模板名，重试接口支持模板消息（2026-11-03）
 
 ### 做了什么
