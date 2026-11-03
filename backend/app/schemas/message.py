@@ -1,7 +1,11 @@
+import re
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
+
+# Meta's limits on body parameters (docs/chatbot-phase3.md section 5.3 item 6).
+TEMPLATE_PARAM_FORBIDDEN = re.compile(r"[\r\n\t]| {4,}")
 
 
 class MessageResponse(BaseModel):
@@ -25,6 +29,8 @@ class MessageResponse(BaseModel):
     contact_name: Optional[str] = None
     sent_by: Optional[str] = None
     sent_by_name: Optional[str] = None
+    # Set for template messages only (docs/chatbot-phase3.md section 15 item 3).
+    template_name: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
@@ -38,6 +44,34 @@ class WhatsAppSendRequest(BaseModel):
     def message_length(cls, value: str) -> str:
         if not 1 <= len(value.strip()) <= 4096:
             raise ValueError("message must contain 1 to 4096 non-whitespace characters")
+        return value
+
+
+class WhatsAppTemplateSendRequest(BaseModel):
+    contact_id: str
+    template_name: str
+    language: str = Field(min_length=1, max_length=20)
+    params: list[str] = Field(max_length=10)
+
+    @field_validator("template_name")
+    @classmethod
+    def template_name_length(cls, value: str) -> str:
+        value = value.strip()
+        if not 1 <= len(value) <= 100:
+            raise ValueError("template_name must contain 1 to 100 non-whitespace characters")
+        return value
+
+    @field_validator("params")
+    @classmethod
+    def params_characters(cls, value: list[str]) -> list[str]:
+        for param in value:
+            stripped = param.strip()
+            if not 1 <= len(stripped) <= 1024:
+                raise ValueError("each param must contain 1 to 1024 non-whitespace characters")
+            if TEMPLATE_PARAM_FORBIDDEN.search(stripped):
+                raise ValueError(
+                    "params may not contain newlines, tabs or more than 3 consecutive spaces"
+                )
         return value
 
 

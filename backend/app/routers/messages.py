@@ -11,10 +11,15 @@ from app.models.contact import Contact
 from app.models.conversation_triage import ConversationTriage
 from app.models.message import Message
 from app.models.user import User
-from app.schemas.message import EmailSendRequest, WhatsAppSendRequest
+from app.schemas.message import (
+    EmailSendRequest,
+    WhatsAppSendRequest,
+    WhatsAppTemplateSendRequest,
+)
 from app.services import (
     access_service,
     chatbot_send_service,
+    chatbot_template_service,
     contact_service,
     email_service,
     inbox_events,
@@ -284,6 +289,49 @@ async def send_whatsapp(
     return await _send_result(db, result)
 
 
+@router.get("/whatsapp/templates")
+async def list_whatsapp_templates(
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """chatbot's template whitelist, read on every call (docs/chatbot-phase3.md section 7)."""
+    result = await chatbot_template_service.list_templates()
+    if result.category == chatbot_send_service.NOT_CONFIGURED:
+        return fail("Chatbot is not configured", code="NOT_CONFIGURED", status_code=503)
+    if result.category != chatbot_template_service.OK:
+        return fail("Could not read the template list", code="CHATBOT_FAILED", status_code=502)
+    return ok(data=[_template_dict(template) for template in result.templates])
+
+
+@router.post("/whatsapp/send-template")
+async def send_whatsapp_template(
+    body: WhatsAppTemplateSendRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    # may_access_contact lets an admin through for any id, so a missing or deleted
+    # contact is checked here too (docs/chatbot-phase3.md section 15 item 8).
+    contact_is_live = (
+        await db.execute(
+            select(Contact.id).where(Contact.id == body.contact_id, Contact.deleted_at.is_(None))
+        )
+    ).scalar_one_or_none()
+    if contact_is_live is None or not await access_service.may_access_contact(
+        db, current_user, body.contact_id
+    ):
+        return fail(message=NOT_YOURS, code="NOT_ASSIGNED", status_code=403)
+
+    result = await chatbot_template_service.send_template(
+        db,
+        contact_id=body.contact_id,
+        name=body.template_name,
+        language=body.language,
+        params=body.params,
+        agent_id=current_user.id,
+        agent_name=current_user.name,
+    )
+    return await _send_result(db, result)
+
+
 @router.post("/{message_id}/whatsapp/retry")
 async def retry_whatsapp(
     message_id: str,
@@ -364,7 +412,19 @@ def _msg_to_dict(m: Message) -> dict:
         "contact_name": None,
         "sent_by": m.sent_by,
         "sent_by_name": None,
+        "template_name": m.template_name,
     }
+
+
+def _template_dict(template: dict) -> dict:
+    item = {"name": template["name"], "language": template["language"]}
+    if template.get("category") is not None:
+        item["category"] = template["category"]
+    item["params"] = [
+        {"label": param["label"], "max_len": param["max_len"]} for param in template["params"]
+    ]
+    item["body"] = template["body"]
+    return item
 
 
 async def _message_dicts(
@@ -438,6 +498,17 @@ async def _send_result(db: AsyncSession, result: chatbot_send_service.SendReplyR
         )
     if category == chatbot_send_service.NO_PHONE:
         return fail("Contact not found or has no phone number", code="NO_PHONE", status_code=400)
+    # Only template sends return these (docs/chatbot-phase3.md section 15 item 8).
+    if category == chatbot_template_service.NO_OPT_IN:
+        return fail(
+            "This contact has never sent a WhatsApp message", code="NO_OPT_IN", status_code=409
+        )
+    if category == chatbot_template_service.TEMPLATE_PENDING:
+        return fail(
+            "A template was already sent and the customer has not replied yet",
+            code="TEMPLATE_PENDING",
+            status_code=409,
+        )
     if category == chatbot_send_service.WINDOW_CLOSED:
         return fail(
             "WhatsApp reply window is closed",
@@ -447,6 +518,16 @@ async def _send_result(db: AsyncSession, result: chatbot_send_service.SendReplyR
         )
     if category == chatbot_send_service.NOT_CONFIGURED:
         return fail("Chatbot is not configured", code="NOT_CONFIGURED", status_code=503)
+    if category == chatbot_send_service.CHATBOT_FAILED:
+        return fail("Chatbot request failed", code="CHATBOT_FAILED", status_code=502)
+    if category == chatbot_template_service.TEMPLATE_UNKNOWN:
+        return fail("This template is not available", code="TEMPLATE_UNKNOWN", status_code=422)
+    if category == chatbot_template_service.TEMPLATE_PARAMS:
+        return fail(
+            "Template parameters do not match the template",
+            code="TEMPLATE_PARAMS",
+            status_code=422,
+        )
     if category == chatbot_send_service.IN_PROGRESS:
         return fail("Message is still being sent", code="IN_PROGRESS", status_code=409)
     if category == chatbot_send_service.RETRY_EXPIRED:
