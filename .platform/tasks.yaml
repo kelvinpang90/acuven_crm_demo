@@ -2830,7 +2830,7 @@ tasks:
     purpose: >-
       按 docs/chatbot-phase3.md 第十五节第 2、3 条，给 messages 加 template_name、template_language、template_params，记客服发出的 WhatsApp 模板消息用的是哪个模板与参数，
       重试时原样重发。一次 Alembic 迁移加列，模型同步。只做表结构：不改服务、接口、前端，不改存量数据。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-091
     acceptance_criteria:
