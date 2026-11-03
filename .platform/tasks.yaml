@@ -2859,7 +2859,7 @@ tasks:
       按 docs/chatbot-phase3.md 第 5.3 节、第七节与第十五节第 3 至 8 条，新建模板服务：经 chatbot 读给 CRM 用的模板白名单；客服在窗口外给曾来过消息的访客发一条模板，
       校验资格、频率、白名单与参数，先存未确认的出站消息再签名调用 chatbot 的 send-template，结果分类与文字发送相同；模板消息的重试改调 send-template、不查窗口。
       只做业务规则层，由 CRM-TASK-098 的接口调用：不加接口、不改归属校验与请求模型校验（接口层）、不改表结构、不改前端，文字发送与交还 AI 的行为不变。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-096
       - CRM-TASK-093
