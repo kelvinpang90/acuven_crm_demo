@@ -32,6 +32,25 @@
 
 ---
 
+## CRM-TASK-096 消息表加模板名、语言与参数三列，供发送与重试模板消息（2026-11-03）
+
+### 做了什么
+
+- 新迁移 `backend/alembic/versions/020_add_message_template_fields.py`（`down_revision` 为 019）：upgrade 给 `messages` 加 `template_name`（字符串 100，可空）、`template_language`（字符串 20，可空）与 `template_params`（JSON，可空，存字符串列表），不加外键与索引、不改存量数据；downgrade 删掉这三列回到 019 的形状。
+- `backend/app/models/message.py`：只加这三个字段，注释说明只有客服发的 WhatsApp 模板消息才写；不加行为。
+- 新测试 `backend/tests/test_migration_020.py`：迁移号与 `down_revision`；在内存 SQLite 只含 id 的最小 `messages` 表上执行 020 的 upgrade 再 downgrade（三列的类型、可空、没有外键与索引，存量行为空，降级后消失且行保留）；模型与迁移一致；按模型建表后插入不带三列的消息成功且三列为空；插入带字符串列表参数的消息后读回相同的列表。每条测试写明守住的验收标准。
+- 没有改服务、路由、schema、前端。
+
+### 偏离了什么
+
+- 无
+
+### 验证到什么程度
+
+- 测试由 PR 的必需检查 backend 执行，检查结果由 Worker 和 CI 记录不写在这里。
+
+---
+
 ## CRM-TASK-095 收件箱显示与操作会话认领，遇到他人认领可接手后发送，会话头部可转派（2026-11-03）
 
 ### 做了什么
