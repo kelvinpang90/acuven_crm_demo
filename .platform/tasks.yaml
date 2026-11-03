@@ -2919,7 +2919,7 @@ tasks:
     purpose: >-
       在 CRM-TASK-098 的接口之上，按 docs/chatbot-phase3.md 第 5.3 节「前端」与第十节 Q8，WhatsApp 回复窗口关闭时给客服一个发模板的弹窗：
       选模板、填参数、看预览、发送；发出的模板消息在会话里标明模板名。只改前端：不改后端、不加页面或路由，不做媒体。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-098
       - CRM-TASK-095
