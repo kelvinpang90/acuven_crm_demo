@@ -161,6 +161,23 @@ export interface Message {
   contact_name?: string;
   sent_by: string | null;
   sent_by_name: string | null;
+  // Set for template messages only.
+  template_name: string | null;
+}
+
+// One item of the chatbot's template whitelist.
+export interface WhatsAppTemplateParam {
+  label: string;
+  max_len: number;
+}
+
+export interface WhatsAppTemplate {
+  name: string;
+  language: string;
+  category?: string;
+  params: WhatsAppTemplateParam[];
+  // The approved body, with {{1}}… placeholders.
+  body: string;
 }
 
 export type TriageIntent =
