@@ -14,10 +14,9 @@
 <!-- openclaw:planning-v1:begin -->
 ### 当前计划
 
+1. `CRM-TASK-017` 删掉 CRM 自己的 Meta webhook、网关入口与直连发送及其配置
 
 ### 已阻塞
-
-- `CRM-TASK-017` 删掉 CRM 自己的 Meta webhook、网关入口与直连发送及其配置｜阻塞：等第 2 阶段真机验收通过（chatbot 侧 C3、C4 上线并配好第二把密钥）
 
 ### 后续计划
 
@@ -25,6 +24,17 @@
 - `CRM-TASK-019` 联系人模型取消 is_gateway 映射，列先留在库里
 - `CRM-TASK-020` 删除联系人表的 is_gateway 列
 <!-- openclaw:planning-v1:end -->
+
+---
+
+## 补记第 2 阶段真机验收，解锁 CRM-TASK-017（2026-11-03）
+
+- 来由：CRM-TASK-017 在 planning-v1 里一直挂在「已阻塞：等第 2 阶段真机验收通过」。第 2 阶段 CRM-TASK-012 至 016 与 chatbot 侧 C3、C4 于 2026-10-22 部署，第二把密钥 2026-10-23 配好。
+- 验收清单：`ai_chatbot_demo` 仓库 `tasks/runbook-batch09-steps3-5.md` 第 5 步（真机验收，10 项：开窗口、回复、导演台、接管期间 bot 不插话、续期、交还 AI、送达对勾、窗口外被拒、导演台接管时长、任务 43）。
+- 依据只有口头确认：Kelvin 2026-10-30 在会话里说第 2 阶段真机验收「之前已经在 CRM 那边测试完了」，当时没有记下来，并要求补记、解锁。验收日期与逐项结果 Kelvin 没有提供（问过一次），runbook 第 5 步前后的 Redis 基线、日志计数也没有贴回；这里不写成逐项都已核实。
+- 当时的 PR #248（017 排在 090 之后）一直是草稿，090 完成后与 master 冲突，2026-11-03 关掉、从 master 重开本记录；Kelvin 2026-11-03 定先做这一项。
+- planning-v1：CRM-TASK-017 从「已阻塞」移到「当前计划」第 1 项；018 至 020 依赖 017，留在「后续计划」。
+- `.platform/tasks.yaml` 不改：017 早已登记为 `ready`（依赖 015），012 至 016 都是 `done`；范围与验收标准不动。2026-11-03 对照 master 核对过：要删的 `whatsapp_service.py`、`webhooks.py`、`internal_whatsapp.py` 只被 `main.py` 与要删的测试导入，091 至 099 没有新加对它们或那六项配置的依赖，另外几处只在注释里提到，不影响删除。
 
 ---
 
