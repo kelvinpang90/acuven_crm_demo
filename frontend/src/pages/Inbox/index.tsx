@@ -27,6 +27,9 @@ export default function InboxPage() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Message | null>(null);
+  // Claims are shown by reply_claimed_until; one clock rechecks the list tags
+  // and the conversation header every 30 seconds, without a request.
+  const [now, setNow] = useState(Date.now());
   const requestSeq = useRef(0);
   const selectedCustomer = selected ? customerOf(selected) : undefined;
 
@@ -62,6 +65,10 @@ export default function InboxPage() {
 
   useEffect(() => { load(); }, [load]);
   useInboxChanges(() => { void load(true); });
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 30000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const handleFilterChange = (f: ChannelFilter) => {
     setFilter(f);
@@ -105,6 +112,12 @@ export default function InboxPage() {
   }, [selectedCustomer]);
 
   const handleSelect = (conversation: Conversation) => setSelected(conversation);
+
+  // The user can no longer see the open conversation, e.g. after reassigning it.
+  const handleClose = () => {
+    setSelected(null);
+    void load(true);
+  };
 
   // Opened from the new-message alert: show that conversation straight away.
   // It may not be on this page of the list, so read it here as well.
@@ -175,6 +188,7 @@ export default function InboxPage() {
               <MessageList
                 conversations={conversations}
                 selectedCustomer={selectedCustomer}
+                now={now}
                 onSelect={handleSelect}
               />
             )}
@@ -210,6 +224,9 @@ export default function InboxPage() {
                 contactId={customerOf(selected)}
                 contactName={selected.contact_name || farEndOf(selected)}
                 channel={selected.channel}
+                now={now}
+                onListChange={() => void load(true)}
+                onClose={handleClose}
               />
             </>
           ) : (
