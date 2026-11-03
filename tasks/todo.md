@@ -31,6 +31,27 @@
 
 ---
 
+## CRM-TASK-097 经 chatbot 读模板白名单与发模板消息的规则，含资格、频率、重试（2026-11-03）
+
+### 做了什么
+
+- 新服务 `backend/app/services/chatbot_template_service.py`：
+  - `list_templates()`：未配置返回 `NOT_CONFIGURED`；否则用现有的签名请求（`_post_chatbot`，总时限 30 秒）向 `/internal/crm/templates` 发 `{}`；200 且 `templates` 为列表时按第十五节第 10 条筛选合规项原样返回（name、language、body 为非空字符串，params 每项 label 为字符串、max_len 为正整数且不是布尔，正文 `{{n}}` 的序号集合恰好是 1 到参数个数），不合规项丢弃并打 WARNING；其他结果一律 `CHATBOT_FAILED`。
+  - `send_template(...)`：按第十五节第 8 条依次判 `NOT_FOUND` → 只读的 `CLAIMED` → `NO_PHONE` → `NO_OPT_IN`（没有 WhatsApp 入站）→ `TEMPLATE_PENDING`（有客服模板消息，且没有 WhatsApp 入站严格晚于最新那条的创建时间）→ `NOT_CONFIGURED` → 读白名单（`CHATBOT_FAILED`）→ `TEMPLATE_UNKNOWN` → `TEMPLATE_PARAMS`；读白名单前先提交结束读事务、之后重读联系人；再用文字发送同一个 `_take_claim` 抢或续认领，与新消息（三列模板字段、参数去首尾空白、按白名单渲染的正文）同一次提交，然后签名调用 `/internal/crm/send-template`。
+- `backend/app/services/chatbot_send_service.py`：把文字发送提交后的「调用 chatbot、分类结果、删行或保留」抽成 `_deliver_stored`，文字发送与模板发送共用，文字发送的行为不变；`retry_agent_reply` 遇到 `template_name` 非空的消息不查 24 小时窗口，改调 `/internal/crm/send-template`（同一个 request_id、存下的名字、语言与参数、存下的收件人、原发送人），其余检查与之后的处理不变。
+- 新测试 `backend/tests/test_chatbot_template_service.py`：打桩 HTTP 客户端充当 chatbot、独立重算每个请求的签名并核对路径与请求体；覆盖读白名单的合规、逐类丢弃不合规项、各类失败；发模板每个校验结果各一例（不存消息、不调用 send-template、不留认领）；`TEMPLATE_PENDING` 的同一秒与访客再来消息；读白名单期间被别人认领；第十二节例 8（三列、渲染正文、认领、`external_id`、`sent`、响应的 `body` 不覆盖、再发一条为 `TEMPLATE_PENDING`）与例 9；明确没发出删行、结果不明留行；模板重试在窗口已关时照样调用 send-template、其余重试检查不变；文字重试仍调用文字发送。每条测试写明守住的验收标准。
+- 没有改接口、请求模型、表结构、前端与事件处理。
+
+### 偏离了什么
+
+- 无
+
+### 验证到什么程度
+
+- 测试由 PR 的必需检查 backend 执行，检查结果由 Worker 和 CI 记录不写在这里。
+
+---
+
 ## CRM-TASK-096 消息表加模板名、语言与参数三列，供发送与重试模板消息（2026-11-03）
 
 ### 做了什么
