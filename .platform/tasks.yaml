@@ -2890,7 +2890,7 @@ tasks:
       按 docs/chatbot-phase3.md 第 5.3 节与第十五节第 6、8 条，在 CRM-TASK-097 的服务之上加读模板列表与发模板两个接口，把各结果映射成响应，
       消息接口返回模板名，供 CRM-TASK-099 使用；重试接口不改路径，模板消息由服务自行改调 send-template。
       只做接口层：不改业务规则、不改表结构、不改前端，不改会话事件接口。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-097
       - CRM-TASK-094
