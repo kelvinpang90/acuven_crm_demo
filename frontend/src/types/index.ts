@@ -38,6 +38,9 @@ export interface Contact {
   wa_handover_expires_at: string | null;
   wa_handover_updated_at: string | null;
   wa_reply_window_until: string | null;
+  reply_claimed_by: string | null;
+  reply_claimed_by_name: string | null;
+  reply_claimed_until: string | null;
   phone_conflict: boolean;
   deleted_at: string | null;
   created_at: string;
@@ -177,8 +180,22 @@ export interface ConversationTriage {
   triaged_at: string;
 }
 
+// Who is replying to a contact right now; all empty when nobody or expired
+// (docs/chatbot-phase3.md 5.2).
+export interface ReplyClaim {
+  reply_claimed_by: string | null;
+  reply_claimed_by_name: string | null;
+  reply_claimed_until: string | null;
+}
+
+// A successful claim; after a takeover, whose claim it replaced.
+export interface ClaimResult extends ReplyClaim {
+  taken_over_from: string | null;
+  taken_over_from_name: string | null;
+}
+
 // A customer's latest message, as one row of the grouped inbox.
-export interface Conversation extends Message {
+export interface Conversation extends Message, ReplyClaim {
   unread_count: number;
   triage: ConversationTriage | null;
 }

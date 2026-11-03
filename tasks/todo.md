@@ -33,6 +33,29 @@
 
 ---
 
+## CRM-TASK-095 收件箱显示与操作会话认领，遇到他人认领可接手后发送，会话头部可转派（2026-11-03）
+
+### 做了什么
+
+- `frontend/src/types/index.ts`：`Contact` 加 `reply_claimed_by`、`reply_claimed_by_name`、`reply_claimed_until`；新增 `ReplyClaim`（三项）与 `ClaimResult`（三项加 `taken_over_from`、`taken_over_from_name`）；`Conversation` 同时继承 `ReplyClaim`。
+- `frontend/src/services/contacts.ts`：新增 `claim(id, takeover)`（`POST /contacts/{id}/claim`，请求体 `{ takeover }`）与 `releaseClaim(id)`（`DELETE /contacts/{id}/claim`）；`activeClaim(claim, now)` 以 `reply_claimed_until` 判断有效认领，过期或没有认领返回空，名字查不到时用 id。
+- `frontend/src/pages/Inbox/index.tsx`：一个每 30 秒更新的时钟，同时传给会话列表与会话头部，到期只按当前时间重算、不额外请求；会话头部转派后可刷新列表，或在无权查看时关闭当前会话并刷新列表。
+- `frontend/src/pages/Inbox/MessageList.tsx`：每行在别人有有效认领时显示「X 正在处理」小标，自己的认领不显示，数据取会话列表返回的三项。
+- `frontend/src/pages/Inbox/ConversationView.tsx`：WhatsApp 会话头部显示认领状态（无人认领、自己正在处理到 HH:mm、X 正在处理到 HH:mm，本地时间），按钮按状态为认领、释放、接手（确认后带 `takeover` 调用认领接口）；成功后用返回的三项更新头部，接手时提示被接手的人；失败按错误码提示（`CLAIMED` 带认领人与到期时间、`NOT_ASSIGNED`、其余通用）。邮件会话不显示这些。经理与管理员在头部看到转派下拉，候选人取 `GET /api/users`，确认后用 `PUT /api/contacts/{id}` 只改 `assigned_to`；成功后重新读取联系人与会话消息，任一返回 403 或 404 即提示无权查看并关闭当前会话、刷新列表，否则刷新列表；失败按错误码提示（`FORBIDDEN`、`NOT_FOUND`、其余通用）。重试遇到 `CLAIMED` 只提示认领人与到期时间。
+- `frontend/src/pages/Inbox/ReplyBox.tsx`：发送返回 409 `CLAIMED` 时保留输入框内容，在回复框显示「X 正在处理此会话（到 HH:mm）」与「接手并发送」；接手先带 `takeover` 调用认领接口，成功后更新会话头部并用同一段文字再发送一次，发送结果的处理与原来相同；接手失败只提示原因、不发送。输入框文字改动后不再显示接手并发送。
+- `frontend/src/locales/en/inbox.json`、`frontend/src/locales/zh/inbox.json`：新文案同时加在两个语言的 inbox 命名空间。
+
+### 偏离了什么
+
+- 会话头部右侧原有的交还 AI、会话简报按钮与新加的认领按钮、转派下拉一起放进一个可换行的容器里，按钮排列方式随之改变。
+
+### 验证到什么程度
+
+- 前端类型检查与构建由 PR 的必需检查 frontend 执行，检查结果由 Worker 和 CI 记录不写在这里。
+- 没有在浏览器里实际操作过。
+
+---
+
 ## CRM-TASK-094 认领与释放接口，发送遇到他人认领返回冲突，列表与详情返回认领状态（2026-11-01）
 
 ### 做了什么

@@ -4,17 +4,24 @@ import toast from 'react-hot-toast';
 import axios from 'axios';
 import type { TFunction } from 'i18next';
 import { messagesApi } from '@/services/messages';
-import { contactsApi, type WhatsAppHandover } from '@/services/contacts';
+import { activeClaim, contactsApi, type WhatsAppHandover } from '@/services/contacts';
 import { aiApi } from '@/services/ai';
-import type { AiConversationBrief, AiLanguage, ApiError, Contact, Message } from '@/types';
+import { usersApi } from '@/services/users';
+import { useAuthStore } from '@/store/authStore';
+import type { AiConversationBrief, AiLanguage, ApiError, Contact, Message, ReplyClaim, User } from '@/types';
 import dayjs from 'dayjs';
 import { useInboxChanges } from '@/hooks/useInboxChanges';
-import ReplyBox from './ReplyBox';
+import ReplyBox, { claimErrorMessage, claimedMessage } from './ReplyBox';
 
 interface Props {
   contactId: string;
   contactName: string;
   channel: string;
+  // The inbox's 30-second clock, shared with the list tags.
+  now: number;
+  onListChange: () => void;
+  // The user can no longer see this conversation.
+  onClose: () => void;
 }
 
 function retryErrorMessage(error: unknown, t: TFunction<'inbox'>) {
@@ -33,8 +40,23 @@ function retryErrorMessage(error: unknown, t: TFunction<'inbox'>) {
     case 'RETRY_EXPIRED': return t('retryExpired');
     case 'IN_PROGRESS': return t('sendingInProgress');
     case 'NO_IDENTITY': return t('noWhatsAppIdentity');
+    case 'CLAIMED': return claimedMessage(apiError.fields, t);
     default: return t('sendFailed');
   }
+}
+
+function reassignErrorMessage(error: unknown, t: TFunction<'inbox'>) {
+  if (!axios.isAxiosError<ApiError>(error) || !error.response) return t('reassignFailed');
+  switch (error.response.data?.error?.code) {
+    case 'FORBIDDEN': return t('reassignForbidden');
+    case 'NOT_FOUND': return t('notAssigned');
+    default: return t('reassignFailed');
+  }
+}
+
+// A read the user may no longer make: the contact answers 404, its messages 403.
+function isRefused(error: unknown) {
+  return axios.isAxiosError(error) && (error.response?.status === 403 || error.response?.status === 404);
 }
 
 function handbackErrorMessage(error: unknown, t: TFunction<'inbox'>) {
@@ -92,8 +114,13 @@ function joinLatest(shown: Message[], page: Message[]) {
   return joint >= 0 ? [...shown.slice(0, joint), ...page] : null;
 }
 
-export default function ConversationView({ contactId, contactName, channel }: Props) {
+export default function ConversationView({ contactId, contactName, channel, now, onListChange, onClose }: Props) {
   const { t, i18n } = useTranslation('inbox');
+  const currentUser = useAuthStore((s) => s.user);
+  const canReassign = currentUser?.role === 'admin' || currentUser?.role === 'manager';
+  const [users, setUsers] = useState<User[]>([]);
+  const [claiming, setClaiming] = useState(false);
+  const [reassigning, setReassigning] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [contact, setContact] = useState<Contact | null>(null);
   const [loading, setLoading] = useState(true);
@@ -124,9 +151,11 @@ export default function ConversationView({ contactId, contactName, channel }: Pr
   activeContactId.current = contactId;
   shown.current = messages;
 
+  // Resolves true when the read was refused (403 or 404).
   const load = useCallback(async (mode: LoadMode = 'open') => {
-    if (activeContactId.current !== contactId) return;
+    if (activeContactId.current !== contactId) return false;
     const seq = ++loadSeq.current;
+    let refused = false;
     if (mode === 'open') setLoading(true);
     try {
       const res = await messagesApi.getContactMessages(contactId, { limit: PAGE_SIZE });
@@ -139,8 +168,11 @@ export default function ConversationView({ contactId, contactName, channel }: Pr
         if (mode === 'open' || !joinLatest(shown.current, page)) setHasOlder(page.length === PAGE_SIZE);
         setMessages((current) => (mode === 'open' ? page : joinLatest(current, page) ?? page));
       }
-    } catch { /* ignore */ }
+    } catch (error: unknown) {
+      refused = isRefused(error);
+    }
     if (activeContactId.current === contactId && seq === loadSeq.current) setLoading(false);
+    return refused;
   }, [contactId]);
 
   const loadOlder = async () => {
@@ -165,11 +197,15 @@ export default function ConversationView({ contactId, contactName, channel }: Pr
     if (hasOlder && !loadingOlder && (listRef.current?.scrollTop ?? 0) < 80) void loadOlder();
   };
 
+  // Resolves true when the read was refused (403 or 404).
   const loadContact = useCallback(async () => {
     try {
       const res = await contactsApi.getContact(contactId);
       if (activeContactId.current === contactId) setContact(res.data.data);
-    } catch { /* ignore */ }
+      return false;
+    } catch (error: unknown) {
+      return isRefused(error);
+    }
   }, [contactId]);
 
   useEffect(() => { load(); }, [load]);
@@ -196,11 +232,23 @@ export default function ConversationView({ contactId, contactName, channel }: Pr
     );
     return () => { active = false; };
   }, []);
+  // Candidates are the users the backend lets this user assign to.
+  useEffect(() => {
+    if (!canReassign) return undefined;
+    let active = true;
+    void usersApi.getUsers().then(
+      (res) => { if (active) setUsers(res.data.data ?? []); },
+      () => { if (active) setUsers([]); },
+    );
+    return () => { active = false; };
+  }, [canReassign]);
   useEffect(() => {
     setContact(null);
     setHasOlder(false);
     setLoadingOlder(false);
     setHandingBack(false);
+    setClaiming(false);
+    setReassigning(false);
     setBrief(null);
     setBriefing(false);
     setMessageTranslations({});
@@ -302,6 +350,77 @@ export default function ConversationView({ contactId, contactName, channel }: Pr
     }
   };
 
+  const claim = contact ? activeClaim(contact, now) : null;
+  const claimIsMine = !!claim && claim.userId === currentUser?.id;
+  const claimLabel = !claim
+    ? t('claimNone')
+    : claimIsMine
+      ? t('claimMine', { until: dayjs(claim.until).format('HH:mm') })
+      : t('claimOther', { name: claim.name, until: dayjs(claim.until).format('HH:mm') });
+
+  const applyClaim = (requestedContactId: string, next: ReplyClaim) => {
+    if (activeContactId.current !== requestedContactId) return;
+    setContact((current) => current ? {
+      ...current,
+      reply_claimed_by: next.reply_claimed_by,
+      reply_claimed_by_name: next.reply_claimed_by_name,
+      reply_claimed_until: next.reply_claimed_until,
+    } : current);
+  };
+
+  // Claim when nobody holds it, release one's own, take over someone else's.
+  const changeClaim = async () => {
+    if (claim && !claimIsMine && !window.confirm(t('takeoverConfirm', { name: claim.name, until: dayjs(claim.until).format('HH:mm') }))) return;
+    const requestedContactId = contactId;
+    setClaiming(true);
+    try {
+      if (claimIsMine) {
+        const response = await contactsApi.releaseClaim(requestedContactId);
+        applyClaim(requestedContactId, response.data.data);
+      } else {
+        const response = await contactsApi.claim(requestedContactId, !!claim);
+        const result = response.data.data;
+        applyClaim(requestedContactId, result);
+        if (result.taken_over_from && activeContactId.current === requestedContactId) {
+          toast(t('takenOver', { name: result.taken_over_from_name || result.taken_over_from }));
+        }
+      }
+    } catch (error: unknown) {
+      if (activeContactId.current === requestedContactId) toast.error(claimErrorMessage(error, t));
+    } finally {
+      if (activeContactId.current === requestedContactId) setClaiming(false);
+    }
+  };
+
+  // Changes only the owner, through the contact update. The new owner may put
+  // the conversation out of this user's reach; then it is closed.
+  const reassign = async (userId: string) => {
+    const user = users.find((candidate) => candidate.id === userId);
+    if (!user || !window.confirm(t('reassignConfirm', { name: user.name }))) return;
+    const requestedContactId = contactId;
+    setReassigning(true);
+    try {
+      await contactsApi.updateContact(requestedContactId, { assigned_to: user.id });
+    } catch (error: unknown) {
+      if (activeContactId.current === requestedContactId) {
+        toast.error(reassignErrorMessage(error, t));
+        setReassigning(false);
+      }
+      return;
+    }
+    if (activeContactId.current !== requestedContactId) return;
+    toast(t('reassigned', { name: user.name }));
+    const [contactRefused, messagesRefused] = await Promise.all([loadContact(), load('refresh')]);
+    if (activeContactId.current !== requestedContactId) return;
+    setReassigning(false);
+    if (contactRefused || messagesRefused) {
+      toast(t('reassignNoAccess'));
+      onClose();
+    } else {
+      onListChange();
+    }
+  };
+
   const createBrief = async () => {
     const requestedContactId = contactId;
     setBriefing(true);
@@ -351,7 +470,24 @@ export default function ConversationView({ contactId, contactName, channel }: Pr
                 {contact.wa_handover_active ? t('handoverActive', { expiresAt: dayjs(contact.wa_handover_expires_at).format('YYYY-MM-DD HH:mm') }) : t('aiReplying')}
               </p>
             )}
+            {channel === 'whatsapp' && contact && (
+              <p className="text-xs text-text-secondary mt-1">{claimLabel}</p>
+            )}
           </div>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+          {channel === 'whatsapp' && contact && (
+            <button type="button" className="btn-secondary text-xs" disabled={claiming} onClick={changeClaim}>
+              {!claim ? t('claim') : claimIsMine ? t('releaseClaim') : t('takeover')}
+            </button>
+          )}
+          {canReassign && contact && (
+            <select className="input w-auto text-xs" value="" disabled={reassigning || users.length === 0} onChange={(event) => void reassign(event.target.value)}>
+              <option value="" disabled>{t('reassign')}</option>
+              {users.filter((user) => user.id !== contact.assigned_to).map((user) => (
+                <option key={user.id} value={user.id}>{user.name}</option>
+              ))}
+            </select>
+          )}
           {channel === 'whatsapp' && contact && isHandoverActive(contact) && (
             <button type="button" className="btn-secondary text-xs" disabled={handingBack} onClick={handback}>
               {t('handbackToAi')}
@@ -362,6 +498,7 @@ export default function ConversationView({ contactId, contactName, channel }: Pr
               {briefing ? t('aiBriefLoading') : t('aiBrief')}
             </button>
           )}
+          </div>
         </div>
         <p className="text-xs text-text-muted">{t('conversation')} · {channel}</p>
         {visibleBrief && (
@@ -421,7 +558,7 @@ export default function ConversationView({ contactId, contactName, channel }: Pr
         ))}
       </div>
 
-      <ReplyBox contactId={contactId} channel={channel} waReplyWindowUntil={contact?.wa_reply_window_until} contactPhone={contact?.phone} aiEnabled={aiEnabled} messageCount={messages.length} onSent={handleSent} />
+      <ReplyBox contactId={contactId} channel={channel} waReplyWindowUntil={contact?.wa_reply_window_until} contactPhone={contact?.phone} aiEnabled={aiEnabled} messageCount={messages.length} onSent={handleSent} onClaimChange={(next) => applyClaim(contactId, next)} />
     </div>
   );
 }

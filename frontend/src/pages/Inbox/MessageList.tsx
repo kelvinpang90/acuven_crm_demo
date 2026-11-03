@@ -1,11 +1,15 @@
 import dayjs from 'dayjs';
 import { useTranslation } from 'react-i18next';
 import type { Conversation, ConversationTriage, TriageUrgency } from '@/types';
+import { activeClaim } from '@/services/contacts';
+import { useAuthStore } from '@/store/authStore';
 import { customerOf, farEndOf } from '@/utils/conversation';
 
 interface Props {
   conversations: Conversation[];
   selectedCustomer?: string;
+  // The inbox's 30-second clock, shared with the conversation header.
+  now: number;
   onSelect: (conversation: Conversation) => void;
 }
 
@@ -45,12 +49,17 @@ function TriageTags({ triage }: { triage: ConversationTriage }) {
 }
 
 // One row per customer: their latest message and how many inbound are unread.
-export default function MessageList({ conversations, selectedCustomer, onSelect }: Props) {
+export default function MessageList({ conversations, selectedCustomer, now, onSelect }: Props) {
+  const { t } = useTranslation('inbox');
+  const currentUserId = useAuthStore((s) => s.user?.id);
   return (
     <div className="space-y-1">
       {conversations.map((conversation) => {
         const customer = customerOf(conversation);
         const unread = conversation.unread_count > 0;
+        // Only someone else's claim gets a tag; one's own needs no warning.
+        const claim = activeClaim(conversation, now);
+        const claimedByOther = claim && claim.userId !== currentUserId ? claim : null;
         return (
           <button
             key={customer}
@@ -74,6 +83,11 @@ export default function MessageList({ conversations, selectedCustomer, onSelect 
               <p className={`text-xs truncate flex-1 ${unread ? 'text-text-secondary' : 'text-text-muted'}`}>
                 {conversation.subject || conversation.body}
               </p>
+              {claimedByOther && (
+                <span className="px-1.5 py-0.5 rounded bg-yellow-500/15 text-yellow-400 text-[10px] leading-none shrink-0">
+                  {t('claimBadge', { name: claimedByOther.name })}
+                </span>
+              )}
               {conversation.triage && <TriageTags triage={conversation.triage} />}
               {unread && (
                 <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-primary text-white text-[10px] leading-[18px] text-center shrink-0">

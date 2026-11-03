@@ -9,12 +9,28 @@ import type {
   DuplicateResult,
   AssignSuggestionRequest,
   AssignSuggestionResult,
+  ClaimResult,
+  ReplyClaim,
 } from '@/types';
 
 export interface WhatsAppHandover {
   wa_handover_active: boolean;
   wa_handover_expires_at: string | null;
   wa_handover_updated_at: string | null;
+}
+
+export interface ActiveClaim {
+  userId: string;
+  name: string;
+  until: string;
+}
+
+// The claim in effect at `now`; an expired one reads as nobody. The name falls
+// back to the id once the user is gone.
+export function activeClaim(claim: ReplyClaim, now: number): ActiveClaim | null {
+  const { reply_claimed_by: userId, reply_claimed_until: until } = claim;
+  if (!userId || !until || new Date(until).getTime() <= now) return null;
+  return { userId, name: claim.reply_claimed_by_name || userId, until };
 }
 
 export interface ContactListParams {
@@ -38,6 +54,12 @@ export const contactsApi = {
 
   handbackWhatsApp: (id: string) =>
     api.post<ApiResponse<WhatsAppHandover>>(`/contacts/${id}/whatsapp/handback`),
+
+  claim: (id: string, takeover = false) =>
+    api.post<ApiResponse<ClaimResult>>(`/contacts/${id}/claim`, { takeover }),
+
+  releaseClaim: (id: string) =>
+    api.delete<ApiResponse<ReplyClaim>>(`/contacts/${id}/claim`),
 
   checkDuplicates: (data: DuplicateCheckRequest) =>
     api.post<ApiResponse<DuplicateResult>>('/contacts/duplicate-check', data),

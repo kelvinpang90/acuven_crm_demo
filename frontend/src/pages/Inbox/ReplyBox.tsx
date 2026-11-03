@@ -3,9 +3,11 @@ import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 import type { TFunction } from 'i18next';
+import dayjs from 'dayjs';
 import { aiApi } from '@/services/ai';
+import { contactsApi } from '@/services/contacts';
 import { messagesApi } from '@/services/messages';
-import type { AiLanguage, ApiError } from '@/types';
+import type { AiLanguage, ApiError, ReplyClaim } from '@/types';
 
 interface Props {
   contactId: string;
@@ -15,6 +17,26 @@ interface Props {
   aiEnabled: boolean;
   messageCount: number;
   onSent: () => void;
+  onClaimChange: (claim: ReplyClaim) => void;
+}
+
+// The fields of a 409 CLAIMED: who is replying and until when (local time).
+export function claimedMessage(fields: ApiError['error']['fields'], t: TFunction<'inbox'>) {
+  const claim = fields || {};
+  return t('claimedBy', {
+    name: claim.claimed_by_name || claim.claimed_by || t('unknownUser'),
+    until: claim.claimed_until ? dayjs(claim.claimed_until).format('HH:mm') : t('unknownTime'),
+  });
+}
+
+export function claimErrorMessage(error: unknown, t: TFunction<'inbox'>) {
+  if (!axios.isAxiosError<ApiError>(error) || !error.response) return t('claimFailed');
+  const apiError = error.response.data?.error;
+  switch (apiError?.code) {
+    case 'CLAIMED': return claimedMessage(apiError?.fields, t);
+    case 'NOT_ASSIGNED': return t('notAssigned');
+    default: return t('claimFailed');
+  }
 }
 
 function whatsappErrorMessage(error: unknown, t: TFunction<'inbox'>) {
@@ -50,7 +72,7 @@ function defaultDraftLanguage(language: string): AiLanguage {
   return language.startsWith('en') ? 'en' : 'zh-CN';
 }
 
-export default function ReplyBox({ contactId, channel, waReplyWindowUntil, contactPhone, aiEnabled, messageCount, onSent }: Props) {
+export default function ReplyBox({ contactId, channel, waReplyWindowUntil, contactPhone, aiEnabled, messageCount, onSent, onClaimChange }: Props) {
   const { t, i18n } = useTranslation('inbox');
   const [message, setMessage] = useState('');
   const [subject, setSubject] = useState('');
@@ -62,6 +84,8 @@ export default function ReplyBox({ contactId, channel, waReplyWindowUntil, conta
   const [drafting, setDrafting] = useState(false);
   const [translating, setTranslating] = useState(false);
   const [now, setNow] = useState(Date.now());
+  // A send refused because someone else is replying, with the text it carried.
+  const [claimConflict, setClaimConflict] = useState<{ text: string; notice: string } | null>(null);
   const activeContactId = useRef(contactId);
   const previousContactId = useRef(contactId);
   const aiRequestVersion = useRef(0);
@@ -76,6 +100,8 @@ export default function ReplyBox({ contactId, channel, waReplyWindowUntil, conta
   const replyDisabled = !windowOpen || missingPhone;
   const normalizedMessage = message.trim();
   const translationInvalid = !normalizedMessage || Array.from(normalizedMessage).length > 2000;
+  // Takeover sends the same text, so the offer lasts only while it is unchanged.
+  const visibleConflict = claimConflict?.text === message ? claimConflict : null;
 
   useEffect(() => {
     if (!isWhatsApp || !waReplyWindowUntil) return undefined;
@@ -95,16 +121,17 @@ export default function ReplyBox({ contactId, channel, waReplyWindowUntil, conta
     setNoteForAgent('');
     setDrafting(false);
     setTranslating(false);
+    setClaimConflict(null);
   }, [contactId]);
 
-  const handleSubmit = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!normalizedMessage || sending || replyDisabled) return;
+  const send = async (text: string) => {
+    const requestedContactId = contactId;
     setSending(true);
     try {
-      const response = channel === 'email' ? await messagesApi.sendEmail(contactId, subject, message) : await messagesApi.sendWhatsApp(contactId, message);
+      const response = channel === 'email' ? await messagesApi.sendEmail(contactId, subject, text) : await messagesApi.sendWhatsApp(contactId, text);
       setMessage('');
       setSubject('');
+      setClaimConflict(null);
       if (response.status === 200 || response.status === 202) setNoteForAgent('');
       onSent();
       if (isWhatsApp && response.status === 202) toast(t('sentUnconfirmed'));
@@ -115,12 +142,44 @@ export default function ReplyBox({ contactId, channel, waReplyWindowUntil, conta
       } else if (!axios.isAxiosError(error) || !error.response) {
         onSent();
         toast.error(t('sendUnknownResult'));
+      } else if (error.response.data?.error?.code === 'CLAIMED') {
+        // The text stays in the box for takeover and send.
+        if (activeContactId.current === requestedContactId) {
+          setClaimConflict({ text, notice: claimedMessage(error.response.data.error.fields, t) });
+        }
       } else {
         toast.error(whatsappErrorMessage(error, t));
       }
     } finally {
       setSending(false);
     }
+  };
+
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!normalizedMessage || sending || replyDisabled) return;
+    await send(message);
+  };
+
+  // Take over the claim, then send the refused text again; no send if the takeover fails.
+  const takeoverAndSend = async () => {
+    if (!visibleConflict || sending || replyDisabled) return;
+    const { text } = visibleConflict;
+    const requestedContactId = contactId;
+    setSending(true);
+    try {
+      const response = await contactsApi.claim(requestedContactId, true);
+      if (activeContactId.current !== requestedContactId) return;
+      const claim = response.data.data;
+      onClaimChange(claim);
+      if (claim.taken_over_from) toast(t('takenOver', { name: claim.taken_over_from_name || claim.taken_over_from }));
+    } catch (error: unknown) {
+      if (activeContactId.current === requestedContactId) toast.error(claimErrorMessage(error, t));
+      return;
+    } finally {
+      setSending(false);
+    }
+    await send(text);
   };
 
   const createDraft = async () => {
@@ -170,6 +229,12 @@ export default function ReplyBox({ contactId, channel, waReplyWindowUntil, conta
       {channel === 'email' && <input className="input text-sm" placeholder={t('subject')} value={subject} disabled={replyDisabled} onChange={(event) => setSubject(event.target.value)} />}
       {isWhatsApp && !windowOpen && <p className="text-xs text-text-muted">{t('windowClosed')}</p>}
       {missingPhone && <p className="text-xs text-text-muted">{t('replyNoPhone')}</p>}
+      {visibleConflict && (
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-xs text-text-secondary">{visibleConflict.notice}</p>
+          <button type="button" className="btn-secondary text-xs" disabled={sending || replyDisabled} onClick={takeoverAndSend}>{t('takeoverAndSend')}</button>
+        </div>
+      )}
       {aiEnabled && (
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
