@@ -30,6 +30,29 @@
 
 ---
 
+## CRM-TASK-098 模板列表与发模板接口，消息返回模板名，重试接口支持模板消息（2026-11-03）
+
+### 做了什么
+
+- `backend/app/routers/messages.py`：
+  - 新增 `GET /api/messages/whatsapp/templates`（登录即可）：调 CRM-TASK-097 的 `list_templates()`，成功 200，`data` 为列表，每项只带 name、language、有则带 category、params 的 label 与 max_len、body；`NOT_CONFIGURED` 503，`CHATBOT_FAILED` 502。
+  - 新增 `POST /api/messages/whatsapp/send-template`：先过 `may_access_contact`（与文字发送同一个 403 `NOT_ASSIGNED`），再调 `send_template(...)`（模板名为去掉首尾空白后的值，发送人为当前用户），结果交给与文字发送共用的 `_send_result`。
+  - `_send_result` 按第十五节第 8 条补上 `NO_OPT_IN` 409、`TEMPLATE_PENDING` 409、`CHATBOT_FAILED` 502、`TEMPLATE_UNKNOWN` 422、`TEMPLATE_PARAMS` 422；已有的 `CLAIMED`、`NO_PHONE`、`NOT_CONFIGURED`、`SEND_FAILED`、已发出 200、结果不明 202 不变。重试接口的路径、权限与代码不变，模板消息由服务改调 send-template，结果走同一套映射。
+  - `_msg_to_dict` 多返回 `template_name`（文字消息为空）。
+- `backend/app/schemas/message.py`：新请求模型 `WhatsAppTemplateSendRequest`（contact_id；template_name 去首尾空白后 1 至 100 字符；language 1 至 20 字符；params 0 至 10 个字符串，每个去首尾空白后 1 至 1024 字符，且不含换行、回车、制表符、连续 4 个以上空格）；`MessageResponse` 加 `template_name`。
+- 新测试 `backend/tests/test_template_api.py`：模板列表的成功、空列表、两个错误码、登录即可与未登录被拒；发模板请求模型的各类 422（含换行、连续 5 个空格、超过 10 个参数）与边界值；归属的 403；每个结果的映射（含 CLAIMED 的 fields、SEND_FAILED 的 fields、200 与 202）；经真实服务、打桩 chatbot 的发模板 200 与 `NO_OPT_IN`；模板消息经现有重试接口的 200、202、502 与权限；消息列表、联系人消息、会话列表与文字发送返回的 `template_name`。每条测试写明守住的验收标准。
+- 没有改业务规则、表结构、前端与会话事件接口。
+
+### 偏离了什么
+
+- 标记已读接口（`PATCH /api/messages/{message_id}/read`）与其他接口共用 `_msg_to_dict`，返回的消息也多了 `template_name`，验收标准没有列这个接口。
+
+### 验证到什么程度
+
+- 测试由 PR 的必需检查 backend 执行，检查结果由 Worker 和 CI 记录不写在这里。
+
+---
+
 ## CRM-TASK-097 经 chatbot 读模板白名单与发模板消息的规则，含资格、频率、重试（2026-11-03）
 
 ### 做了什么
