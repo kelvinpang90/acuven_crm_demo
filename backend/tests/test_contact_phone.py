@@ -6,19 +6,18 @@ CRM-TASK-007 (docs/chatbot-events.md sections 3, 9.2 and P2):
   without a number alone, and the sync does not rewrite an unchanged number.
 - AC3: the conflict query returns, in normalized form, the given numbers that
   two or more non-deleted contacts share.
-- AC4: the Meta webhook and the gateway inbound attach a shared number's
-  message to the earliest created contact (lowest id on a tie) without erroring.
+
+The AC4 cases went through the Meta webhook and the gateway inbound, both
+removed by CRM-TASK-017 (docs/chatbot-replies.md section 7).
 """
 
 from datetime import datetime
 
 import pytest
-from sqlalchemy import func, select, update
+from sqlalchemy import select, update
 
-from app.config import settings
 from app.models.contact import Contact
-from app.models.message import Message
-from app.services import autocount_client, autocount_service, contact_service, whatsapp_service
+from app.services import autocount_client, autocount_service, contact_service
 from tests._people import ADMIN, REP
 
 # --- AC2: create ---
@@ -297,89 +296,3 @@ async def test_conflict_goes_away_when_a_contact_is_deleted(async_session_maker)
         await session.commit()
 
     assert await _conflicts(async_session_maker, ["60123456789"]) == set()
-
-
-# --- AC4: inbound attaches to the earliest created contact ---
-
-OLD = datetime(2026, 1, 1, 8, 0, 0)
-NEW = datetime(2026, 6, 1, 8, 0, 0)
-
-
-async def _seed_twins(session_maker, phone: str, same_time: bool) -> None:
-    """Two contacts on one number; the earlier one has the larger id when times differ."""
-    if same_time:
-        twins = [
-            Contact(id="c-b", name="B", phone=phone, created_at=OLD),
-            Contact(id="c-a", name="A", phone=phone, created_at=OLD),
-        ]
-    else:
-        twins = [
-            Contact(id="c-a", name="A", phone=phone, created_at=NEW),
-            Contact(id="c-z", name="Z", phone=phone, created_at=OLD),
-        ]
-    await _seed(session_maker, *twins)
-
-
-async def _message_owner(session_maker, external_id: str) -> str:
-    async with session_maker() as session:
-        query = select(Message.contact_id).where(Message.external_id == external_id)
-        return (await session.execute(query)).scalar_one()
-
-
-async def _contact_count(session_maker) -> int:
-    async with session_maker() as session:
-        return (await session.execute(select(func.count()).select_from(Contact))).scalar()
-
-
-def _wa_message(external_id: str) -> dict:
-    return {"from": "60123456789", "id": external_id, "type": "text", "text": {"body": "hi"}}
-
-
-@pytest.mark.parametrize(("same_time", "expected"), [(False, "c-z"), (True, "c-a")])
-async def test_meta_webhook_uses_the_earliest_contact(async_session_maker, same_time, expected):
-    """AC4: the Meta webhook stores the message on the earliest created contact
-    (lowest id on a tie) and creates no new one."""
-    await _seed_twins(async_session_maker, "60123456789", same_time)
-    payload = {"entry": [{"changes": [{"value": {"messages": [_wa_message("wamid.META1")]}}]}]}
-
-    async with async_session_maker() as session:
-        await whatsapp_service.process_inbound(session, payload)
-
-    assert await _message_owner(async_session_maker, "wamid.META1") == expected
-    assert await _contact_count(async_session_maker) == 2
-
-
-@pytest.mark.parametrize(("same_time", "expected"), [(False, "c-z"), (True, "c-a")])
-async def test_gateway_inbound_uses_the_earliest_contact(
-    client, async_session_maker, monkeypatch, same_time, expected
-):
-    """AC4: the gateway inbound does the same and still answers 200 with its receipt."""
-    monkeypatch.setattr(settings, "internal_shared_secret", "test-secret")
-    await _seed_twins(async_session_maker, "60123456789", same_time)
-
-    resp = await client.post(
-        "/internal/whatsapp/inbound",
-        json={"message": _wa_message("wamid.GW1")},
-        headers={"X-Internal-Secret": "test-secret"},
-    )
-
-    assert resp.status_code == 200
-    assert len(resp.json()["messages"]) == 1
-    assert await _message_owner(async_session_maker, "wamid.GW1") == expected
-    assert await _contact_count(async_session_maker) == 2
-
-
-async def test_deleted_earlier_contact_is_skipped(async_session_maker):
-    """AC4: only non-deleted contacts are candidates, as before."""
-    await _seed_twins(async_session_maker, "60123456789", same_time=False)
-    async with async_session_maker() as session:
-        await session.execute(
-            update(Contact).where(Contact.id == "c-z").values(deleted_at=datetime(2026, 7, 1))
-        )
-        await session.commit()
-    payload = {"entry": [{"changes": [{"value": {"messages": [_wa_message("wamid.META2")]}}]}]}
-
-    async with async_session_maker() as session:
-        await whatsapp_service.process_inbound(session, payload)
-
-    assert await _message_owner(async_session_maker, "wamid.META2") == "c-a"

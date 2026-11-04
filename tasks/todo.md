@@ -27,6 +27,38 @@
 
 ---
 
+## CRM-TASK-017 删掉 CRM 自己的 Meta webhook、网关入口与直连发送及其配置（2026-11-04）
+
+### 做了什么
+
+- 按 `docs/chatbot-replies.md` 第七节删掉 `backend/app/routers/webhooks.py`（`/api/webhooks/whatsapp` 的 GET 订阅校验与 POST 回调）、`backend/app/routers/internal_whatsapp.py`（`/internal/whatsapp/inbound` 网关入站）与 `main.py` 里的两处导入和挂载；删掉 `backend/app/services/whatsapp_service.py` 整个文件（Meta 验签与密钥未配时放行、吞异常的回调处理、入站解析与建联系人、网关回执、网关出站与 Graph 直连发送）。
+- `backend/app/config.py`：删掉 `whatsapp_phone_number_id`、`whatsapp_access_token`、`whatsapp_webhook_verify_token`、`whatsapp_app_secret`、`internal_shared_secret`、`whatsapp_gateway_base_url` 六项；`model_config` 加 `extra="ignore"`，照 `backend/.env.example` 复制的本地 `.env` 仍带这六项也能启动（第十四节第 9 条）。CHATBOT_EVENTS 与 CHATBOT_SEND 两组不动。
+- 测试：删掉 `test_internal_whatsapp.py`、`test_whatsapp_service_send.py`；`test_contact_phone.py` 删掉 AC4 一节（经旧 Meta 回调与网关入站的三个用例及其辅助函数）与不再用到的导入，号码规范化与冲突查询的用例不变。新增 `test_legacy_whatsapp_removed.py`：旧 webhook 的 GET、POST 与网关入站的 POST 都返回 404；带着六项旧键的环境文件能加载配置。
+- 文档：删掉 `WHATSAPP_GOLIVE.md`；`DEPLOY.md` 1.4 的环境变量示例删掉 WhatsApp 四项，加上 `CHATBOT_EVENTS_SECRET`、`CHATBOT_EVENTS_SECRET_PREVIOUS`、`CHATBOT_SEND_URL`、`CHATBOT_SEND_SECRET` 四项空值与说明（与 chatbot 一侧同值、两个方向不同值、PREVIOUS 只在轮换时填）；开头一句与第 5 节里「WhatsApp Webhook 公网入口」的说法同步改掉。
+- 没有改 nginx、部署配置、`backend/.env.example`、前端、表结构，没有动 `is_gateway`（CRM-TASK-018、019）。
+
+### 偏离了什么
+
+- `DEPLOY.md` 除了验收标准写的环境变量示例，还改了开头的「WhatsApp 集成暂不启用」与第 5 节指向已删 webhook 的那句，否则文档仍说 webhook 入口在用。
+- 新测试多了一条配置加载的用例，守 `extra="ignore"`，验收标准只要求了 404。
+- 其他文件里只在注释中提到 `whatsapp_service` 的几处（`utils/utc.py`、`utils/demo_scope.py`、`routers/messages.py`、`tests/test_utc_response.py`）不在本任务可改范围，没有改。
+- 六个文件的删除不是 Worker 做的：Worker 的实现会话只有读写编辑工具、删不了文件（控制面缺口，另开会话修），run 7ce2c5e8 因此评审不过、修复轮无改动而失败。2026-11-04 Kelvin 定由人工会话在同一分支补一个提交 `git rm` 这六个文件，其余改动仍是 Worker 的原提交；这次 PR 不经 Telegram「批准」，由人工会话验证 CI 后合并，收尾 PR 手工开。
+
+### 验证到什么程度
+
+- 后端测试由 PR 的必需检查 backend 执行，结果由 Worker 和 CI 记录，不写在这里。
+- 没有在真机或 VPS 上验证；生产经 compose 以环境变量注入，旧变量留着也不影响启动。
+
+### 留给 Kelvin 手工做
+
+- [ ] VPS 上 CRM 的 `.env` 删掉 `WHATSAPP_PHONE_NUMBER_ID`、`WHATSAPP_ACCESS_TOKEN`、`WHATSAPP_WEBHOOK_VERIFY_TOKEN`、`WHATSAPP_APP_SECRET`、`INTERNAL_SHARED_SECRET`、`WHATSAPP_GATEWAY_BASE_URL`，重建 backend 容器
+- [ ] Meta 开发者后台作废 CRM 那个 App 沙盒号的 token
+- [ ] Meta 开发者后台取消 CRM 的 webhook 订阅（或直接删掉 App）
+- [ ] `backend/.env.example` 删掉上面六项、补上 CHATBOT_ 四项（Worker 改不了这个文件）
+- [ ] nginx 里 CRM 域名的 `/api/webhooks/` 段留着无害（后端 404），要删另开运维改动
+
+---
+
 ## 补记第 2 阶段真机验收，解锁 CRM-TASK-017（2026-11-03）
 
 - 来由：CRM-TASK-017 在 planning-v1 里一直挂在「已阻塞：等第 2 阶段真机验收通过」。第 2 阶段 CRM-TASK-012 至 016 与 chatbot 侧 C3、C4 于 2026-10-22 部署，第二把密钥 2026-10-23 配好。
