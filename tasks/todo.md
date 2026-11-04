@@ -58,10 +58,10 @@
 
 ### 留给 Kelvin 手工做
 
-- [ ] VPS 上 CRM 的 `.env` 删掉 `WHATSAPP_PHONE_NUMBER_ID`、`WHATSAPP_ACCESS_TOKEN`、`WHATSAPP_WEBHOOK_VERIFY_TOKEN`、`WHATSAPP_APP_SECRET`、`INTERNAL_SHARED_SECRET`、`WHATSAPP_GATEWAY_BASE_URL`，重建 backend 容器
-- [ ] Meta 开发者后台作废 CRM 那个 App 沙盒号的 token
-- [ ] Meta 开发者后台取消 CRM 的 webhook 订阅（或直接删掉 App）
-- [ ] `backend/.env.example` 删掉上面六项、补上 CHATBOT_ 四项（Worker 改不了这个文件）
+- [x] VPS 上 CRM 的 `.env` 删掉 `WHATSAPP_PHONE_NUMBER_ID`、`WHATSAPP_ACCESS_TOKEN`、`WHATSAPP_WEBHOOK_VERIFY_TOKEN`、`WHATSAPP_APP_SECRET`、`INTERNAL_SHARED_SECRET`、`WHATSAPP_GATEWAY_BASE_URL`，重建 backend 容器
+- [x] Meta 开发者后台作废 CRM 那个 App 沙盒号的 token
+- [x] Meta 开发者后台取消 CRM 的 webhook 订阅（或直接删掉 App）：2026-11-04 核对账号下三个 App，没有回调指向 CRM 的订阅；另把 Acuven Messaging (RETIRED) 指向已停用网关的 WhatsApp 订阅删掉（Kelvin 同意）
+- [x] `backend/.env.example` 删掉上面六项、补上 CHATBOT_ 四项（Worker 改不了这个文件）：示例里原本只有 WhatsApp 四项，已换成 CHATBOT_ 四项与说明
 - [ ] nginx 里 CRM 域名的 `/api/webhooks/` 段留着无害（后端 404），要删另开运维改动
 
 ---
