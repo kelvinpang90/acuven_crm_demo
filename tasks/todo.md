@@ -14,15 +14,23 @@
 <!-- openclaw:planning-v1:begin -->
 ### 当前计划
 
+1. `CRM-TASK-018` 去掉 is_gateway 的全部用处，原有网关联系人回到列表与统计
 
 ### 已阻塞
 
 ### 后续计划
 
-- `CRM-TASK-018` 去掉 is_gateway 的全部用处，原有网关联系人回到列表与统计
 - `CRM-TASK-019` 联系人模型取消 is_gateway 映射，列先留在库里
 - `CRM-TASK-020` 删除联系人表的 is_gateway 列
 <!-- openclaw:planning-v1:end -->
+
+---
+
+## CRM-TASK-018 移入当前计划（2026-11-04）
+
+- 来由：CRM-TASK-017 于 2026-11-04 合并部署（#276）并收尾（#277），「当前计划」清空；018 依赖的 017 已完成，Kelvin 2026-11-04 定把 018 移进「当前计划」第 1 项。019、020 依赖 018，留在「后续计划」。
+- `.platform/tasks.yaml` 不改：018 早已登记为 `ready`，范围与验收标准不动。2026-11-04 对照 master 核对过：`utils/demo_scope.py` 仍被 `contact_service`、`deal_service`、`dashboard_service`、`analytics`、`pipeline` 五处调用，`chatbot_event_service` 仍显式写 `is_gateway=False`，与验收标准一致。
+- 注意：018 要删 `backend/app/utils/demo_scope.py` 与 `backend/tests/test_demo_scope.py` 两个文件。Worker 的实现会话目前删不了文件（017 的 run 7ce2c5e8 就因此失败，删除最后由人工补上），控制面修复另开会话在做；修复部署之前发「开启」，018 大概率同样失败。
 
 ---
 
