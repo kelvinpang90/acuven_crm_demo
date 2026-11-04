@@ -14,7 +14,6 @@
 <!-- openclaw:planning-v1:begin -->
 ### 当前计划
 
-1. `CRM-TASK-017` 删掉 CRM 自己的 Meta webhook、网关入口与直连发送及其配置
 
 ### 已阻塞
 

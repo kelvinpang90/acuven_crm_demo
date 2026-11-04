@@ -534,7 +534,7 @@ tasks:
       按 docs/chatbot-replies.md 第七节，在第 2 阶段真机验收之后删掉 CRM 自己的 WhatsApp 入口：Meta webhook（含吞异常返回 200、
       密钥未配时验签放行）、网关入站与出站、Graph 直连发送、相关配置、测试与上线指南。发送已由 CRM-TASK-013 至 015 接替。
       不改 nginx、部署配置与环境变量示例文件（由人另做），不动 is_gateway（CRM-TASK-018、019）。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-015
     acceptance_criteria:
