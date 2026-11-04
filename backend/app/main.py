@@ -15,7 +15,6 @@ from app.routers import (
     dashboard,
     deals,
     internal_chatbot,
-    internal_whatsapp,
     messages,
     pipeline,
     projects,
@@ -23,7 +22,6 @@ from app.routers import (
     sales_targets,
     tasks,
     users,
-    webhooks,
 )
 
 
@@ -69,7 +67,6 @@ app.include_router(users.router, prefix="/api/users", tags=["users"])
 app.include_router(tasks.router, prefix="/api/tasks", tags=["tasks"])
 app.include_router(pipeline.router, prefix="/api/pipeline", tags=["pipeline"])
 app.include_router(routing.router, prefix="/api/routing/rules", tags=["routing"])
-app.include_router(webhooks.router, prefix="/api/webhooks", tags=["Webhooks"])
 app.include_router(messages.router, prefix="/api/messages", tags=["messages"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["analytics"])
 app.include_router(ai.router, prefix="/api/ai", tags=["ai"])
@@ -77,9 +74,7 @@ app.include_router(sales_targets.router, prefix="/api/sales-targets", tags=["sal
 app.include_router(deals.router, prefix="/api/deals", tags=["deals"])
 app.include_router(projects.router, prefix="/api/projects", tags=["projects"])
 app.include_router(autocount.router, prefix="/api/autocount", tags=["autocount"])
-# No /api prefix: path must match whatsapp_gateway's demos_registry internal_base_url exactly.
-app.include_router(internal_whatsapp.router, prefix="/internal/whatsapp", tags=["internal"])
-# No /api prefix either: the path ai_chatbot_demo pushes to (docs/chatbot-events.md section 4).
+# No /api prefix: the path ai_chatbot_demo pushes to (docs/chatbot-events.md section 4).
 app.include_router(internal_chatbot.router, prefix="/internal/chatbot", tags=["internal"])
 
 

@@ -24,12 +24,6 @@ class Settings(BaseSettings):
     # Commit the image was built from (baked in by CI); reported by /api/health
     git_sha: str = "unknown"
 
-    # WhatsApp
-    whatsapp_phone_number_id: str = ""
-    whatsapp_access_token: str = ""
-    whatsapp_webhook_verify_token: str = ""
-    whatsapp_app_secret: str = ""
-
     # IMAP
     imap_host: str = ""
     imap_port: int = 993
@@ -50,10 +44,6 @@ class Settings(BaseSettings):
     autocount_key_id: str = ""
     autocount_api_key: str = ""
     autocount_poll_interval_seconds: int = 60
-
-    # Shared WhatsApp demo gateway (whatsapp_gateway)
-    internal_shared_secret: str = ""
-    whatsapp_gateway_base_url: str = ""
 
     # ai_chatbot_demo -> CRM conversation events (docs/chatbot-events.md section 4).
     # Same value as CRM_EVENTS_SECRET on the chatbot side; _previous holds the old
@@ -87,7 +77,9 @@ class Settings(BaseSettings):
             f"@{self.db_host}:{self.db_port}/{self.db_name}?charset=utf8mb4"
         )
 
-    model_config = {"env_file": ".env", "case_sensitive": False}
+    # extra="ignore": a .env copied from backend/.env.example still carries the
+    # removed WhatsApp keys (docs/chatbot-replies.md section 14, item 9).
+    model_config = {"env_file": ".env", "case_sensitive": False, "extra": "ignore"}
 
 
 settings = Settings()

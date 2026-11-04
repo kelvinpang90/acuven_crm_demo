@@ -1,6 +1,6 @@
 # CRM 部署手册（VPS + Docker Compose 共享栈 + GitHub Actions）
 
-> 适用场景：VPS 已有 nginx / mysql / redis 以 Docker Compose 编排运行，本项目复用这些基础设施，通过 GitHub Actions 自动部署，使用独立二级域名 + Let's Encrypt HTTPS。WhatsApp / Email 集成暂不启用。
+> 适用场景：VPS 已有 nginx / mysql / redis 以 Docker Compose 编排运行，本项目复用这些基础设施，通过 GitHub Actions 自动部署，使用独立二级域名 + Let's Encrypt HTTPS。Email 集成暂不启用；WhatsApp 经 ai_chatbot_demo 收发（见 1.4 的 CHATBOT_ 四项）。
 
 ---
 
@@ -137,11 +137,15 @@ REFRESH_TOKEN_EXPIRE_DAYS=7
 APP_ENV=production
 CORS_ORIGINS=https://crm.kelvinpeng.com
 
+# ai_chatbot_demo 对接（WhatsApp 经 chatbot 收发，CRM 不再直连 Meta）。
+# 每把密钥与 chatbot 一侧对应的那把同值；事件（chatbot → CRM）与发送（CRM → chatbot）两个方向的密钥必须不同值；
+# CHATBOT_EVENTS_SECRET_PREVIOUS 只在轮换时填旧密钥，平时留空。CHATBOT_SEND_URL 是 chatbot 内部基地址（含端口、不含路径）。
+CHATBOT_EVENTS_SECRET=
+CHATBOT_EVENTS_SECRET_PREVIOUS=
+CHATBOT_SEND_URL=
+CHATBOT_SEND_SECRET=
+
 # 集成（暂留空）
-WHATSAPP_PHONE_NUMBER_ID=
-WHATSAPP_ACCESS_TOKEN=
-WHATSAPP_WEBHOOK_VERIFY_TOKEN=
-WHATSAPP_APP_SECRET=
 IMAP_HOST=
 IMAP_PORT=993
 IMAP_USER=
@@ -406,9 +410,9 @@ docker logs -f crm_os-frontend-1
 
 ---
 
-## 5. 后续接入 WhatsApp / Email 时
+## 5. 后续接入 Email、改 chatbot 对接配置时
 
-只需在 VPS 的 `/opt/crm_os/.env` 填入对应字段，按 3.1 末尾先导出镜像变量，再 `docker compose up -d backend`（重建容器才会读到新的 `.env`），无需重新部署。WhatsApp Webhook 公网入口已通过 nginx `/api/webhooks/whatsapp` 暴露（HTTPS 已就绪）。
+只需在 VPS 的 `/opt/crm_os/.env` 填入对应字段，按 3.1 末尾先导出镜像变量，再 `docker compose up -d backend`（重建容器才会读到新的 `.env`），无需重新部署。WhatsApp 由 ai_chatbot_demo 收发（`docs/chatbot-events.md`、`docs/chatbot-replies.md`），CRM 自己的 Meta webhook 已删除。
 
 ---
 
