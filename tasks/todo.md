@@ -42,6 +42,7 @@
 - `DEPLOY.md` 除了验收标准写的环境变量示例，还改了开头的「WhatsApp 集成暂不启用」与第 5 节指向已删 webhook 的那句，否则文档仍说 webhook 入口在用。
 - 新测试多了一条配置加载的用例，守 `extra="ignore"`，验收标准只要求了 404。
 - 其他文件里只在注释中提到 `whatsapp_service` 的几处（`utils/utc.py`、`utils/demo_scope.py`、`routers/messages.py`、`tests/test_utc_response.py`）不在本任务可改范围，没有改。
+- 六个文件的删除不是 Worker 做的：Worker 的实现会话只有读写编辑工具、删不了文件（控制面缺口，另开会话修），run 7ce2c5e8 因此评审不过、修复轮无改动而失败。2026-11-04 Kelvin 定由人工会话在同一分支补一个提交 `git rm` 这六个文件，其余改动仍是 Worker 的原提交；这次 PR 不经 Telegram「批准」，由人工会话验证 CI 后合并，收尾 PR 手工开。
 
 ### 验证到什么程度
 
