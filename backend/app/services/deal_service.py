@@ -10,7 +10,6 @@ from app.models.activity import Activity
 from app.models.contact import Contact
 from app.models.deal import Deal
 from app.models.user import User
-from app.utils.demo_scope import deal_not_demo
 
 VALID_STATUSES = {"lead", "following", "negotiating", "won", "lost"}
 VALID_PRIORITIES = {"high", "mid", "low"}
@@ -46,7 +45,7 @@ async def list_deals(
     contact_id: Optional[str] = None,
 ) -> list[dict]:
     scope = await _scope_conditions(db, current_user)
-    query = select(Deal).where(Deal.deleted_at.is_(None), deal_not_demo(), *scope)
+    query = select(Deal).where(Deal.deleted_at.is_(None), *scope)
     if contact_id:
         query = query.where(Deal.contact_id == contact_id)
     query = query.order_by(Deal.created_at.desc())

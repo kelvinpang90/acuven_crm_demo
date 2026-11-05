@@ -26,6 +26,31 @@
 
 ---
 
+## CRM-TASK-018 去掉 is_gateway 的全部用处，原有网关联系人回到列表与统计（2026-11-05）
+
+### 做了什么
+
+- 按 `docs/chatbot-replies.md` 第八节去掉 `demo_scope` 的 5 处调用，其他条件不变：`contact_service.list_contacts` 去掉 `contact_not_demo()`；`deal_service.list_deals` 去掉 `deal_not_demo()`；`dashboard_service` 的 `_deal_in_stats`、`_contact_in_stats` 只剩「未删除」，`and_` 导入随之去掉；`routers/analytics.py` 的商机范围条件去掉 `deal_not_demo()`，渠道分布去掉 `message_not_demo()`；`routers/pipeline.py` 联系人子查询去掉 `contact_not_demo()`，注释同步改。
+- `chatbot_event_service` 新建联系人时不再写 `is_gateway=False`，靠模型默认值。后端 `app/` 下除模型外不再出现 `is_gateway`。
+- 测试：`test_contact_unassigned.py` 里无负责人的 `c-demo-orphan` 按新口径出现在未分派列表与管理员全量列表里（未分派 total 由 2 改 3，管理员全量多一个 id）；新增 `test_gateway_contacts_visible.py`（设计第十一节例 11）：`is_gateway` 为真的联系人及其商机出现在客户列表、商机列表、管道、管理员看板计数（今日新线索、新线索漏斗）与分析的商机范围条件里。
+- `utils/demo_scope.py` 与 `tests/test_demo_scope.py` 内容清空。
+
+### 偏离了什么
+
+- 两个文件没有删掉，只清空了：Worker 的实现会话仍只有读写编辑工具，删不了文件（同 017）。需要人工在同一分支补一个提交 `git rm backend/app/utils/demo_scope.py backend/tests/test_demo_scope.py`，删掉之前验收标准第 1、3 条的「删掉」不算完成。
+- 分析接口的渠道分布（消息口径）没有单独加测试：接口整体在 SQLite 上跑不起来（趋势查询用 MySQL 的 `date_format`），新测试沿用旧 `test_demo_scope` 的做法，只测商机范围条件。
+
+### 验证到什么程度
+
+- 后端测试由 PR 的必需检查 backend 执行，结果由 Worker 和 CI 记录，不写在这里。
+- 没有在真机或 VPS 上验证 2 个网关联系人回到列表与统计。
+
+### 留给 Kelvin 手工做
+
+- [ ] 在本分支 `git rm` 已清空的 `backend/app/utils/demo_scope.py` 与 `backend/tests/test_demo_scope.py`
+
+---
+
 ## CRM-TASK-018 移入当前计划（2026-11-04）
 
 - 来由：CRM-TASK-017 于 2026-11-04 合并部署（#276）并收尾（#277），「当前计划」清空；018 依赖的 017 已完成，Kelvin 2026-11-04 定把 018 移进「当前计划」第 1 项。019、020 依赖 018，留在「后续计划」。
