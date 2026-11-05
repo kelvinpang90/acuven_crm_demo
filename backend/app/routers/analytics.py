@@ -10,14 +10,13 @@ from app.dependencies import get_current_user
 from app.models.deal import Deal
 from app.models.message import Message
 from app.models.user import User
-from app.utils.demo_scope import deal_not_demo, message_not_demo
 from app.utils.response import ok
 
 router = APIRouter()
 
 
 async def _get_scoped_deal_conditions(current_user: User, db: AsyncSession) -> list:
-    conditions = [Deal.deleted_at.is_(None), deal_not_demo()]
+    conditions = [Deal.deleted_at.is_(None)]
     if current_user.role == "sales":
         conditions.append(Deal.assigned_to == current_user.id)
     elif current_user.role == "manager":
@@ -103,7 +102,7 @@ async def get_analytics(
             Message.channel,
             func.count(Message.id).label("cnt"),
         )
-        .where(Message.created_at >= since, message_not_demo())
+        .where(Message.created_at >= since)
         .group_by(Message.channel)
     )
     channels_raw = channel_q.all()

@@ -10,7 +10,6 @@ from app.models.deal import Deal
 from app.models.message import Message
 from app.models.user import User
 from app.services import access_service, claim_service, routing_service
-from app.utils.demo_scope import contact_not_demo
 from app.utils.phone import normalize_phone, phone_for_storage
 
 VALID_STATUSES = {"lead", "following", "negotiating", "won", "lost"}
@@ -33,7 +32,6 @@ async def list_contacts(
     query = select(Contact).where(
         Contact.deleted_at.is_(None),
         Contact.is_archived == is_archived,
-        contact_not_demo(),
     )
 
     # Data permission

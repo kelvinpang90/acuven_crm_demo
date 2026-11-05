@@ -182,7 +182,6 @@ async def _find_or_create_contact(
         name=(profile_name or phone or bsuid)[:CONTACT_NAME_MAX],
         phone=phone,
         whatsapp_bsuid=bsuid,
-        is_gateway=False,
     )
     db.add(contact)
     await db.flush()

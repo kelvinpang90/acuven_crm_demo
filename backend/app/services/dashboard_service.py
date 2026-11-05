@@ -1,7 +1,7 @@
 from datetime import date, datetime, timedelta
 from typing import Optional
 
-from sqlalchemy import and_, case, extract, func, select
+from sqlalchemy import case, extract, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.activity import Activity
@@ -10,7 +10,6 @@ from app.models.deal import Deal
 from app.models.sales_target import SalesTarget
 from app.models.task import Task
 from app.models.user import User
-from app.utils.demo_scope import contact_not_demo, deal_not_demo
 
 
 async def _get_team_ids(db: AsyncSession, manager_id: str) -> list[str]:
@@ -21,13 +20,13 @@ async def _get_team_ids(db: AsyncSession, manager_id: str) -> list[str]:
 
 
 def _deal_in_stats():
-    """Deals that count towards business figures: not deleted, not demo traffic."""
-    return and_(Deal.deleted_at.is_(None), deal_not_demo())
+    """Deals that count towards business figures: not deleted."""
+    return Deal.deleted_at.is_(None)
 
 
 def _contact_in_stats():
-    """Contacts that count towards business figures: not deleted, not demo traffic."""
-    return and_(Contact.deleted_at.is_(None), contact_not_demo())
+    """Contacts that count towards business figures: not deleted."""
+    return Contact.deleted_at.is_(None)
 
 
 # ---------------------------------------------------------------------------
