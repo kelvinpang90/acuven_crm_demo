@@ -14,7 +14,6 @@
 <!-- openclaw:planning-v1:begin -->
 ### 当前计划
 
-1. `CRM-TASK-018` 去掉 is_gateway 的全部用处，原有网关联系人回到列表与统计
 
 ### 已阻塞
 
