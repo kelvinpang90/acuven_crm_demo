@@ -571,7 +571,7 @@ tasks:
       按 docs/chatbot-replies.md 第八节（Q1 定为去掉标记、不删除），网关入口删掉后不再有代码写 is_gateway 为真，
       删掉 demo_scope 与它在客户列表、商机、看板、分析、管道的 5 处过滤，原有 2 个网关联系人从此和 chatbot 访客一样出现在列表与统计里。
       只做业务规则层：模型映射留给 CRM-TASK-019、删列留给 CRM-TASK-020，不改接口形状、不改前端。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-017
     acceptance_criteria:
