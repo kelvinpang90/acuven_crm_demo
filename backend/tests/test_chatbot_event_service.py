@@ -223,7 +223,6 @@ async def test_new_contact_is_created_assigned_and_gets_a_lead(async_session_mak
     contact = await _one(async_session_maker, Contact, Contact.phone == PHONE)
     assert contact.name == "Ann"
     assert contact.whatsapp_bsuid == BSUID
-    assert contact.is_gateway is False
     assert contact.assigned_to == "u-sales"
     deal = await _one(async_session_maker, Deal, Deal.contact_id == contact.id)
     assert deal.status == "lead"
@@ -618,15 +617,14 @@ async def test_edge_bsuid_visitor_later_shares_someone_elses_number(async_sessio
 
 
 async def test_edge_number_belongs_to_gateway_contact(async_session_maker):
-    """AC5 / section 8, case 2: the number is an is_gateway contact's -> the message is
-    attached to it, it stays is_gateway, no new contact or deal."""
-    await _seed(async_session_maker, _contact("c-gw", phone=PHONE, is_gateway=True))
+    """AC5 / section 8, case 2: the number is a (former) gateway contact's -> the message is
+    attached to it, no new contact or deal."""
+    await _seed(async_session_maker, _contact("c-gw", phone=PHONE))
     assert await _message_event(async_session_maker, phone=PHONE, profile_name="Ann") == "stored"
 
     message = await _one(async_session_maker, Message, Message.external_id == "wamid.1")
     assert message.contact_id == "c-gw"
     contact = await _one(async_session_maker, Contact, Contact.id == "c-gw")
-    assert contact.is_gateway is True
     assert contact.name == "c-gw"
     assert len(await _all(async_session_maker, Contact)) == 1
     assert await _all(async_session_maker, Deal) == []

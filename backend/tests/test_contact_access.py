@@ -25,7 +25,6 @@ async def _seed(session_maker) -> None:
                     name="Demo visitor",
                     phone="60144444444",
                     assigned_to="u-rep",
-                    is_gateway=True,
                 ),
                 Deal(id="d-mine", contact_id="c-mine", assigned_to="u-rep"),
                 Deal(id="d-theirs", contact_id="c-theirs", assigned_to="u-other"),

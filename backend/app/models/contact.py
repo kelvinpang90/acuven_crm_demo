@@ -36,9 +36,6 @@ class Contact(Base):
     # No fuzzy matching: invoice/quotation sync only links documents whose
     # debtorCode equals this value.
     autocount_customer_code: Mapped[str | None] = mapped_column(String(12), nullable=True)
-    # True for contacts that came in through the shared WhatsApp demo gateway
-    # (whatsapp_gateway) rather than this project's own WhatsApp number.
-    is_gateway: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     # WhatsApp business-scoped user id from ai_chatbot_demo events: the channel
     # identity of visitors who don't share their number (docs/chatbot-events.md).
     whatsapp_bsuid: Mapped[str | None] = mapped_column(String(128), nullable=True)
@@ -65,7 +62,6 @@ class Contact(Base):
         Index("idx_deleted_at", "deleted_at"),
         Index("idx_is_archived", "is_archived"),
         Index("idx_autocount_customer_code", "autocount_customer_code"),
-        Index("idx_contacts_is_gateway", "is_gateway"),
         Index("idx_contacts_whatsapp_bsuid", "whatsapp_bsuid", unique=True),
         Index("idx_contacts_phone", "phone"),
     )

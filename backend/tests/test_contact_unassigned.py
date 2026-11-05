@@ -45,7 +45,6 @@ async def _seed(session_maker) -> None:
                     name="Demo orphan",
                     phone="60188888888",
                     assigned_to=None,
-                    is_gateway=True,
                 ),
             ]
         )
@@ -65,7 +64,7 @@ def _ids(page) -> set[str]:
 
 async def test_admin_sees_only_unassigned_with_matching_total(client, async_session_maker):
     """AC1: unassigned=1 returns only ownerless customers, and total counts just those.
-    CRM-TASK-018 AC3: an ownerless is_gateway contact is listed like any other."""
+    CRM-TASK-018 AC3: an ownerless former gateway contact is listed like any other."""
     await _seed(async_session_maker)
     page = await _list(client, ADMIN, unassigned=1)
     assert _ids(page) == {"c-orphan", "c-orphan-2", "c-demo-orphan"}
@@ -75,7 +74,7 @@ async def test_admin_sees_only_unassigned_with_matching_total(client, async_sess
 
 async def test_total_is_filtered_count_across_pages(client, async_session_maker):
     """AC1: total is the filtered count, not the page length, when paging applies.
-    CRM-TASK-018 AC3: the ownerless is_gateway contact counts towards that total."""
+    CRM-TASK-018 AC3: the ownerless former gateway contact counts towards that total."""
     await _seed(async_session_maker)
     page = await _list(client, ADMIN, unassigned=1, page_size=1)
     assert len(page["data"]) == 1
@@ -128,7 +127,7 @@ async def test_assigned_to_with_unassigned_is_empty(client, async_session_maker)
 )
 async def test_omitted_or_zero_leaves_list_unchanged(client, async_session_maker, user, expected):
     """AC2: leaving unassigned out or passing 0 gives the same list as before.
-    CRM-TASK-018 AC3: admins also see the is_gateway contact in the full list."""
+    CRM-TASK-018 AC3: admins also see the former gateway contact in the full list."""
     await _seed(async_session_maker)
     omitted = await _list(client, user)
     zero = await _list(client, user, unassigned=0)

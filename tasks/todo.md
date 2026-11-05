@@ -25,6 +25,31 @@
 
 ---
 
+## CRM-TASK-019 联系人模型取消 is_gateway 映射，列先留在库里（2026-11-05）
+
+### 做了什么
+
+- 按 `docs/chatbot-replies.md` 第八节与第十四节第 12 条，`backend/app/models/contact.py` 删掉 `is_gateway` 字段及其注释，`__table_args__` 删掉 `idx_contacts_is_gateway`。没有加迁移，库里的列（迁移 010 起带数据库默认值 false）与索引不动，留给 CRM-TASK-020。
+- 测试：`test_access`、`test_contact_access`、`test_contact_unassigned` 构造联系人时去掉 `is_gateway=True`，断言不变；`test_contact_unassigned` 里三处 CRM-TASK-018 AC3 的 docstring 改称「former gateway contact」。`test_chatbot_event_service` 去掉新建联系人的 `is_gateway is False` 断言，与第八节例 2 里构造参数和 `is_gateway is True` 断言，其余断言不变，例 2 的 docstring 同步改。
+- 新增 `test_contact_model_unmapped.py`：模型的列与索引各自恰好等于逐个写出的集合（不含网关标记及其索引）；按模型建表后新建联系人能写入并读回。
+- `test_gateway_contacts_visible.py` 已清空，待人工删除（见下）。
+
+### 偏离了什么
+
+- `backend/tests/test_gateway_contacts_visible.py` 的删除不是 Worker 做的：实现会话仍只有读写编辑工具、删不了文件（同 017、018），只能把它清空。要照 018 由人工在本分支补一个 `git rm`。
+- 新测试没有写出 `is_gateway` 这个词（验收第 2 条不许测试里出现），改为把期望的列与索引全部列出来做等值断言，效果相同：这一列或索引换回来都会让断言失败。
+
+### 验证到什么程度
+
+- 后端测试由 PR 的必需检查 backend 执行，结果由 Worker 和 CI 记录，不写在这里。
+- 没有在真实 MySQL 上验证：库里还有这一列时，取消映射后插入是否靠数据库默认值写入成功。
+
+### 留给 Kelvin 手工做
+
+- [ ] 在本分支 `git rm` 已清空的 `backend/tests/test_gateway_contacts_visible.py`
+
+---
+
 ## CRM-TASK-019 移入当前计划（2026-11-05）
 
 - 来由：CRM-TASK-018 于 2026-11-05 合并部署（#280）并收尾（#281），「当前计划」清空；019 依赖的 018 已完成，Kelvin 2026-11-05 定把 019 移进「当前计划」第 1 项。020 依赖 019，留在「后续计划」。
