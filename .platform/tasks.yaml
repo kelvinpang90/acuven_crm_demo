@@ -606,7 +606,7 @@ tasks:
       按 docs/chatbot-replies.md 第八节与第十四节第 12 条，在 CRM-TASK-018 部署（代码已不读这一列）之后，从 Contact 模型去掉 is_gateway，
       让下一次部署删列（CRM-TASK-020）时，正在运行的版本与回滚目标都已不映射这一列。列有数据库默认值 false，取消映射后插入照常。
       只改模型映射与测试：不加迁移、不改服务、接口、前端。
-    status: ready
+    status: done
     depends_on:
       - CRM-TASK-018
     acceptance_criteria:
