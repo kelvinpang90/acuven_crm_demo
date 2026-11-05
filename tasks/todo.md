@@ -14,7 +14,6 @@
 <!-- openclaw:planning-v1:begin -->
 ### 当前计划
 
-1. `CRM-TASK-019` 联系人模型取消 is_gateway 映射，列先留在库里
 
 ### 已阻塞
 
