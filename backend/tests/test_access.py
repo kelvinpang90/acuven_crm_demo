@@ -47,7 +47,6 @@ async def _seed_conversations(session_maker) -> None:
                     name="Demo visitor",
                     phone="60144444444",
                     assigned_to="u-rep",
-                    is_gateway=True,
                 ),
                 Message(
                     id="m-mine",
