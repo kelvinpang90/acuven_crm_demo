@@ -14,14 +14,22 @@
 <!-- openclaw:planning-v1:begin -->
 ### 当前计划
 
+1. `CRM-TASK-019` 联系人模型取消 is_gateway 映射，列先留在库里
 
 ### 已阻塞
 
 ### 后续计划
 
-- `CRM-TASK-019` 联系人模型取消 is_gateway 映射，列先留在库里
 - `CRM-TASK-020` 删除联系人表的 is_gateway 列
 <!-- openclaw:planning-v1:end -->
+
+---
+
+## CRM-TASK-019 移入当前计划（2026-11-05）
+
+- 来由：CRM-TASK-018 于 2026-11-05 合并部署（#280）并收尾（#281），「当前计划」清空；019 依赖的 018 已完成，Kelvin 2026-11-05 定把 019 移进「当前计划」第 1 项。020 依赖 019，留在「后续计划」。
+- `.platform/tasks.yaml` 不改：019 早已登记为 `ready`，范围与验收标准不动。2026-11-05 对照 master 核对过：除迁移 `011_rename_is_demo_to_is_gateway.py` 外，出现 `is_gateway` 的只有 `models/contact.py` 与 `test_access`、`test_contact_access`、`test_contact_unassigned`、`test_chatbot_event_service`、`test_gateway_contacts_visible` 五个测试，全部在 `allowed_change_paths` 内，与验收标准一致。
+- 注意：019 要删 `backend/tests/test_gateway_contacts_visible.py`。控制面修复 ACVDEV-TASK-128（实现会话能删文件）尚未合并部署；之前发「开启」，019 大概率同 017、018 一样失败，删除要人工补。
 
 ---
 
