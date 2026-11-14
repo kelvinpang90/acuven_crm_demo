@@ -304,7 +304,13 @@ GitHub → 仓库 → Settings → Actions → General → Workflow permissions�
   docker login ghcr.io（使用 GITHUB_TOKEN）
   CRM_IMAGE_REPO=ghcr.io/<owner>/acuven_crm_demo bash deploy/deploy.sh <DEPLOY_SHA>
   ```
-  `deploy/deploy.sh`：记下正在跑的版本 → 拉新镜像 → 先跑迁移 → 换容器 → 等 healthcheck → 不健康就回滚到原版本并以失败结束 → 清理本项目旧镜像
+  `deploy/deploy.sh`：取主机级部署锁 → 记下正在跑的版本 → 拉新镜像 → 先跑迁移 → 换容器 → 等 healthcheck → 不健康就回滚到原版本并以失败结束 → 清理本项目旧镜像
+- **主机级部署锁**：同一台主机上合并即部署的各项目（ai_billing_hub、acuven-shop、acuven_stock_core、本项目）共用一把 `flock`，默认锁文件 `/run/lock/acuven-deploy.lock`（`ACUVEN_DEPLOY_LOCK` 可覆盖），部署一个接一个跑。起因是别的项目部署成功后的 `image prune` 撞上本项目的 `compose pull`（或反过来），containerd 报错、部署失败。
+  - 持锁范围是整个 `deploy.sh`：从记下正在跑的版本起，经迁移、换容器、回滚，到清理旧镜像；脚本退出时由内核释放，不会留下死锁。上线后在 runner 上跑的健康检查不在锁内。
+  - 锁被占时日志出现 `another deploy holds the host lock (<持锁方>); waiting up to 300s`，最多等 300 秒（`ACUVEN_DEPLOY_LOCK_WAIT` 可覆盖）；取得后日志出现 `holding the host deploy lock`。
+  - 等不到锁时，在执行任何 docker 命令之前失败退出，报 `nothing has been changed (re-run this job)`：线上没动，**在 Actions 里重跑这个 job 即可**。连续等不到，说明持锁方在回滚、等健康超时或卡住了，先去看它的日志。
+  - deploy job 的 `timeout-minutes` 为 17：等锁 5 分钟 + 部署加回滚约 7 分钟 + 上线后健康检查 5 分钟。
+  - 约定与参与名单登记在 vps_infra 的 README「部署串行化」一节；新项目照抄同一段。
 - **结论**：最后轮询 `HEALTHCHECK_URL`，响应里出现这次的 SHA 才算成功
 - **并发控制**：同时只允许一个部署，且不取消正在跑的那个
 
@@ -350,7 +356,7 @@ docker compose exec backend python seed.py
 
 1. 本机改代码 → 提 PR → 合并到 `master`
 2. GHA 自动按 1.6.3 部署这个提交；Actions 里那次运行绿了，就表示线上 `/api/health` 已报出这个 SHA
-3. 运行失败时看日志：迁移失败则旧版本仍在跑；新版本不健康会自动回滚到部署前的版本（运行仍记为失败）
+3. 运行失败时看日志：迁移失败则旧版本仍在跑；新版本不健康会自动回滚到部署前的版本（运行仍记为失败）；等主机级部署锁超时（`the host deploy lock was not free within 300s`）则什么都没改，重跑该 job（见 1.6.3）
 4. backend 容器重启时会有 ~5-10 秒 502 短暂中断（单实例代价）
 
 > 服务器上的 `/opt/crm_os` 现在停在某个提交的 detached HEAD，**不要再在里面 `git pull`**。

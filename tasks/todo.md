@@ -25,6 +25,25 @@
 
 ---
 
+## CRM-TASK-100 部署脚本加主机级部署锁，同一主机上各项目的部署依次进行（2026-11-14）
+
+### 做了什么
+
+- `deploy/deploy.sh`：在参数检查与两个镜像变量赋值之后、记下正在跑的版本之前，插入方案 D 的锁片段（项目名 `crm_os`）。四个项目共用 `/run/lock/acuven-deploy.lock`（`ACUVEN_DEPLOY_LOCK` 可覆盖），被占时日志写明持锁方并最多等 300 秒（`ACUVEN_DEPLOY_LOCK_WAIT` 可覆盖）；等不到、没有 `flock`、锁文件打不开都在执行任何 docker 命令之前 `die … nothing has been changed`；取得后尽力写下持锁方，记 `holding the host deploy lock`。锁随进程退出释放，覆盖迁移、换容器、回滚与清理旧镜像。文件头「顺序」一行补上「取主机级部署锁」。
+- `.github/workflows/deploy.yml`：deploy job 的 `timeout-minutes` 12 → 17；文件头 D5 注释合计 24 → 29 分钟。`on:` 与 `concurrency` 不动。
+- `DEPLOY.md`：1.6.3 加「主机级部署锁」一条（共用一把锁、持锁范围、等待上限、日志里的两行、等锁超时后重跑该 job、17 分钟怎么来的）；3.1 第 3 步补上等锁超时的处理。
+
+### 偏离了什么
+
+- 打开锁文件那一句没有逐字照抄方案片段：原写法 `exec 9>>"$DEPLOY_LOCK" 2>/dev/null` 的 `2>/dev/null` 会对整个脚本生效，之后 `compose pull`、迁移、`up` 的报错全部从部署日志消失（ai_billing_hub 的会话先发现，本会话在 WSL 里复现）。改成 `{ exec 9>>"$DEPLOY_LOCK"; } 2>/dev/null || { exec 9<"$DEPLOY_LOCK"; } 2>/dev/null`，只让这一句静音；锁路径与 `flock` 用法不变，与其他项目照样互斥。
+
+### 验证到什么程度
+
+- 在 WSL 的 Ubuntu 24.04（util-linux 2.39.3 的真 `flock`）里，用只记录调用的假 `docker` 跑本分支的 `deploy.sh`，锁文件指到临时目录：锁空闲时直接取得并走完；另一进程持锁 8 秒、等待上限 30 秒时，先打出持锁方与 waiting，约 7 秒后取得并走完；另一进程持锁 20 秒、等待上限 3 秒时，3 秒后以 1 退出，假 `docker` 一次都没被调用。修复后假 `docker` 写到 stderr 的内容在输出里可见。完整输出在 PR 描述里。
+- 没有在生产主机上跑过；真正的跨项目排队要等合并后批量部署时，从 Actions 日志里看 `another deploy holds the host lock`。
+
+---
+
 ## 登记 CRM-TASK-100 部署主机锁（2026-11-14）
 
 - 来由：同一台主机上多个项目合并即部署。一个项目部署成功后的 `docker image prune` 恰好落在另一个项目 `compose pull` 的几秒里，containerd 报错、部署失败（2026-10-27、11-03、11-14 三次；前两次正是本项目部署成功后的清理撞上 ai_billing_hub 拉镜像）。GitHub Actions 的 `concurrency` 只在单个仓库内生效，挡不住跨仓库。
