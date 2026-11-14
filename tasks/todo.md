@@ -20,7 +20,6 @@
 ### 后续计划
 
 - `CRM-TASK-020` 删除联系人表的 is_gateway 列
-- `CRM-TASK-100` 部署脚本加主机级部署锁，同一主机上各项目的部署依次进行
 <!-- openclaw:planning-v1:end -->
 
 ---
