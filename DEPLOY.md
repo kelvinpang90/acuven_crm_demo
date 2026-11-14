@@ -309,7 +309,7 @@ GitHub → 仓库 → Settings → Actions → General → Workflow permissions�
   - 持锁范围是整个 `deploy.sh`：从记下正在跑的版本起，经迁移、换容器、回滚，到清理旧镜像；脚本退出时由内核释放，不会留下死锁。上线后在 runner 上跑的健康检查不在锁内。
   - 锁被占时日志出现 `another deploy holds the host lock (<持锁方>); waiting up to 300s`，最多等 300 秒（`ACUVEN_DEPLOY_LOCK_WAIT` 可覆盖）；取得后日志出现 `holding the host deploy lock`。
   - 等不到锁时，在执行任何 docker 命令之前失败退出，报 `nothing has been changed (re-run this job)`：线上没动，**在 Actions 里重跑这个 job 即可**。连续等不到，说明持锁方在回滚、等健康超时或卡住了，先去看它的日志。
-  - deploy job 的 `timeout-minutes` 为 17：等锁 5 分钟 + 部署加回滚约 7 分钟 + 上线后健康检查 5 分钟。
+  - 超时：SSH 步骤 `command_timeout: 13m`（ssh-action 默认 10 分钟不够：等锁 5 分钟 + 部署加回滚约 7 分钟，约 12 分钟）；deploy job 的 `timeout-minutes` 为 17（成功路径最坏约 14 分钟：等锁 5 + 部署约 4 + 上线后健康检查 5；走到回滚时健康检查不执行）。
   - 约定与参与名单登记在 vps_infra 的 README「部署串行化」一节；新项目照抄同一段。
 - **结论**：最后轮询 `HEALTHCHECK_URL`，响应里出现这次的 SHA 才算成功
 - **并发控制**：同时只允许一个部署，且不取消正在跑的那个

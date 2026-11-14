@@ -31,11 +31,13 @@
 
 - `deploy/deploy.sh`：在参数检查与两个镜像变量赋值之后、记下正在跑的版本之前，插入方案 D 的锁片段（项目名 `crm_os`）。四个项目共用 `/run/lock/acuven-deploy.lock`（`ACUVEN_DEPLOY_LOCK` 可覆盖），被占时日志写明持锁方并最多等 300 秒（`ACUVEN_DEPLOY_LOCK_WAIT` 可覆盖）；等不到、没有 `flock`、锁文件打不开都在执行任何 docker 命令之前 `die … nothing has been changed`；取得后尽力写下持锁方，记 `holding the host deploy lock`。锁随进程退出释放，覆盖迁移、换容器、回滚与清理旧镜像。文件头「顺序」一行补上「取主机级部署锁」。
 - `.github/workflows/deploy.yml`：deploy job 的 `timeout-minutes` 12 → 17；文件头 D5 注释合计 24 → 29 分钟。`on:` 与 `concurrency` 不动。
+- 同一文件的 Deploy 步骤加 `command_timeout: 13m`，注释写明原因：ssh-action v1.0.3 默认 10 分钟，加锁后最坏约 12 分钟（等锁 5 + 部署与回滚约 7），默认值会在部署中途切断 SSH。
 - `DEPLOY.md`：1.6.3 加「主机级部署锁」一条（共用一把锁、持锁范围、等待上限、日志里的两行、等锁超时后重跑该 job、17 分钟怎么来的）；3.1 第 3 步补上等锁超时的处理。
 
 ### 偏离了什么
 
 - 打开锁文件那一句没有逐字照抄方案片段：原写法 `exec 9>>"$DEPLOY_LOCK" 2>/dev/null` 的 `2>/dev/null` 会对整个脚本生效，之后 `compose pull`、迁移、`up` 的报错全部从部署日志消失（ai_billing_hub 的会话先发现，本会话在 WSL 里复现）。改成 `{ exec 9>>"$DEPLOY_LOCK"; } 2>/dev/null || { exec 9<"$DEPLOY_LOCK"; } 2>/dev/null`，只让这一句静音；锁路径与 `flock` 用法不变，与其他项目照样互斥。
+- `command_timeout: 13m` 不在登记的验收标准里：shop 会话发现默认 10 分钟不够，Kelvin 2026-11-14 补充批准（方案第 8 节第 11 条），四个仓库在各自的 PR 里顺带改。
 
 ### 验证到什么程度
 
